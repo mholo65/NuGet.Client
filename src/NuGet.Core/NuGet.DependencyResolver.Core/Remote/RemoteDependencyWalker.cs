@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.LibraryModel;
 using NuGet.RuntimeModel;
@@ -105,6 +106,8 @@ namespace NuGet.DependencyResolver
                 };
             }
 
+            var noWarn = new Dictionary<string, IEnumerable<NuGetLogCode>>();
+
             foreach (var dependency in node.Item.Data.Dependencies)
             {
                 // Skip dependencies if the dependency edge has 'all' excluded and
@@ -126,6 +129,7 @@ namespace NuGet.DependencyResolver
                             runtimeGraph,
                             ChainPredicate(predicate, node, dependency),
                             innerEdge));
+                        noWarn.Add(dependency.Name, dependency.NoWarn);
                     }
                     else
                     {
@@ -154,7 +158,11 @@ namespace NuGet.DependencyResolver
                 tasks.Remove(task);
                 var dependencyNode = await task;
                 dependencyNode.OuterNode = node;
-
+                if (noWarn.ContainsKey(dependencyNode.Key.Name))
+                {
+                    dependencyNode.Item.Data.NoWarn = noWarn[dependencyNode.Key.Name]
+                        .ToList();
+                }
                 node.InnerNodes.Add(dependencyNode);
             }
 
