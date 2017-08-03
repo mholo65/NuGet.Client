@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImageManifest
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns="http://schemas.microsoft.com/VisualStudio/ImageManifestSchema/2014"
+  xmlns:nuget="clr-namespace:NuGet.PackageManagement.UI">
+  <Symbols>
+    <Guid Name="PackageIconMonikers" Value="{8F5EAE8F-9892-4CE2-826C-764BEDE6D2EC}" />
+    <ID Name="PrefixReservedIndicator" Value="1" />
+  </Symbols>
+  <Images>
+    <Image Guid="$(PackageIconMonikers)" ID="$(PrefixReservedIndicator)">
+      <Source Uri="$(nuget:PrefixReservedIndicator)" />
+    </Image>
+  </Images>
+</ImageManifest>

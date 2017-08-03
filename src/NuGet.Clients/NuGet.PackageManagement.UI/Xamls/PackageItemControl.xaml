@@ -4,6 +4,7 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+  xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"  
   x:Name="_self"
   mc:Ignorable="d"
   xmlns:nuget="clr-namespace:NuGet.PackageManagement.UI"
@@ -159,7 +160,7 @@
                         VerticalAlignment="Top"
                         Text="{Binding Id}" />
                       <!-- prefix reservation indicator -->
-                      <nuget:UpdateAvailableIndicator
+                      <imaging:CrispImage
                         x:Name="_prefixReservedMark"
                         Grid.Row="0"
                         Margin="5,5,0,0"
@@ -167,7 +168,8 @@
                         Height="13"
                         VerticalAlignment="Top"
                         Visibility="{Binding PrefixReserved, Converter={StaticResource BooleanToVisibilityConverter}}"
-                        ToolTip="{x:Static nuget:Resources.Tooltip_PrefixReserved}" />
+                        ToolTip="{x:Static nuget:Resources.Tooltip_PrefixReserved}"
+                        Moniker="{x:Static nuget:PackageIconMonikers.PrefixReservedIndicator}" />
                       <!-- author and download count -->
                       <nuget:AuthorAndDownloadCount
                         Margin="5,4,0,0"
