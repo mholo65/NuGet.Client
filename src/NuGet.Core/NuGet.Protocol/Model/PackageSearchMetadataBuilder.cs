@@ -36,6 +36,7 @@ namespace NuGet.Protocol.Core.Types
             public string Summary { get; set; }
             public string Tags { get; set; }
             public string Title { get; set; }
+            public bool PrefixReserved { get { return true;  } set { } }
 
             public AsyncLazy<IEnumerable<VersionInfo>> LazyVersionsFactory { get; set; }
 

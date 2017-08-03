@@ -39,11 +39,12 @@ namespace NuGet.Protocol
         private readonly string _packageHashAlgorithm;
         private readonly NuGetVersion _minClientVersion;
         private const string NullString = "null";
+        private readonly bool _prefixReserved;
 
         public V2FeedPackageInfo(PackageIdentity identity, string title, string summary, string description, IEnumerable<string> authors, IEnumerable<string> owners,
             string iconUrl, string licenseUrl, string projectUrl, string reportAbuseUrl,
             string tags, DateTimeOffset? created, DateTimeOffset? lastEdited, DateTimeOffset? published, string dependencies, bool requireLicenseAccept, string downloadUrl, string downloadCount,
-            string packageHash, string packageHashAlgorithm, NuGetVersion minClientVersion)
+            string packageHash, string packageHashAlgorithm, NuGetVersion minClientVersion, bool prefixReserved)
             : base(identity.Id, identity.Version)
         {
             _summary = summary;
@@ -68,6 +69,7 @@ namespace NuGet.Protocol
             _packageHash = packageHash;
             _packageHashAlgorithm = packageHashAlgorithm;
             _minClientVersion = minClientVersion;
+            _prefixReserved = prefixReserved;
         }
 
         public string Title
@@ -219,6 +221,14 @@ namespace NuGet.Protocol
             get
             {
                 return _dependencies;
+            }
+        }
+
+        public bool PrefixReserved
+        {
+            get
+            {
+                return _prefixReserved;
             }
         }
 

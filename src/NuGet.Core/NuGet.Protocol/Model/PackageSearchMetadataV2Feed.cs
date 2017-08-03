@@ -33,6 +33,7 @@ namespace NuGet.Protocol
             Title = package.Title;
             Version = package.Version;
             IsListed = package.IsListed;
+            PrefixReserved = package.PrefixReserved;
 
             long count;
             if (long.TryParse(package.DownloadCount, out count))
@@ -60,6 +61,7 @@ namespace NuGet.Protocol
             Title = package.Title;
             Version = package.Version;
             IsListed = package.IsListed;
+            PrefixReserved = package.PrefixReserved;
 
             long count;
             if (long.TryParse(package.DownloadCount, out count))
@@ -87,6 +89,8 @@ namespace NuGet.Protocol
         public string PackageId { get; private set; }
 
         public Uri ProjectUrl { get; private set; }
+
+        public bool PrefixReserved { get; private set; }
 
         public DateTimeOffset? Created { get; private set; }
 

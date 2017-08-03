@@ -55,6 +55,7 @@ namespace NuGet.Protocol
         private static readonly XName _xnamePackageHash = XName.Get("PackageHash", DataServicesNS);
         private static readonly XName _xnamePackageHashAlgorithm = XName.Get("PackageHashAlgorithm", DataServicesNS);
         private static readonly XName _xnameMinClientVersion = XName.Get("MinClientVersion", DataServicesNS);
+        private static readonly XName _xnamePrefixReserved = XName.Get("PrefixReserved", DataServicesNS);
 
         private readonly HttpSource _httpSource;
         private readonly string _baseAddress;
@@ -381,10 +382,12 @@ namespace NuGet.Protocol
                 authors = authorNode.Elements(_xnameName).Select(e => metadataCache.GetString(e.Value));
             }
 
+            bool prefixReserved = StringComparer.OrdinalIgnoreCase.Equals(bool.TrueString, GetString(properties, _xnamePrefixReserved));
+
             return new V2FeedPackageInfo(new PackageIdentity(identityId, version), title, summary, description, authors,
                 owners, iconUrl, licenseUrl, projectUrl, reportAbuseUrl, tags, created, lastEdited, published,
                 dependencies, requireLicenseAcceptance, downloadUrl, downloadCount, packageHash, packageHashAlgorithm,
-                minClientVersion);
+                minClientVersion, prefixReserved);
         }
 
         /// <summary>

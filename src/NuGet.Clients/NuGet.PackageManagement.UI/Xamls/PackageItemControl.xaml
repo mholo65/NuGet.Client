@@ -158,6 +158,16 @@
                         AutomationProperties.AutomationId="id"
                         VerticalAlignment="Top"
                         Text="{Binding Id}" />
+                      <!-- prefix reservation indicator -->
+                      <nuget:UpdateAvailableIndicator
+                        x:Name="_prefixReservedMark"
+                        Grid.Row="0"
+                        Margin="5,5,0,0"
+                        Width="13"
+                        Height="13"
+                        VerticalAlignment="Top"
+                        Visibility="{Binding PrefixReserved, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        ToolTip="{x:Static nuget:Resources.Tooltip_PrefixReserved}" />
                       <!-- author and download count -->
                       <nuget:AuthorAndDownloadCount
                         Margin="5,4,0,0"

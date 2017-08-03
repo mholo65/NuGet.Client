@@ -306,7 +306,8 @@ namespace NuGet.PackageManagement.UI
                         DownloadCount = metadata.DownloadCount,
                         Summary = metadata.Summary,
                         Versions = AsyncLazy.New(() => metadata.GetVersionsAsync()),
-                        AllowedVersions = allowedVersions
+                        AllowedVersions = allowedVersions,
+                        PrefixReserved = metadata.PrefixReserved
                     };
                     listItem.UpdatePackageStatus(_installedPackages);
 
