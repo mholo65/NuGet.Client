@@ -209,12 +209,16 @@ namespace NuGetConsole.Host.PowerShell.Implementation
             {
                 Assumes.Present(_solutionManager);
 
-                if (_solutionManager.DefaultNuGetProject == null)
+                return NuGetUIThreadHelper.JoinableTaskFactory.Run(async () =>
                 {
-                    return null;
-                }
+                    var defaultProject = await _solutionManager.DefaultNuGetProjectAsync();
+                    if (defaultProject == null)
+                    {
+                        return null;
+                    }
 
-                return GetDisplayName(_solutionManager.DefaultNuGetProject);
+                    return await GetDisplayNameAsync(defaultProject);
+                });
             }
         }
 
@@ -339,7 +343,7 @@ namespace NuGetConsole.Host.PowerShell.Implementation
 
                 while (retries < ExecuteInitScriptsRetriesLimit)
                 {
-                    if (_solutionManager.IsAllProjectsNominated())
+                    if (await _solutionManager.IsAllProjectsNominatedAsync())
                     {
                         await ExecuteInitScriptsAsync();
                         break;
@@ -680,32 +684,38 @@ namespace NuGetConsole.Host.PowerShell.Implementation
 
             return NuGetUIThreadHelper.JoinableTaskFactory.Run(async delegate
                 {
-                    await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    var allProjects = await _solutionManager.GetNuGetProjectsAsync();
 
-                    var allProjects = _solutionManager.GetNuGetProjects();
-                    _projectSafeNames = allProjects.Select(_solutionManager.GetNuGetProjectSafeName).ToArray();
-                    var displayNames = allProjects.Select(GetDisplayName).ToArray();
-                    Array.Sort(displayNames, _projectSafeNames, StringComparer.CurrentCultureIgnoreCase);
+                    var projectSafeNames = new List<string>();
+                    var displayNames = new List<string>();
+
+                    foreach (var project in allProjects)
+                    {
+                        projectSafeNames.Add(await _solutionManager.GetNuGetProjectSafeNameAsync(project));
+                        displayNames.Add(await GetDisplayNameAsync(project));
+                    }
+
+                    _projectSafeNames = projectSafeNames.ToArray();
+                    Array.Sort(displayNames.ToArray(), _projectSafeNames, StringComparer.CurrentCultureIgnoreCase);
                     return _projectSafeNames;
                 });
         }
 
-        private string GetDisplayName(NuGetProject nuGetProject)
+        private async Task<string> GetDisplayNameAsync(NuGetProject nuGetProject)
         {
-            var vsProjectAdapter = _solutionManager.GetVsProjectAdapter(nuGetProject);
+            var vsProjectAdapter = await _solutionManager.GetVsProjectAdapterAsync(nuGetProject);
 
             var name = vsProjectAdapter.CustomUniqueName;
-            if (IsWebSite(vsProjectAdapter))
+            if (await IsWebSiteAsync(vsProjectAdapter))
             {
                 name = PathHelper.SmartTruncate(name, 40);
             }
             return name;
         }
 
-        private static bool IsWebSite(IVsProjectAdapter project)
+        private async static Task<bool> IsWebSiteAsync(IVsProjectAdapter project)
         {
-            return NuGetUIThreadHelper.JoinableTaskFactory.Run(
-                async () => (await project.GetProjectTypeGuidsAsync()).Contains(VsProjectTypes.WebSiteProjectTypeGuid));
+            return (await project.GetProjectTypeGuidsAsync()).Contains(VsProjectTypes.WebSiteProjectTypeGuid);
         }
 
         #region ITabExpansion
