@@ -12,7 +12,7 @@ namespace NuGet.PackageManagement.UI
     {
         public UpdateAvailableIndicator()
         {
-            InitializeComponent();
+            //InitializeComponent();
         }
     }
 }

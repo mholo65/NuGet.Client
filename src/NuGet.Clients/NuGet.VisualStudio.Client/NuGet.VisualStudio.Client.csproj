@@ -98,6 +98,10 @@
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <None Include="project.json" />
+    <Content Include="..\NuGet.PackageManagement.UI\Monikers\PackageIconMonikers.imagemanifest">
+      <Link>Modules\NuGet\PackageIconMonikers.imagemanifest</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\NuGet.Core\NuGet.Build.Tasks\NuGet.Build.Tasks.csproj">
