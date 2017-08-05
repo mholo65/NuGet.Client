@@ -7,10 +7,30 @@
     <String Name="Resources" Value="/NuGet.PackageManagement.UI;Component/" />
     <Guid Name="PackageIconMonikers" Value="{8F5EAE8F-9892-4CE2-826C-764BEDE6D2EC}" />
     <ID Name="PrefixReservedIndicator" Value="1" />
+    <ID Name="PrefixReservedIndicatorReversed" Value="2" />
+    <ID Name="UpdateAvailableIndicator" Value="3" />
+    <ID Name="UninstallIndicator" Value="4" />
+    <ID Name="DownloadIndicator" Value="5" />
+    <ID Name="InstalledIndicator" Value="6" />
   </Symbols>
   <Images>
     <Image Guid="$(PackageIconMonikers)" ID="$(PrefixReservedIndicator)">
+      <Source Uri="$(Resources)/Xamls/PrefixReservedIndicator.xaml" />
+    </Image>
+    <Image Guid="$(PackageIconMonikers)" ID="$(PrefixReservedIndicatorReversed)">
+      <Source Uri="$(Resources)/Xamls/PrefixReservedIndicatorReversed.xaml" />
+    </Image>
+    <Image Guid="$(PackageIconMonikers)" ID="$(UpdateAvailableIndicator)">
       <Source Uri="$(Resources)/Xamls/UpdateAvailableIndicator.xaml" />
+    </Image>
+    <Image Guid="$(PackageIconMonikers)" ID="$(UninstallIndicator)">
+      <Source Uri="$(Resources)/Xamls/UninstallIndicator.xaml" />
+    </Image>
+    <Image Guid="$(PackageIconMonikers)" ID="$(DownloadIndicator)">
+      <Source Uri="$(Resources)/Xamls/DownloadIndicator.xaml" />
+    </Image>
+    <Image Guid="$(PackageIconMonikers)" ID="$(InstalledIndicator)">
+      <Source Uri="$(Resources)/Xamls/InstalledIndicator.xaml" />
     </Image>
   </Images>
   <ImageLists />

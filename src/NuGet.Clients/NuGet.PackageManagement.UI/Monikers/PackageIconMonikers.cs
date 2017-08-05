@@ -7,7 +7,17 @@ namespace NuGet.PackageManagement.UI
     {
         private static readonly Guid ManifestGuid = new Guid("8F5EAE8F-9892-4CE2-826C-764BEDE6D2EC");
         private const int _prefixReservedIndicator = 1;
+        private const int _prefixReservedIndicatorReserved = 2;
+        private const int _updateAvailableIndicator = 3;
+        private const int _uninstallIndicator = 4;
+        private const int _downloadIndicator = 5;
+        private const int _installedIndicator = 6;
 
         public static ImageMoniker PrefixReservedIndicator => new ImageMoniker { Guid = ManifestGuid, Id = _prefixReservedIndicator };
+        public static ImageMoniker PrefixReservedIndicatorSelected => new ImageMoniker { Guid = ManifestGuid, Id = _prefixReservedIndicatorReserved };
+        public static ImageMoniker UpdateAvailableIndicator => new ImageMoniker { Guid = ManifestGuid, Id = _updateAvailableIndicator };
+        public static ImageMoniker UninstallIndicator => new ImageMoniker { Guid = ManifestGuid, Id = _uninstallIndicator };
+        public static ImageMoniker DownloadIndicator => new ImageMoniker { Guid = ManifestGuid, Id = _downloadIndicator };
+        public static ImageMoniker InstalledIndicator => new ImageMoniker { Guid = ManifestGuid, Id = _installedIndicator };
     }
 }

@@ -211,25 +211,16 @@
     <Compile Include="Xamls\Spinner.xaml.cs">
       <DependentUpon>Spinner.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Xamls\UninstallButton.xaml.cs">
-      <DependentUpon>UninstallButton.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Xamls\FileConflictDialog.xaml.cs">
       <DependentUpon>FileConflictDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="Xamls\FilterLabel.xaml.cs">
       <DependentUpon>FilterLabel.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Xamls\InstalledIndicator.xaml.cs">
-      <DependentUpon>InstalledIndicator.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Xamls\InfiniteScrollList.xaml.cs">
       <DependentUpon>InfiniteScrollList.xaml</DependentUpon>
     </Compile>
     <Compile Include="Converters\NullToVisibilityConverter.cs" />
-    <Compile Include="Xamls\InstallIButton.xaml.cs">
-      <DependentUpon>InstallIButton.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Xamls\OptionsControl.xaml.cs">
       <DependentUpon>OptionsControl.xaml</DependentUpon>
     </Compile>
@@ -255,12 +246,6 @@
     <Compile Include="Xamls\LicenseAcceptanceWindow.xaml.cs">
       <DependentUpon>LicenseAcceptanceWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Xamls\UpdateAvailableIndicator.xaml.cs">
-      <DependentUpon>UpdateAvailableIndicator.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Xamls\UpdateButton.xaml.cs">
-      <DependentUpon>UpdateButton.xaml</DependentUpon>
-    </Compile>
   </ItemGroup>
   <ItemGroup>
     <DesignDataWithDesignTimeCreatableTypes Include="Design\LoadingStatusViewModelSampleData.xaml">
@@ -277,9 +262,25 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="Xamls\DownloadIndicator.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Xamls\InstalledIndicator.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Xamls\PackageManagementFormatWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Xamls\PrefixReservedIndicator.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Xamls\PrefixReservedIndicatorReversed.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <Page Include="Xamls\RestartRequestBar.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -321,10 +322,6 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="Xamls\UninstallButton.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="Xamls\FileConflictDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -333,17 +330,9 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Xamls\InstalledIndicator.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="Xamls\InfiniteScrollList.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
-    </Page>
-    <Page Include="Xamls\InstallIButton.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Xamls\OptionsControl.xaml">
       <SubType>Designer</SubType>
@@ -381,11 +370,11 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Resource Include="Xamls\UpdateAvailableIndicator.xaml">
-      <SubType>Designer</SubType>
+    <Page Include="Xamls\UninstallIndicator.xaml">
       <Generator>MSBuild:Compile</Generator>
-    </Resource>
-    <Page Include="Xamls\UpdateButton.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Xamls\UpdateAvailableIndicator.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

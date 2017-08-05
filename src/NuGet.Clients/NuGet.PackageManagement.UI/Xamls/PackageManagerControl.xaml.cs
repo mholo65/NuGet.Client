@@ -682,6 +682,16 @@ namespace NuGet.PackageManagement.UI
 
         private void PackageList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            //TODO: selected is not used for this, try to find a way to compare monikers properly
+            if (_packageList.SelectedItem.PrefixReservedIndicatorMoniker == PackageIconMonikers.PrefixReservedIndicatorSelected)
+            {
+                _packageList.SelectedItem.PrefixReservedIndicatorMoniker = PackageIconMonikers.PrefixReservedIndicatorSelected;
+            }
+            else
+            {
+                _packageList.SelectedItem.PrefixReservedIndicatorMoniker = PackageIconMonikers.PrefixReservedIndicator;
+            }
+
             NuGetUIThreadHelper.JoinableTaskFactory.RunAsync(UpdateDetailPaneAsync);
         }
 
