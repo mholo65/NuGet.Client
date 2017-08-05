@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26726.0
+VisualStudioVersion = 15.0.26730.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{BD1946CE-5544-4F28-A04A-9C3D51113E1A}"
 EndProject
@@ -207,7 +207,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuGet.Build.Tasks.Test", "t
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuGetConsole.Host.PowerShell.Test", "test\NuGet.Clients.Tests\NuGetConsole.Host.PowerShell.Test\NuGetConsole.Host.PowerShell.Test.csproj", "{96E9B926-60A1-48BD-9EC8-8ED1F6746ECD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NuGet.Localization", "src\NuGet.Core\NuGet.Localization\NuGet.Localization.csproj", "{B1BE7458-1A1B-4C38-B99B-08301A6D5A70}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuGet.Localization", "src\NuGet.Core\NuGet.Localization\NuGet.Localization.csproj", "{B1BE7458-1A1B-4C38-B99B-08301A6D5A70}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

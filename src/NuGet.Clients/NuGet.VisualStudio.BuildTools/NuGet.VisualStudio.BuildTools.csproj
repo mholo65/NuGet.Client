@@ -5,11 +5,11 @@
   <Import Project="$(VSSDKRoot)\build\Microsoft.VSSDK.BuildTools.props" />
   <PropertyGroup>
     <Shipping>true</Shipping>
-    <ProjectGuid>{3B96F91B-3B58-40ED-B06E-5CD133A79A63}</ProjectGuid>
+    <ProjectGuid>{AD7FFF41-7A1B-475F-8502-9DE38BD83586}</ProjectGuid>
     <ProjectTypeGuids>{82b43b9b-a64c-4715-b499-d71e9ca2bd60};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>NuGet.VisualStudio.Client</RootNamespace>
+    <RootNamespace>NuGet.VisualStudio.BuildTools</RootNamespace>
     <GeneratePkgDefFile>false</GeneratePkgDefFile>
     <IncludeAssemblyInVSIXContainer>false</IncludeAssemblyInVSIXContainer>
     <IncludeCopyLocalReferencesInVSIXContainer>true</IncludeCopyLocalReferencesInVSIXContainer>
@@ -19,8 +19,8 @@
     <CopyOutputSymbolsToOutputDirectory>false</CopyOutputSymbolsToOutputDirectory>
     <DeployExtension>false</DeployExtension>
     <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
-    <AssemblyName>NuGet.VisualStudio.Client</AssemblyName>
-    <TargetVsixContainerName>NuGet.Tools.vsix</TargetVsixContainerName>
+    <AssemblyName>NuGet.VisualStudio.BuildTools</AssemblyName>
+    <TargetVsixContainerName>NuGet.BuildTools.vsix</TargetVsixContainerName>
     <VSSDKTargetPlatformRegRootSuffix>Exp</VSSDKTargetPlatformRegRootSuffix>
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
     <FileUpgradeFlags />
@@ -54,48 +54,12 @@
     <Content Include="source.extension.vs15.insertable.vsixmanifest" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\NuGetConsole.Host.PowerShell\Scripts\about_NuGet.PackageManagement.PowerShellCmdlets.help.txt">
-      <Link>Modules\NuGet\about_NuGet.PackageManagement.PowerShellCmdlets.help.txt</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="..\NuGetConsole.Host.PowerShell\Scripts\NuGet.PackageManagement.PowerShellCmdlets.dll-Help.xml">
-      <Link>Modules\NuGet\NuGet.PackageManagement.PowerShellCmdlets.dll-Help.xml</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
     <Content Include="$(SolutionPackagesFolder)Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll">
       <Link>Newtonsoft.Json.dll</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Content Include="$(SolutionPackagesFolder)Microsoft.Web.Xdt.2.1.1\lib\net40\Microsoft.Web.XmlTransform.dll">
       <Link>Microsoft.Web.XmlTransform.dll</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="$(SolutionPackagesFolder)Lucene.Net.3.0.3\lib\NET40\Lucene.Net.dll">
-      <Link>Lucene.Net.dll</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="..\NuGetConsole.Host.PowerShell\Scripts\Add-WrapperMembers.ps1">
-      <Link>Modules\NuGet\Add-WrapperMembers.ps1</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="..\NuGetConsole.Host.PowerShell\Scripts\NuGet.Format.ps1xml">
-      <Link>Modules\NuGet\NuGet.Format.ps1xml</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="..\NuGetConsole.Host.PowerShell\Scripts\NuGet.psd1">
-      <Link>Modules\NuGet\NuGet.psd1</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="..\NuGetConsole.Host.PowerShell\Scripts\nuget.psm1">
-      <Link>Modules\NuGet\nuget.psm1</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="..\NuGetConsole.Host.PowerShell\Scripts\NuGet.Types.ps1xml">
-      <Link>Modules\NuGet\NuGet.Types.ps1xml</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-    <Content Include="..\NuGetConsole.Host.PowerShell\Scripts\Profile.ps1">
-      <Link>Modules\NuGet\Profile.ps1</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
   </ItemGroup>
@@ -280,22 +244,11 @@
   <ItemGroup>
     <VsixIncludeFile Include=".vsixinclude" />
   </ItemGroup>
-  <ItemGroup Condition="'$(VisualStudioVersion)' == '14.0'">
-    <VsixIgnoreFile Include=".vsixignore.vs14" />
-    <None Include="source.extension.vs14.vsixmanifest">
-      <SubType>Designer</SubType>
-    </None>
-  </ItemGroup>
   <ItemGroup Condition="'$(VisualStudioVersion)' == '15.0'">
     <VsixIgnoreFile Include=".vsixignore.vs15" />
     <None Include="source.extension.vs15.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Lucene.Net">
-      <Version>3.0.3</Version>
-    </PackageReference>
   </ItemGroup>
   <Target Name="AfterBuild" DependsOnTargets="PublishVS14;PublishVS15;PublishVS15Insertable" />
   <Target Name="PublishVS14" Condition="'$(VisualStudioVersion)' == '14.0'">
