@@ -43,7 +43,9 @@ namespace NuGet.ProjectManagement
         {
             var safeSettings = new XmlReaderSettings
                 {
+#if !NETSTANDARD1_3
                     XmlResolver = null,
+#endif
                     DtdProcessing = DtdProcessing.Prohibit,
                     IgnoreWhitespace = ignoreWhiteSpace
                 };

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0">
   <!-- Helper properties -->
   <PropertyGroup>
@@ -209,6 +209,12 @@
   <!-- The project that builds the VSIX -->
   <PropertyGroup>
     <VSIXProject>$(RepositoryRootDirectory)src\NuGet.Clients\NuGet.VisualStudio.Client\NuGet.VisualStudio.Client.csproj</VSIXProject>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <SignAssembly>True</SignAssembly>
+    <PublicSign>true</PublicSign>
+    <AssemblyOriginatorKeyFile>$(BuildCommonDirectory)NuGet.Public.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <!-- Find all test projects  -->

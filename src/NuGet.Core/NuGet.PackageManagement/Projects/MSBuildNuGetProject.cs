@@ -35,7 +35,9 @@ namespace NuGet.ProjectManagement
                 {
                     { new FileTransformExtensions(".transform", ".transform"), new XmlTransformer(GetConfigMappings()) },
                     { new FileTransformExtensions(".pp", ".pp"), new Preprocessor() },
+#if !NETSTANDARD1_3
                     { new FileTransformExtensions(".install.xdt", ".uninstall.xdt"), new XdtTransformer() }
+#endif
                 };
 
         #region Events
@@ -70,9 +72,9 @@ namespace NuGet.ProjectManagement
         /// </summary>
         public event EventHandler<PackageEventArgs> PackageReferenceRemoved;
 
-        #endregion Events
+#endregion Events
 
-        #region Properties
+#region Properties
 
         public IMSBuildProjectSystem ProjectSystem { get; }
 
@@ -82,7 +84,7 @@ namespace NuGet.ProjectManagement
 
         public string MSBuildProjectPath => ProjectSystem.ProjectFileFullPath;
 
-        #endregion Properties
+#endregion Properties
 
         public MSBuildNuGetProject(
             IMSBuildProjectSystem msbuildNuGetProjectSystem,
