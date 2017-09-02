@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -141,7 +141,7 @@ namespace NuGet.PackageManagement
                 cacheContextModifier(sourceCacheContext);
 
                 // Settings passed here will be used to populate the restore requests.
-                var restoreContext = GetRestoreContext(context, providerCache, sourceCacheContext, sources, dgFile, false); // We don't force in preview 
+                var restoreContext = GetRestoreContext(context, providerCache, sourceCacheContext, sources, dgFile, forceRestore : true);
 
                 var requests = await RestoreRunner.GetRequests(restoreContext);
                 var results = await RestoreRunner.RunWithoutCommit(requests, restoreContext);
@@ -217,6 +217,19 @@ namespace NuGet.PackageManagement
             DependencyGraphCacheContext context)
         {
             var dgSpec = new DependencyGraphSpec();
+
+            foreach (var packageSpec in context.DeferredPackageSpecs)
+            {
+                dgSpec.AddProject(packageSpec);
+
+                if (packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.PackageReference ||
+                    packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.ProjectJson ||
+                    packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.DotnetCliTool ||
+                    packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.Standalone)
+                {
+                    dgSpec.AddRestore(packageSpec.RestoreMetadata.ProjectUniqueName);
+                }
+            }
 
             var projects = solutionManager.GetNuGetProjects().OfType<IDependencyGraphProject>();
 

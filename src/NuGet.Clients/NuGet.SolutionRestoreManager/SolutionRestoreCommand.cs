@@ -11,6 +11,7 @@ using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using NuGet.PackageManagement;
+using NuGet.PackageManagement.VisualStudio;
 using NuGet.VisualStudio;
 using Task = System.Threading.Tasks.Task;
 
@@ -41,6 +42,10 @@ namespace NuGet.SolutionRestoreManager
 
         private Task _restoreTask = Task.CompletedTask;
 
+        private Microsoft.VisualStudio.Shell.IAsyncServiceProvider _serviceProvider;
+
+        private bool _isMEFInitialized;
+
         private SolutionRestoreCommand()
         {
         }
@@ -55,15 +60,14 @@ namespace NuGet.SolutionRestoreManager
 
             _instance = new SolutionRestoreCommand();
 
-            var componentModel = await serviceProvider.GetComponentModelAsync();
-            componentModel.DefaultCompositionService.SatisfyImportsOnce(_instance);
-
             await _instance.SubscribeAsync(serviceProvider);
         }
 
         private async Task SubscribeAsync(Microsoft.VisualStudio.Shell.IAsyncServiceProvider serviceProvider)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            _serviceProvider = serviceProvider;
 
             var commandService = await serviceProvider.GetServiceAsync<IMenuCommandService>();
 
@@ -85,6 +89,12 @@ namespace NuGet.SolutionRestoreManager
                 ref guidCmdUI, out _solutionNotBuildingAndNotDebuggingContextCookie);
         }
 
+        private async Task InitializeMEFAsync()
+        {
+            var componentModel = await _serviceProvider.GetComponentModelAsync();
+            componentModel.DefaultCompositionService.SatisfyImportsOnce(_instance);
+        }
+
         /// <summary>
         /// This function is the callback used to execute the command when the menu item is clicked.
         /// See the constructor to see how the menu item is associated with this function using
@@ -94,6 +104,16 @@ namespace NuGet.SolutionRestoreManager
         /// <param name="e">Event args.</param>
         private void OnRestorePackages(object sender, EventArgs args)
         {
+            if (!_isMEFInitialized)
+            {
+                NuGetUIThreadHelper.JoinableTaskFactory.Run(async () =>
+                {
+                    await InitializeMEFAsync();
+                });
+
+                _isMEFInitialized = true;
+            }
+
             if (_restoreTask.IsCompleted)
             {
                 _restoreTask = NuGetUIThreadHelper.JoinableTaskFactory
@@ -108,6 +128,12 @@ namespace NuGet.SolutionRestoreManager
         {
             NuGetUIThreadHelper.JoinableTaskFactory.Run(async delegate
             {
+                if (!_isMEFInitialized)
+                {
+                    await InitializeMEFAsync();
+                    _isMEFInitialized = true;
+                }
+
                 await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
                 var command = (OleMenuCommand)sender;
@@ -122,7 +148,10 @@ namespace NuGet.SolutionRestoreManager
                     _restoreTask.IsCompleted &&
                     !ConsoleStatus.Value.IsBusy &&
                     !SolutionRestoreWorker.Value.IsBusy &&
-                    SolutionManager.Value.GetNuGetProjects().Any();
+                    (
+                        DeferredProjectVSUtility.IsSolutionDPLEnabled() ||
+                        Enumerable.Any(SolutionManager.Value.GetNuGetProjects())
+                    );
             });
         }
 

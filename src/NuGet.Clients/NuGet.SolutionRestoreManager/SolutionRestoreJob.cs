@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -16,6 +16,7 @@ using NuGet.Commands;
 using NuGet.Configuration;
 using NuGet.PackageManagement;
 using NuGet.PackageManagement.VisualStudio;
+using NuGet.Packaging;
 using NuGet.ProjectManagement;
 using NuGet.ProjectManagement.Projects;
 using NuGet.ProjectModel;
@@ -39,9 +40,9 @@ namespace NuGet.SolutionRestoreManager
         private readonly ISourceRepositoryProvider _sourceRepositoryProvider;
         private readonly ISettings _settings;
         private readonly IRestoreEventsPublisher _restoreEventsPublisher;
+        private readonly ILightWeightProjectWorkspaceService _lightWeightProjectWorkspaceService;
 
         private RestoreOperationLogger _logger;
-        private string _dependencyGraphProjectCacheHash;
         private INuGetProjectContext _nuGetProjectContext;
 
         private NuGetOperationStatus _status;
@@ -60,7 +61,8 @@ namespace NuGet.SolutionRestoreManager
             IVsSolutionManager solutionManager,
             ISourceRepositoryProvider sourceRepositoryProvider,
             IRestoreEventsPublisher restoreEventsPublisher,
-            ISettings settings)
+            ISettings settings,
+            ILightWeightProjectWorkspaceService lightWeightProjectWorkspaceService)
         {
             Assumes.Present(serviceProvider);
             Assumes.Present(packageRestoreManager);
@@ -75,6 +77,7 @@ namespace NuGet.SolutionRestoreManager
             _sourceRepositoryProvider = sourceRepositoryProvider;
             _restoreEventsPublisher = restoreEventsPublisher;
             _settings = settings;
+            _lightWeightProjectWorkspaceService = lightWeightProjectWorkspaceService;
         }
 
         /// <summary>
@@ -104,7 +107,6 @@ namespace NuGet.SolutionRestoreManager
             _logger = logger;
 
             // update instance attributes with the shared context values
-            _dependencyGraphProjectCacheHash = jobContext.DependencyGraphProjectCacheHash;
             _nuGetProjectContext = jobContext.NuGetProjectContext;
 
             using (var ctr1 = token.Register(() => _status = NuGetOperationStatus.Cancelled))
@@ -120,11 +122,6 @@ namespace NuGet.SolutionRestoreManager
                 {
                     // Log the exception to the console and activity log
                     await _logger.LogExceptionAsync(e);
-                }
-                finally
-                {
-                    // update shared context values with instance attributes
-                    jobContext.DependencyGraphProjectCacheHash = _dependencyGraphProjectCacheHash;
                 }
             }
 
@@ -160,6 +157,15 @@ namespace NuGet.SolutionRestoreManager
                     return;
                 }
 
+                // Check if solution has deferred projects
+                var deferredProjectsData = new DeferredProjectRestoreData(new Dictionary<PackageReference, List<string>>(), new List<PackageSpec>());
+                if (await DeferredProjectVSUtility.SolutionHasDeferredProjectsAsync())
+                {
+                    var deferredProjectsPath = await DeferredProjectVSUtility.GetDeferredProjectsFilePathAsync();
+
+                    deferredProjectsData = await DeferredProjectRestoreUtility.GetDeferredProjectsData(_lightWeightProjectWorkspaceService, deferredProjectsPath, _settings, token);
+                }
+
                 // Get the projects from the SolutionManager
                 // Note that projects that are not supported by NuGet, will not show up in this list
                 projects = _solutionManager.GetNuGetProjects();
@@ -167,11 +173,13 @@ namespace NuGet.SolutionRestoreManager
                 // Check if there are any projects that are not INuGetIntegratedProject, that is,
                 // projects with packages.config. OR 
                 // any of the deferred project is type of packages.config, If so, perform package restore on them
-                if (projects.Any(project => !(project is INuGetIntegratedProject)))
+                if (projects.Any(project => !(project is INuGetIntegratedProject)) ||
+                   deferredProjectsData.PackageReferenceDict.Count > 0)
                 {
                     await RestorePackagesOrCheckForMissingPackagesAsync(
                         solutionDirectory,
                         isSolutionAvailable,
+                        deferredProjectsData.PackageReferenceDict,
                         token);
                 }
 
@@ -183,20 +191,17 @@ namespace NuGet.SolutionRestoreManager
                     dependencyGraphProjects,
                     forceRestore,
                     isSolutionAvailable,
+                    deferredProjectsData.PackageSpecs,
                     token);
 
+#if !VS14
                 // TODO: To limit risk, we only publish the event when there is a cross-platform PackageReference
                 // project in the solution. Extending this behavior to all solutions is tracked here:
                 // NuGet/Home#4478
-#if !VS14
-                if (projects.OfType<NetCorePackageReferenceProject>().Any() &&
-                    !string.IsNullOrEmpty(_dependencyGraphProjectCacheHash))
+                if (projects.OfType<NetCorePackageReferenceProject>().Any())
                 {
-                    // A no-op restore is considered successful. A cancellation is considered unsuccessful.
-                    var args = new SolutionRestoredEventArgs(
-                        isSuccess: _status == NuGetOperationStatus.Succeeded || _status == NuGetOperationStatus.NoOp,
-                        solutionSpecHash: _dependencyGraphProjectCacheHash);
-                    _restoreEventsPublisher.OnSolutionRestoreCompleted(args);
+                    _restoreEventsPublisher.OnSolutionRestoreCompleted(
+                        new SolutionRestoredEventArgs(_status, solutionDirectory));
                 }
 #endif
             }
@@ -244,13 +249,15 @@ namespace NuGet.SolutionRestoreManager
         }
 
         private async Task RestorePackageSpecProjectsAsync(
-            List<IDependencyGraphProject> projects,
-            bool forceRestore,
-            bool isSolutionAvailable,
-            CancellationToken token)
+           List<IDependencyGraphProject> projects,
+           bool forceRestore,
+           bool isSolutionAvailable,
+           IReadOnlyList<PackageSpec> packageSpecs,
+           CancellationToken token)
         {
             // Only continue if there are some build integrated type projects.
-            if (!(projects.Any(project => project is BuildIntegratedNuGetProject)))
+            if (!(projects.Any(project => project is BuildIntegratedNuGetProject) ||
+                packageSpecs.Any(project => IsProjectBuildIntegrated(project))))
             {
                 return;
             }
@@ -281,6 +288,9 @@ namespace NuGet.SolutionRestoreManager
                 // Cache p2ps discovered from DTE
                 var cacheContext = new DependencyGraphCacheContext(_logger, _settings);
                 var pathContext = NuGetPathContext.Create(_settings);
+
+                // add deferred projects package spec in cacheContext packageSpecCache
+                cacheContext.DeferredPackageSpecs.AddRange(packageSpecs);
 
                 // Get full dg spec
                 // TODO: pass this down instead of creating it twice.
@@ -404,6 +414,7 @@ namespace NuGet.SolutionRestoreManager
         private async Task RestorePackagesOrCheckForMissingPackagesAsync(
             string solutionDirectory,
             bool isSolutionAvailable,
+            IReadOnlyDictionary<PackageReference, List<string>> packageReferencesDict,
             CancellationToken token)
         {
             if (string.IsNullOrEmpty(solutionDirectory))
@@ -414,6 +425,10 @@ namespace NuGet.SolutionRestoreManager
 
             var packages = (await _packageRestoreManager.GetPackagesInSolutionAsync(
                 solutionDirectory, token)).ToList();
+
+            packages.AddRange(
+                _packageRestoreManager.GetPackagesRestoreData(
+                    solutionDirectory, packageReferencesDict.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList())));
 
             if (IsConsentGranted(_settings))
             {

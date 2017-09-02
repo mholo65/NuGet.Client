@@ -19,23 +19,19 @@ using Microsoft;
 using Microsoft.VisualStudio.Threading;
 using NuGet.Common;
 using NuGet.Configuration;
-using NuGet.Frameworks;
 using NuGet.PackageManagement;
 using NuGet.PackageManagement.VisualStudio;
-using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.ProjectManagement;
-using NuGet.ProjectManagement.Projects;
 using NuGet.Protocol.Core.Types;
-using NuGet.Resolver;
 using NuGet.VisualStudio;
-using ThreadHelper = Microsoft.VisualStudio.Shell.ThreadHelper;
 
 namespace NuGetConsole.Host.PowerShell.Implementation
 {
     internal abstract class PowerShellHost : IHost, IPathExpansion, IDisposable
     {
         private static readonly string AggregateSourceName = Resources.AggregateSourceName;
+        private static readonly TimeSpan ExecuteInitScriptsRetryDelay = TimeSpan.FromMilliseconds(400);
 
         private readonly AsyncSemaphore _initScriptsLock = new AsyncSemaphore(1);
         private readonly string _name;
@@ -53,6 +49,7 @@ namespace NuGetConsole.Host.PowerShell.Implementation
         private const string PackageManagementContextKey = "PackageManagementContext";
         private const string DTEKey = "DTE";
         private const string CancellationTokenKey = "CancellationTokenKey";
+        private const int ExecuteInitScriptsRetriesLimit = 50;
         private string _activePackageSource;
         private string[] _packageSources;
         private readonly DTE _dte;
@@ -79,24 +76,14 @@ namespace NuGetConsole.Host.PowerShell.Implementation
         private string _currentSolutionDirectory;
 
         /// <summary>
-        /// An initial restore event used to compare against future (real) restore events. This value endures on
-        /// <see cref="_latestRestore"/> and <see cref="_currentRestore"/> as long as no restore occurs. Note that the
-        /// hash mentioned here cannot collide with a real hash.
-        /// </summary>
-        private static readonly SolutionRestoredEventArgs InitialRestore = new SolutionRestoredEventArgs(
-            isSuccess: true,
-            solutionSpecHash: "initial");
-
-        /// <summary>
         /// This field tracks information about the latest restore.
         /// </summary>
-        private SolutionRestoredEventArgs _latestRestore = InitialRestore;
+        private SolutionRestoredEventArgs _latestRestore;
 
         /// <summary>
         /// This field tracks information about the most recent restore that had scripts executed for it.
         /// </summary>
-        private SolutionRestoredEventArgs _currentRestore = InitialRestore;
-
+        private SolutionRestoredEventArgs _currentRestore;
 
         protected PowerShellHost(string name, IRestoreEvents restoreEvents, IRunspaceManager runspaceManager)
         {
@@ -305,19 +292,7 @@ namespace NuGetConsole.Host.PowerShell.Implementation
                             if (console is IWpfConsole)
                             {
                                 // Hook up solution events
-                                _solutionManager.SolutionOpened += (o, e) =>
-                                    {
-                                        _scriptExecutor.Reset();
-
-                                    // Solution opened event is raised on the UI thread
-                                    // Go off the UI thread before calling likely expensive call of ExecuteInitScriptsAsync
-                                    // Also, it uses semaphores, do not call it from the UI thread
-                                    Task.Run(delegate
-                                            {
-                                                UpdateWorkingDirectory();
-                                                return ExecuteInitScriptsAsync();
-                                            });
-                                    };
+                                _solutionManager.SolutionOpened += (_, __) => HandleSolutionOpened();
                                 _solutionManager.SolutionClosed += (o, e) => UpdateWorkingDirectory();
                             }
                             _solutionManager.NuGetProjectAdded += (o, e) => UpdateWorkingDirectoryAndAvailableProjects();
@@ -347,6 +322,33 @@ namespace NuGetConsole.Host.PowerShell.Implementation
                         }
                     }
                 });
+        }
+
+        private void HandleSolutionOpened()
+        {
+            _scriptExecutor.Reset();
+
+            // Solution opened event is raised on the UI thread
+            // Go off the UI thread before calling likely expensive call of ExecuteInitScriptsAsync
+            // Also, it uses semaphores, do not call it from the UI thread
+            Task.Run(async () =>
+            {
+                UpdateWorkingDirectory();
+
+                var retries = 0;
+
+                while (retries < ExecuteInitScriptsRetriesLimit)
+                {
+                    if (_solutionManager.IsAllProjectsNominated())
+                    {
+                        await ExecuteInitScriptsAsync();
+                        break;
+                    }
+
+                    await Task.Delay(ExecuteInitScriptsRetryDelay);
+                    retries++;
+                }
+            });
         }
 
         private void UpdateWorkingDirectoryAndAvailableProjects()
@@ -401,170 +403,28 @@ namespace NuGetConsole.Host.PowerShell.Implementation
                     return;
                 }
 
-                // invoke init.ps1 files in the order of package dependency.
-                // if A -> B, we invoke B's init.ps1 before A's.
+                // make sure all projects are loaded before start to execute init scripts. Since
+                // projects might not be loaded when DPL is enabled.
+                _solutionManager.EnsureSolutionIsLoaded();
 
-                var projects = _solutionManager.GetNuGetProjects().ToList();
                 var packageManager = new NuGetPackageManager(
                     _sourceRepositoryProvider,
                     _settings,
                     _solutionManager,
                     _deleteOnRestartManager);
 
-                var packagesByFramework = new Dictionary<NuGetFramework, HashSet<PackageIdentity>>();
-                var sortedGlobalPackages = new List<PackageIdentity>();
+                var enumerator = new InstalledPackageEnumerator(_solutionManager, _settings);
+                var installedPackages = await enumerator.EnumeratePackagesAsync(packageManager, CancellationToken.None);
 
-                // Sort projects by type
-                foreach (var project in projects)
+                foreach (var installedPackage in installedPackages)
                 {
-                    // Skip project K projects.
-                    if (project is ProjectKNuGetProjectBase)
-                    {
-                        continue;
-                    }
-
-                    var buildIntegratedProject = project as BuildIntegratedNuGetProject;
-
-                    if (buildIntegratedProject != null)
-                    {
-                        var packages = await BuildIntegratedProjectUtility
-                            .GetOrderedProjectPackageDependencies(buildIntegratedProject);
-
-                        sortedGlobalPackages.AddRange(packages);
-                    }
-                    else
-                    {
-                        // Read packages.config
-                        var installedRefs = await project.GetInstalledPackagesAsync(CancellationToken.None);
-
-                        if (installedRefs?.Any() == true)
-                        {
-                            // Index packages.config references by target framework since this affects dependencies
-                            NuGetFramework targetFramework;
-                            if (!project.TryGetMetadata(NuGetProjectMetadataKeys.TargetFramework, out targetFramework))
-                            {
-                                targetFramework = NuGetFramework.AnyFramework;
-                            }
-
-                            HashSet<PackageIdentity> fwPackages;
-                            if (!packagesByFramework.TryGetValue(targetFramework, out fwPackages))
-                            {
-                                fwPackages = new HashSet<PackageIdentity>();
-                                packagesByFramework.Add(targetFramework, fwPackages);
-                            }
-
-                            fwPackages.UnionWith(installedRefs.Select(reference => reference.PackageIdentity));
-                        }
-                    }
-                }
-
-                // Each id/version should only be executed once
-                var finishedPackages = new HashSet<PackageIdentity>();
-
-                // Packages.config projects
-                if (packagesByFramework.Count > 0)
-                {
-                    await ExecuteInitPs1ForPackagesConfig(
-                        packageManager,
-                        packagesByFramework,
-                        finishedPackages);
-                }
-
-                // build integrated projects
-                if (sortedGlobalPackages.Count > 0)
-                {
-                    await ExecuteInitPs1ForBuildIntegratedAsync(
-                        sortedGlobalPackages,
-                        finishedPackages);
+                    await ExecuteInitPs1Async(installedPackage.InstallPath, installedPackage.Identity);
                 }
 
                 // We are done executing scripts, so record the restore and solution directory that we executed for.
                 // This aids the no-op logic above.
                 _currentRestore = latestRestore;
                 _currentSolutionDirectory = latestSolutionDirectory;
-            }
-        }
-
-        private async Task ExecuteInitPs1ForPackagesConfig(
-            NuGetPackageManager packageManager,
-            Dictionary<NuGetFramework, HashSet<PackageIdentity>> packagesConfigInstalled,
-            HashSet<PackageIdentity> finishedPackages)
-        {
-            // Get the path to the Packages folder.
-            var packagesFolderPath = packageManager.PackagesFolderSourceRepository.PackageSource.Source;
-            var packagePathResolver = new PackagePathResolver(packagesFolderPath);
-
-            var packagesToSort = new HashSet<ResolverPackage>();
-            var resolvedPackages = new HashSet<PackageIdentity>();
-
-            var dependencyInfoResource = await packageManager
-                .PackagesFolderSourceRepository
-                .GetResourceAsync<DependencyInfoResource>();
-
-            // Order by the highest framework first to make this deterministic
-            // Process each framework/id/version once to avoid duplicate work
-            // Packages may have different dependendcy orders depending on the framework, but there is 
-            // no way to fully solve this across an entire solution so we make a best effort here.
-            foreach (var framework in packagesConfigInstalled.Keys.OrderByDescending(fw => fw, new NuGetFrameworkSorter()))
-            {
-                foreach (var package in packagesConfigInstalled[framework])
-                {
-                    if (resolvedPackages.Add(package))
-                    {
-                        var dependencyInfo = await dependencyInfoResource.ResolvePackage(
-                            package,
-                            framework,
-                            NullLogger.Instance,
-                            CancellationToken.None);
-
-                        // This will be null for unrestored packages
-                        if (dependencyInfo != null)
-                        {
-                            packagesToSort.Add(new ResolverPackage(dependencyInfo, listed: true, absent: false));
-                        }
-                    }
-                }
-            }
-            
-            // Order packages by dependency order
-            var sortedPackages = ResolverUtility.TopologicalSort(packagesToSort);
-            foreach (var package in sortedPackages)
-            {
-                if (finishedPackages.Add(package))
-                {
-                    // Find the package path in the packages folder.
-                    var installPath = packagePathResolver.GetInstalledPath(package);
-
-                    if (string.IsNullOrEmpty(installPath))
-                    {
-                        continue;  
-                    }
-
-                    await ExecuteInitPs1Async(installPath, package);
-                }
-            }
-        }
-
-        private async Task ExecuteInitPs1ForBuildIntegratedAsync(
-            List<PackageIdentity> sortedGlobalPackages,
-            HashSet<PackageIdentity> finishedPackages)
-        {
-            var nugetPaths = NuGetPathContext.Create(_settings);
-            var fallbackResolver = new FallbackPackagePathResolver(nugetPaths);
-
-            foreach (var package in sortedGlobalPackages)
-            {
-                if (finishedPackages.Add(package))
-                {
-                    // Find the package in the global packages folder or any of the fallback folders.
-                    var installPath = fallbackResolver.GetPackageDirectory(package.Id, package.Version);
-                    if (installPath == null)
-                    {
-                        continue;
-                    }
-
-                    await ExecuteInitPs1Async(installPath, package);
-                }
             }
         }
 
@@ -763,10 +623,13 @@ namespace NuGetConsole.Host.PowerShell.Implementation
 
         private bool ShouldNoOpDueToRestore(SolutionRestoredEventArgs latestRestore)
         {
-            return latestRestore != null &&
-                   _currentRestore != null &&
-                   latestRestore.SolutionSpecHash == _currentRestore.SolutionSpecHash &&
-                   latestRestore.IsSuccess == _currentRestore.IsSuccess;
+            return
+                _currentRestore != null &&
+                latestRestore != null &&
+                (
+                    latestRestore.RestoreStatus == NuGetOperationStatus.NoOp ||
+                    object.ReferenceEquals(_currentRestore, latestRestore)
+                );
         }
 
         private bool ShouldNoOpDueToSolutionDirectory(string latestSolutionDirectory)

@@ -31,6 +31,7 @@
     <TestUtilitiesDirectory>$(RepositoryRootDirectory)test\TestUtilities\</TestUtilitiesDirectory>
     <NuGetBuildLocalizationRepository>$(RepositoryRootDirectory)submodules\NuGet.Build.Localization\</NuGetBuildLocalizationRepository>
     <LocalizationRootDirectory>$(NuGetBuildLocalizationRepository)localize</LocalizationRootDirectory>
+    <LocalizationFilesDirectory>$(ArtifactsDirectory)LocalizedFiles</LocalizationFilesDirectory>
   </PropertyGroup>
 
   <!-- Defaults -->
@@ -134,13 +135,15 @@
     <Version>$(SemanticVersion)$(PreReleaseInformationVersion)</Version>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <BuildVariationFolder>$(VisualStudioVersion)</BuildVariationFolder>
+    <BuildVariationFolder Condition=" '$(BuildRTM)' == 'true' ">$(BuildVariationFolder)-RTM</BuildVariationFolder>
+  </PropertyGroup>
   <!-- Set the output location for all non-test projects -->
   <!-- Test projects currently fail when the output dir is moved -->
   <PropertyGroup Condition=" '$(TestProject)' != 'true' ">
     <!-- Create different folders for 14.0, 15.0, 15.0-RTM -->
-    <BuildVariationFolder>$(VisualStudioVersion)</BuildVariationFolder>
-    <BuildVariationFolder Condition=" '$(BuildRTM)' == 'true' ">$(BuildVariationFolder)-RTM</BuildVariationFolder>
-
+    
     <!-- output paths -->
     <BaseIntermediateOutputPath>$(ArtifactsDirectory)$(MSBuildProjectName)\$(BuildVariationFolder)\obj\</BaseIntermediateOutputPath>
     <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
