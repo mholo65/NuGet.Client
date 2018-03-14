@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using NuGet.Common;
 using NuGet.Packaging.Core;
 using NuGet.ProjectManagement;
+using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
 using NuGet.VisualStudio;
 using Task = System.Threading.Tasks.Task;
@@ -23,7 +24,6 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
     [Cmdlet(VerbsData.Sync, "Package")]
     public class SyncPackageCommand : PackageActionBaseCommand
     {
-        private ResolutionContext _context;
         private bool _allowPrerelease;
 
         private List<NuGetProject> _projects = new List<NuGetProject>();
@@ -35,10 +35,14 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
             {
                 ProjectName = VsSolutionManager.DefaultNuGetProjectName;
             }
-            // Get the projects in the solution that's not the current default or specified project to sync the package identity to.
-            _projects = VsSolutionManager.GetNuGetProjects()
-                .Where(p => !StringComparer.OrdinalIgnoreCase.Equals(p.GetMetadata<string>(NuGetProjectMetadataKeys.Name), ProjectName))
-                .ToList();
+
+            NuGetUIThreadHelper.JoinableTaskFactory.Run(async () =>
+            {
+                // Get the projects in the solution that's not the current default or specified project to sync the package identity to.
+                _projects = (await VsSolutionManager.GetNuGetProjectsAsync())
+                    .Where(p => !StringComparer.OrdinalIgnoreCase.Equals(p.GetMetadata<string>(NuGetProjectMetadataKeys.Name), ProjectName))
+                    .ToList();
+            });
         }
 
         protected override void ProcessRecordCore()
@@ -78,9 +82,20 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
         {
             try
             {
-                foreach (NuGetProject project in projects)
+                using (var sourceCacheContext = new SourceCacheContext())
                 {
-                    await InstallPackageByIdentityAsync(project, identity, ResolutionContext, this, WhatIf.IsPresent);
+                    var resolutionContext = new ResolutionContext(
+                        GetDependencyBehavior(),
+                        _allowPrerelease,
+                        false,
+                        VersionConstraints.None,
+                        new GatherCache(),
+                        sourceCacheContext);
+
+                    foreach (var project in projects)
+                    {
+                        await InstallPackageByIdentityAsync(project, identity, resolutionContext, this, WhatIf.IsPresent);
+                    }
                 }
             }
             catch (Exception ex)
@@ -102,7 +117,7 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
             PackageIdentity identity = null;
             if (!string.IsNullOrEmpty(Version))
             {
-                NuGetVersion nVersion = PowerShellCmdletsUtility.GetNuGetVersionFromString(Version);
+                var nVersion = PowerShellCmdletsUtility.GetNuGetVersionFromString(Version);
                 identity = new PackageIdentity(Id, nVersion);
             }
             else
@@ -112,23 +127,6 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
                     .Select(v => v.PackageIdentity).FirstOrDefault();
             }
             return identity;
-        }
-
-        /// <summary>
-        /// Resolution Context for Sync-Package command
-        /// </summary>
-        public ResolutionContext ResolutionContext
-        {
-            get
-            {
-                // ResolutionContext contains a cache, this should only be created once per command
-                if (_context == null)
-                {
-                    _context = new ResolutionContext(GetDependencyBehavior(), _allowPrerelease, false, VersionConstraints.None);
-                }
-
-                return _context;
-            }
         }
     }
 }

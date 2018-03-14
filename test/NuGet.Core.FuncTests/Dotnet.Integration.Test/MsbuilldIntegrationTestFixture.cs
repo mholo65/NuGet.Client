@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -21,6 +21,7 @@ namespace Dotnet.Integration.Test
         private readonly string _dotnetCli = DotnetCliUtil.GetDotnetCli();
         internal readonly string TestDotnetCli;
         internal readonly string MsBuildSdksPath;
+        private readonly Dictionary<string, string> _processEnvVars = new Dictionary<string, string>();
 
         public MsbuildIntegrationTestFixture()
         {
@@ -28,7 +29,9 @@ namespace Dotnet.Integration.Test
             TestDotnetCli = Path.Combine(cliDirectory, "dotnet.exe");
             MsBuildSdksPath = Path.Combine(Directory.GetDirectories
                 (Path.Combine(cliDirectory, "sdk"))
-                .First(), "Sdks");
+                .First(), "Sdks");            
+            _processEnvVars.Add("MSBuildSDKsPath", MsBuildSdksPath);
+            _processEnvVars.Add("UseSharedCompilation", "false");
             // We do this here so that dotnet new will extract all the packages on the first run on the machine.
             InitDotnetNewToExtractPackages();
         }
@@ -47,7 +50,7 @@ namespace Dotnet.Integration.Test
                 CreateDotnetNewProject(testDirectory.Path, projectName, " console", timeOut: 300000);
             }
         }
-        internal void CreateDotnetNewProject(string solutionRoot, string projectName, string args = "console", int timeOut=60000)
+        internal void CreateDotnetNewProject(string solutionRoot, string projectName, string args = "console", int timeOut = 60000)
         {
             var workingDirectory = Path.Combine(solutionRoot, projectName);
             if (!Directory.Exists(workingDirectory))
@@ -58,7 +61,8 @@ namespace Dotnet.Integration.Test
                 workingDirectory,
                 $"new {args}",
                 waitForExit: true,
-                timeOutInMilliseconds: timeOut);
+                timeOutInMilliseconds: timeOut,
+                environmentVariables: _processEnvVars);
 
             // TODO : remove this workaround when https://github.com/dotnet/templating/issues/294 is fixed
             if (result.Item1 != 0)
@@ -67,17 +71,19 @@ namespace Dotnet.Integration.Test
                 workingDirectory,
                 $"new {args} --debug:reinit",
                 waitForExit: true,
-                timeOutInMilliseconds: 300000);
+                timeOutInMilliseconds: 300000,
+                environmentVariables: _processEnvVars);
 
                 result = CommandRunner.Run(TestDotnetCli,
                 workingDirectory,
                 $"new {args} ",
                 waitForExit: true,
-                timeOutInMilliseconds: 300000);
+                timeOutInMilliseconds: 300000,
+                environmentVariables: _processEnvVars);
             }
 
-            Assert.True(result.Item1 == 0, $"Creating project failed with following log information :\n {result.Item3}");
-            Assert.True(result.Item3 == "", $"Creating project failed with following message in error stream :\n {result.Item3}");
+            Assert.True(result.Item1 == 0, $"Creating project failed with following log information :\n {result.AllOutput}");
+            Assert.True(string.IsNullOrWhiteSpace(result.Item3), $"Creating project failed with following message in error stream :\n {result.AllOutput}");
         }
 
         internal void RestoreProject(string workingDirectory, string projectName, string args)
@@ -85,22 +91,22 @@ namespace Dotnet.Integration.Test
             var result = CommandRunner.Run(TestDotnetCli,
                 workingDirectory,
                 $"restore {projectName}.csproj {args}",
-                waitForExit: true);
-            Assert.True(result.Item1 == 0, $"Restore failed with following log information :\n {result.Item3}");
-            Assert.True(result.Item3 == "", $"Restore failed with following message in error stream :\n {result.Item3}");
+                waitForExit: true,
+                environmentVariables: _processEnvVars);
+            Assert.True(result.Item1 == 0, $"Restore failed with following log information :\n {result.AllOutput}");
+            Assert.True(result.Item3 == "", $"Restore failed with following message in error stream :\n {result.AllOutput}");
         }
 
-        internal void PackProject(string workingDirectory, string projectName, string args)
+        internal CommandRunnerResult PackProject(string workingDirectory, string projectName, string args, string nuspecOutputPath = "obj")
         {
-            var envVar = new Dictionary<string, string>();
-            envVar.Add("MSBuildSDKsPath", MsBuildSdksPath);
             var result = CommandRunner.Run(TestDotnetCli,
                 workingDirectory,
-                $"pack {projectName}.csproj {args} ",
+                $"pack {projectName}.csproj {args} /p:NuspecOutputPath={nuspecOutputPath}",
                 waitForExit: true,
-                environmentVariables: envVar);
-            Assert.True(result.Item1 == 0, $"Pack failed with following log information :\n {result.Item3}");
-            Assert.True(result.Item3 == "", $"Pack failed with following message in error stream :\n {result.Item3}");
+                environmentVariables: _processEnvVars);
+            Assert.True(result.Item1 == 0, $"Pack failed with following log information :\n {result.AllOutput}");
+            Assert.True(result.Item3 == "", $"Pack failed with following message in error stream :\n {result.AllOutput}");
+            return result;
         }
 
         internal void BuildProject(string workingDirectory, string projectName, string args)
@@ -108,9 +114,10 @@ namespace Dotnet.Integration.Test
             var result = CommandRunner.Run(TestDotnetCli,
                 workingDirectory,
                 $"msbuild {projectName}.csproj {args} /p:AppendRuntimeIdentifierToOutputPath=false",
-                waitForExit: true);
-            Assert.True(result.Item1 == 0, $"Build failed with following log information :\n {result.Item3}");
-            Assert.True(result.Item3 == "", $"Build failed with following message in error stream :\n {result.Item3}");
+                waitForExit: true,
+                environmentVariables: _processEnvVars);
+            Assert.True(result.Item1 == 0, $"Build failed with following log information :\n {result.AllOutput}");
+            Assert.True(result.Item3 == "", $"Build failed with following message in error stream :\n {result.AllOutput}");
         }
 
         private string CopyLatestCliForPack()
@@ -124,7 +131,7 @@ namespace Dotnet.Integration.Test
         private void CopyLatestCliToTestDirectory(string destinationDir)
         {
             var cliDir = Path.GetDirectoryName(_dotnetCli);
-            
+
             //Create sub-directory structure in destination
             foreach (var directory in Directory.GetDirectories(cliDir, "*", SearchOption.AllDirectories))
             {
@@ -159,12 +166,12 @@ namespace Dotnet.Integration.Test
                                 || fileName.StartsWith("build")
                                 || fileName.StartsWith("buildCrossTargeting"));
 
-                DeleteFiles(pathToPackSdk);
+                DeleteDirectory(pathToPackSdk);
                 CopyNupkgFilesToTarget(nupkg, pathToPackSdk, files);
             }
         }
 
-        private void CopyNupkgFilesToTarget(PackageArchiveReader nupkg, string destPath, IEnumerable<string> files )
+        private void CopyNupkgFilesToTarget(PackageArchiveReader nupkg, string destPath, IEnumerable<string> files)
         {
             var packageFileExtractor = new PackageFileExtractor(files,
                                          PackageExtractionBehavior.XmlDocFileSaveMode);
@@ -172,11 +179,6 @@ namespace Dotnet.Integration.Test
             nupkg.CopyFiles(destPath, files, packageFileExtractor.ExtractPackageFile, new TestCommandOutputLogger(),
                 CancellationToken.None);
 
-        }
-
-        private void DeleteFiles(string destinationDir)
-        {
-            Directory.Delete(destinationDir, true);
         }
 
         private static string FindMostRecentNupkg(string nupkgDirectory, string id)
@@ -191,7 +193,69 @@ namespace Dotnet.Integration.Test
 
         public void Dispose()
         {
-            Directory.Delete(Path.GetDirectoryName(TestDotnetCli), true);
+            KillDotnetExe(TestDotnetCli);
+            DeleteDirectory(Path.GetDirectoryName(TestDotnetCli));
+        }
+
+        private static void KillDotnetExe(string pathToDotnetExe)
+        {
+
+            var processes = Process.GetProcessesByName("dotnet")
+                .Where(t => string.Compare(t.MainModule.FileName, Path.GetFullPath(pathToDotnetExe), ignoreCase: true) == 0);
+            var testDirProcesses = Process.GetProcesses()
+                .Where(t => t.MainModule.FileName.StartsWith(TestFileSystemUtility.NuGetTestFolder, StringComparison.OrdinalIgnoreCase));
+            try
+            {
+                if (processes != null)
+                {
+                    foreach (var process in processes)
+                    {
+                        if (string.Compare(process.MainModule.FileName, Path.GetFullPath(pathToDotnetExe), true) == 0)
+                        {
+                            process.Kill();
+                        }
+                    }
+                }
+
+                if (testDirProcesses != null)
+                {
+                    foreach (var process in testDirProcesses)
+                    {
+                        process.Kill();
+                    }
+                }
+
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Depth-first recursive delete, with handling for descendant 
+        /// directories open in Windows Explorer or used by another process
+        /// </summary>
+        private static void DeleteDirectory(string path)
+        {
+            foreach (string directory in Directory.GetDirectories(path))
+            {
+                DeleteDirectory(directory);
+            }
+
+            try
+            {
+                Directory.Delete(path, true);
+            }
+            catch (IOException)
+            {
+                Directory.Delete(path, true);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                Directory.Delete(path, true);
+            }
+            catch
+            {
+
+            }
         }
     }
 }

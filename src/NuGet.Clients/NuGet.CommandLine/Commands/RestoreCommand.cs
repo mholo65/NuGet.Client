@@ -13,6 +13,8 @@ using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.PackageManagement;
 using NuGet.Packaging;
+using NuGet.Packaging.PackageExtraction;
+using NuGet.Packaging.Signing;
 using NuGet.ProjectManagement;
 using NuGet.ProjectModel;
 using NuGet.Protocol;
@@ -300,9 +302,18 @@ namespace NuGet.CommandLine
             CheckRequireConsent();
 
             var collectorLogger = new RestoreCollectorLogger(Console);
+
+            var signedPackageVerifier = new PackageSignatureVerifier(
+                            SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
+                            SignedPackageVerifierSettings.Default);
+
             var projectContext = new ConsoleProjectContext(collectorLogger)
             {
-                PackageExtractionContext = new PackageExtractionContext(collectorLogger)
+                PackageExtractionContext = new PackageExtractionContext(
+                        Packaging.PackageSaveMode.Defaultv2,
+                        PackageExtractionBehavior.XmlDocFileSaveMode,
+                        collectorLogger,
+                        signedPackageVerifier)
             };
 
             if (EffectivePackageSaveMode != Packaging.PackageSaveMode.None)
@@ -333,7 +344,7 @@ namespace NuGet.CommandLine
                     Settings.Priority.Select(x => Path.Combine(x.Root, x.FileName)),
                     packageSources.Select(x => x.Source),
                     installCount,
-                    collectorLogger.Errors.Concat(failedEvents.Select(e => new RestoreLogMessage(LogLevel.Error, e.Exception.Message))));
+                    collectorLogger.Errors.Concat(failedEvents.Select(e => new RestoreLogMessage(LogLevel.Error, NuGetLogCode.Undefined, e.Exception.Message))));
             }
         }
 
@@ -350,7 +361,7 @@ namespace NuGet.CommandLine
                         LocalizedResourceManager.GetString("RestoreCommandPackageRestoreOptOutMessage"),
                         NuGetResources.PackageRestoreConsentCheckBoxText.Replace("&", ""));
 
-                    Console.LogMinimal(message);
+                    Console.LogInformation(message);
                 }
                 else
                 {

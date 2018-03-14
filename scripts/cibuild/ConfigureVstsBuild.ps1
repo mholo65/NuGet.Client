@@ -1,22 +1,17 @@
 <#
 .SYNOPSIS
 Sets build variables during a VSTS build dynamically.
-
 .DESCRIPTION
 This script is used to dynamically set some build variables during VSTS build.
 Specifically, this script reads the buildcounter.txt file in the $(DropRoot) to
 determine the build number of the artifacts, also it sets the $(NupkgOutputDir)
 based on whether $(BuildRTM) is true or false.
-
 .PARAMETER BuildCounterFile
 Path to the file in the drop root which stores the current build counter.
-
 .PARAMETER BuildInfoJsonFile
 Path to the buildInfo.json file that is generated for every build in the output folder.
-
 .PARAMETER BuildRTM
 True/false depending on whether nupkgs are being with or without the release labels.
-
 #>
 
 param
@@ -37,13 +32,13 @@ Function Get-Version {
         [string]$build
     )
         Write-Host "Evaluating the new VSIX Version : ProductVersion $ProductVersion, build $build"
-        # Generate the new minor version: 4.0.0 => 40000, 4.11.5 => 41105.
-        # This assumes we only get to NuGet major/minor 99 at worst, otherwise the logic breaks.
+        # Generate the new minor version: 4.0.0 => 40000, 4.11.5 => 41105. 
+        # This assumes we only get to NuGet major/minor 99 at worst, otherwise the logic breaks. 
         #The final version for NuGet 4.0.0, build number 3128 would be 15.0.40000.3128
-        $finalVersion = "15.0.$((-join ($ProductVersion -split '\.' | %{ '{0:D2}' -f ($_ -as [int]) } )).TrimStart("0")).$build"
-
+        $finalVersion = "15.0.$((-join ($ProductVersion -split '\.' | %{ '{0:D2}' -f ($_ -as [int]) } )).TrimStart("0")).$build"    
+    
         Write-Host "The new VSIX Version is: $finalVersion"
-        return $finalVersion
+        return $finalVersion    
 }
 
 Function Update-VsixVersion {
@@ -89,7 +84,7 @@ $NuGetClientRoot = $env:BUILD_REPOSITORY_LOCALPATH
 $Submodules = Join-Path $NuGetClientRoot submodules -Resolve
 
 $NuGetLocalization = Join-Path $Submodules NuGet.Build.Localization -Resolve
-$NuGetLocalizationRepoBranch = 'release-4.3.0-rtm'
+$NuGetLocalizationRepoBranch = 'master'
 $updateOpts = 'pull', 'origin', $NuGetLocalizationRepoBranch
 
 Write-Host "git update NuGet.Build.Localization at $NuGetLocalization"
@@ -124,6 +119,7 @@ if ($BuildRTM -eq 'true')
 {
     # Set the $(NupkgOutputDir) build variable in VSTS build
     Write-Host "##vso[task.setvariable variable=NupkgOutputDir;]ReleaseNupkgs"
+    Write-Host "##vso[task.setvariable variable=VsixPublishDir;]VS15-RTM"
     $numberOfTries = 0
     do{
         Write-Host "Waiting for buildinfo.json to be generated..."
@@ -135,7 +131,8 @@ if ($BuildRTM -eq 'true')
     $currentBuild = [System.Decimal]::Parse($json.BuildNumber)
     # Set the $(Revision) build variable in VSTS build
     Write-Host "##vso[task.setvariable variable=Revision;]$currentBuild"
-    Write-Host "##vso[build.updatebuildnumber]$currentBuild"
+    Write-Host "##vso[build.updatebuildnumber]$currentBuild" 
+    Write-Host "##vso[task.setvariable variable=BuildNumber;isOutput=true]$currentBuild"
     $oldBuildOutputDirectory = Split-Path -Path $BuildInfoJsonFile
     $branchDirectory = Split-Path -Path $oldBuildOutputDirectory
     $newBuildOutputFolder =  Join-Path $branchDirectory $currentBuild
@@ -148,7 +145,7 @@ if ($BuildRTM -eq 'true')
     {
         Rename-Item $oldBuildOutputDirectory $currentBuild
     }
-
+    
 }
 else
 {
@@ -159,13 +156,20 @@ else
     # Set the $(Revision) build variable in VSTS build
     Write-Host "##vso[task.setvariable variable=Revision;]$newBuildCounter"
     Write-Host "##vso[build.updatebuildnumber]$newBuildCounter"
+    Write-Host "##vso[task.setvariable variable=BuildNumber;isOutput=true]$newBuildCounter"
+    $VsTargetBranch = & $msbuildExe $env:BUILD_REPOSITORY_LOCALPATH\build\config.props /v:m /nologo /t:GetVsTargetBranch
+    $CliTargetBranch = & $msbuildExe $env:BUILD_REPOSITORY_LOCALPATH\build\config.props /v:m /nologo /t:GetCliTargetBranch
+    $SdkTargetBranch = & $msbuildExe $env:BUILD_REPOSITORY_LOCALPATH\build\config.props /v:m /nologo /t:GetSdkTargetBranch
     $jsonRepresentation = @{
         BuildNumber = $newBuildCounter
         CommitHash = $env:BUILD_SOURCEVERSION
         BuildBranch = $env:BUILD_SOURCEBRANCHNAME
         LocalizationRepositoryBranch = $NuGetLocalizationRepoBranch
         LocalizationRepositoryCommitHash = $LocalizationRepoCommitHash
-    }
+        VsTargetBranch = $VsTargetBranch.Trim()
+        CliTargetBranch = $CliTargetBranch.Trim()
+        SdkTargetBranch = $SdkTargetBranch.Trim()
+    }   
 
     New-Item $BuildInfoJsonFile -Force
     $jsonRepresentation | ConvertTo-Json | Set-Content $BuildInfoJsonFile
@@ -176,5 +180,4 @@ else
         exit 1
     }
     Update-VsixVersion -manifestName source.extension.vs15.vsixmanifest -ReleaseProductVersion $productVersion -buildNumber $newBuildCounter
-    Update-VsixVersion -manifestName source.extension.vs15.insertable.vsixmanifest -ReleaseProductVersion $productVersion -buildNumber $newBuildCounter
 }

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -15,6 +15,7 @@ using NuGet.Frameworks;
 using NuGet.LibraryModel;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.Repositories;
 using NuGet.RuntimeModel;
 
@@ -22,19 +23,21 @@ namespace NuGet.Commands
 {
     internal class ProjectRestoreCommand
     {
-        private readonly ILogger _logger;
+        private readonly RestoreCollectorLogger _logger;
 
         private readonly ProjectRestoreRequest _request;
+
+        public Guid ParentId { get; }
 
         public ProjectRestoreCommand(ProjectRestoreRequest request)
         {
             _logger = request.Log;
             _request = request;
+            ParentId = request.ParentId;
         }
 
-        public async Task<Tuple<bool, List<RestoreTargetGraph>, RuntimeGraph>> TryRestore(LibraryRange projectRange,
+        public async Task<Tuple<bool, List<RestoreTargetGraph>, RuntimeGraph>> TryRestoreAsync(LibraryRange projectRange,
             IEnumerable<FrameworkRuntimePair> frameworkRuntimePairs,
-            HashSet<LibraryIdentity> allInstalledPackages,
             NuGetv3LocalRepository userPackageFolder,
             IReadOnlyList<NuGetv3LocalRepository> fallbackPackageFolders,
             RemoteDependencyWalker remoteWalker,
@@ -46,6 +49,7 @@ namespace NuGet.Commands
             var frameworkTasks = new List<Task<RestoreTargetGraph>>();
             var graphs = new List<RestoreTargetGraph>();
             var runtimesByFramework = frameworkRuntimePairs.ToLookup(p => p.Framework, p => p.RuntimeIdentifier);
+            var success = true;
 
             foreach (var pair in runtimesByFramework)
             {
@@ -62,16 +66,9 @@ namespace NuGet.Commands
 
             graphs.AddRange(frameworkGraphs);
 
-            await InstallPackagesAsync(graphs,
-                allInstalledPackages,
+            success &= await InstallPackagesAsync(graphs,
+                userPackageFolder,
                 token);
-
-            // Clear the in-memory cache for newly installed packages
-            userPackageFolder.ClearCacheForIds(allInstalledPackages.Select(package => package.Name));
-
-            var localRepositories = new List<NuGetv3LocalRepository>();
-            localRepositories.Add(userPackageFolder);
-            localRepositories.AddRange(fallbackPackageFolders);
 
             // Check if any non-empty RIDs exist before reading the runtime graph (runtime.json).
             // Searching all packages for runtime.json and building the graph can be expensive.
@@ -82,9 +79,13 @@ namespace NuGet.Commands
             // Resolve runtime dependencies
             if (hasNonEmptyRIDs || forceRuntimeGraphCreation)
             {
-                var runtimeGraphs = new List<RestoreTargetGraph>();
+                var localRepositories = new List<NuGetv3LocalRepository>();
+                localRepositories.Add(userPackageFolder);
+                localRepositories.AddRange(fallbackPackageFolders);
 
+                var runtimeGraphs = new List<RestoreTargetGraph>();
                 var runtimeTasks = new List<Task<RestoreTargetGraph[]>>();
+
                 foreach (var graph in graphs)
                 {
                     // Get the runtime graph for this specific tfm graph
@@ -111,19 +112,20 @@ namespace NuGet.Commands
                 graphs.AddRange(runtimeGraphs);
 
                 // Install runtime-specific packages
-                await InstallPackagesAsync(runtimeGraphs,
-                    allInstalledPackages,
+                success &= await InstallPackagesAsync(runtimeGraphs,
+                    userPackageFolder,
                     token);
-
-                // Clear the in-memory cache for newly installed packages
-                userPackageFolder.ClearCacheForIds(allInstalledPackages.Select(package => package.Name));
             }
+
+            // Update the logger with the restore target graphs
+            // This allows lazy initialization for the Transitive Warning Properties
+            _logger.ApplyRestoreOutput(graphs);
 
             // Warn for all dependencies that do not have exact matches or
             // versions that have been bumped up unexpectedly.
             await UnexpectedDependencyMessages.LogAsync(graphs, _request.Project, _logger);
 
-            var success = await ResolutionSucceeded(graphs, context, token);
+            success &= (await ResolutionSucceeded(graphs, context, token));
 
             return Tuple.Create(success, graphs, allRuntimes);
         }
@@ -206,56 +208,99 @@ namespace NuGet.Commands
             return success;
         }
 
-        private async Task InstallPackagesAsync(IEnumerable<RestoreTargetGraph> graphs,
-            HashSet<LibraryIdentity> allInstalledPackages,
+        private async Task<bool> InstallPackagesAsync(IEnumerable<RestoreTargetGraph> graphs,
+            NuGetv3LocalRepository userPackageFolder,
             CancellationToken token)
         {
-            var packagesToInstall = graphs.SelectMany(g => g.Install.Where(match => allInstalledPackages.Add(match.Library)));
-            if (_request.MaxDegreeOfConcurrency <= 1)
+            var uniquePackages = new HashSet<LibraryIdentity>();
+
+            var packagesToInstall = graphs
+                .SelectMany(g => g.Install.Where(match => uniquePackages.Add(match.Library)))
+                .ToList();
+
+            var success = true;
+
+            if (packagesToInstall.Count > 0)
             {
-                foreach (var match in packagesToInstall)
+                // Use up to MaxDegreeOfConcurrency, create less threads if less packages exist.
+                var threadCount = Math.Min(packagesToInstall.Count, _request.MaxDegreeOfConcurrency);
+
+                if (threadCount <= 1)
                 {
-                    await InstallPackageAsync(match, token);
+                    foreach (var match in packagesToInstall)
+                    {
+                        success &= (await InstallPackageAsync(match, userPackageFolder, _request.PackageExtractionContext, token));
+                    }
+                }
+                else
+                {
+                    var bag = new ConcurrentBag<RemoteMatch>(packagesToInstall);
+                    var tasks = Enumerable.Range(0, threadCount)
+                        .Select(async _ =>
+                        {
+                            RemoteMatch match;
+                            var result = true;
+                            while (bag.TryTake(out match))
+                            {
+                                result &= await InstallPackageAsync(match, userPackageFolder, _request.PackageExtractionContext, token);
+                            }
+                            return result;
+                        });
+
+                    success = (await Task.WhenAll(tasks)).All(p => p);
                 }
             }
-            else
-            {
-                var bag = new ConcurrentBag<RemoteMatch>(packagesToInstall);
-                var tasks = Enumerable.Range(0, _request.MaxDegreeOfConcurrency)
-                    .Select(async _ =>
-                    {
-                        RemoteMatch match;
-                        while (bag.TryTake(out match))
-                        {
-                            await InstallPackageAsync(match, token);
-                        }
-                    });
-                await Task.WhenAll(tasks);
-            }
+
+            return success;
         }
 
-        private async Task InstallPackageAsync(RemoteMatch installItem, CancellationToken token)
+        private async Task<bool> InstallPackageAsync(RemoteMatch installItem, NuGetv3LocalRepository userPackageFolder, PackageExtractionContext packageExtractionContext, CancellationToken token)
         {
             var packageIdentity = new PackageIdentity(installItem.Library.Name, installItem.Library.Version);
 
-            var versionFolderPathContext = new VersionFolderPathContext(
-                packageIdentity,
-                _request.PackagesDirectory,
-                _logger,
-                _request.PackageSaveMode,
-                _request.XmlDocFileSaveMode);
-
-            using (var packageDependency = await installItem.Provider.GetPackageDownloaderAsync(
-                packageIdentity,
-                _request.CacheContext,
-                _logger,
-                token))
+            // Check if the package has already been installed.
+            if (!userPackageFolder.Exists(packageIdentity.Id, packageIdentity.Version))
             {
-                await PackageExtractor.InstallFromSourceAsync(
-                    packageDependency,
-                    versionFolderPathContext,
-                    token);
+                var versionFolderPathResolver = new VersionFolderPathResolver(_request.PackagesDirectory);
+
+                try
+                {
+                    using (var packageDependency = await installItem.Provider.GetPackageDownloaderAsync(
+                        packageIdentity,
+                        _request.CacheContext,
+                        _logger,
+                        token))
+                    {
+                        // Install, returns true if the package was actually installed.
+                        // Returns false if the package was a noop once the lock
+                        // was acquired.
+                        var installed = await PackageExtractor.InstallFromSourceAsync(
+                            packageIdentity,
+                            packageDependency,
+                            versionFolderPathResolver,
+                            packageExtractionContext,
+                            token,
+                            ParentId);
+
+                        // 1) If another project in this process installs the package this will return false but userPackageFolder will contain the package.
+                        // 2) If another process installs the package then this will also return false but we still need to update the cache.
+                        // For #2 double check that the cache has the package now otherwise clear
+                        if (installed || !userPackageFolder.Exists(packageIdentity.Id, packageIdentity.Version))
+                        {
+                            // If the package was added, clear the cache so that the next caller can see it.
+                            // Avoid calling this for packages that were not actually installed.
+                            userPackageFolder.ClearCacheForIds(new string[] { packageIdentity.Id });
+                        }
+                    }
+                }
+                catch (SignatureException e)
+                {
+                    await _logger.LogMessagesAsync(e.Results.SelectMany(p => p.Issues).Select(p => p.ToLogMessage()));
+                    return false;
+                }
             }
+
+            return true;
         }
 
         private Task<RestoreTargetGraph[]> WalkRuntimeDependenciesAsync(LibraryRange projectRange,
@@ -283,82 +328,41 @@ namespace NuGet.Commands
             return Task.WhenAll(resultGraphs);
         }
 
+        /// <summary>
+        /// Merge all runtime.json found in the flattened graph.
+        /// </summary>
         private RuntimeGraph GetRuntimeGraph(RestoreTargetGraph graph, IReadOnlyList<NuGetv3LocalRepository> localRepositories)
         {
-            // TODO: Caching!
-            RuntimeGraph runtimeGraph;
-            if (_request.RuntimeGraphCache.TryGetValue(graph.Framework, out runtimeGraph))
-            {
-                return runtimeGraph;
-            }
-
             _logger.LogVerbose(Strings.Log_ScanningForRuntimeJson);
-            runtimeGraph = RuntimeGraph.Empty;
+            var runtimeGraph = RuntimeGraph.Empty;
 
-            // maintain visited nodes to avoid duplicate runtime graph for the same node
-            var visitedNodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            graph.Graphs.ForEach(node =>
+            // Find runtime.json files using the flattened graph which is unique per id.
+            // Using the flattened graph ensures that only accepted packages will be used.
+            foreach (var node in graph.Flattened)
             {
-                var match = node?.Item?.Data?.Match;
-                if (match == null)
+                var match = node.Data?.Match;
+                if (match == null || match.Library.Type != LibraryType.Package)
                 {
-                    return;
-                }
-
-                // Ignore runtime.json from rejected nodes
-                if (node.Disposition == Disposition.Rejected)
-                {
-                    return;
-                }
-
-                // ignore the same node again
-                if (!visitedNodes.Add(match.Library.Name))
-                {
-                    return;
-                }
-
-                // runtime.json can only exist in packages
-                if (match.Library.Type != LibraryType.Package)
-                {
-                    return;
+                    // runtime.json can only exist in packages
+                    continue;
                 }
 
                 // Locate the package in the local repository
                 var info = NuGetv3LocalRepositoryUtility.GetPackage(localRepositories, match.Library.Name, match.Library.Version);
 
+                // Unresolved packages may not exist.
                 if (info != null)
                 {
-                    var package = info.Package;
-                    var nextGraph = LoadRuntimeGraph(package);
+                    var nextGraph = info.Package.RuntimeGraph;
                     if (nextGraph != null)
                     {
                         _logger.LogVerbose(string.Format(CultureInfo.CurrentCulture, Strings.Log_MergingRuntimes, match.Library));
                         runtimeGraph = RuntimeGraph.Merge(runtimeGraph, nextGraph);
                     }
                 }
-            });
-            _request.RuntimeGraphCache[graph.Framework] = runtimeGraph;
-            return runtimeGraph;
-        }
-
-        private RuntimeGraph LoadRuntimeGraph(LocalPackageInfo package)
-        {
-            var id = new PackageIdentity(package.Id, package.Version);
-            return _request.RuntimeGraphCacheByPackage.GetOrAdd(id, (x) => LoadRuntimeGraphCore(package));
-        }
-
-        private static RuntimeGraph LoadRuntimeGraphCore(LocalPackageInfo package)
-        {
-            var runtimeGraphFile = Path.Combine(package.ExpandedPath, RuntimeGraph.RuntimeGraphFileName);
-            if (File.Exists(runtimeGraphFile))
-            {
-                using (var stream = File.OpenRead(runtimeGraphFile))
-                {
-                    return JsonRuntimeFormat.ReadRuntimeGraph(stream);
-                }
             }
-            return null;
+
+            return runtimeGraph;
         }
     }
 }

@@ -20,7 +20,7 @@ namespace NuGet.Test.Utility
 {
     public class SimpleTestProjectContext
     {
-        private PackageSpec _packageSpec;
+        private static string ProjectExt = ".csproj";
 
         public SimpleTestProjectContext(string projectName, ProjectStyle type, string solutionRoot)
         {
@@ -35,7 +35,7 @@ namespace NuGet.Test.Utility
             }
 
             ProjectName = projectName;
-            ProjectPath = Path.Combine(solutionRoot, projectName, $"{projectName}.csproj");
+            ProjectPath = Path.Combine(solutionRoot, projectName, $"{projectName}{ProjectExt}");
             OutputPath = Path.Combine(solutionRoot, projectName, "obj");
             Type = type;
         }
@@ -145,6 +145,21 @@ namespace NuGet.Test.Utility
             }
         }
 
+        public string CacheFileOutputPath
+        {
+            get
+            {
+                switch (Type)
+                {
+                    case ProjectStyle.PackageReference:
+                        return Path.Combine(OutputPath, $"{ProjectName}{ProjectExt}.nuget.cache");
+
+                    default:
+                        return null;
+                }
+            }
+        }
+
         public string TargetsOutput
         {
             get
@@ -201,34 +216,32 @@ namespace NuGet.Test.Utility
         {
             get
             {
-                if (_packageSpec == null)
+                var _packageSpec = new PackageSpec(Frameworks
+                    .Select(f => new TargetFrameworkInformation() { FrameworkName = f.Framework,
+                        Dependencies = f.PackageReferences.Select(e => new LibraryDependency() { LibraryRange = new LibraryRange(e.Id, VersionRange.Parse(e.Version), LibraryDependencyTarget.Package) }).ToList()
+                    }).ToList());
+                _packageSpec.RestoreMetadata = new ProjectRestoreMetadata();
+                _packageSpec.Name = ProjectName;
+                _packageSpec.FilePath = ProjectPath;
+                _packageSpec.RestoreMetadata.ProjectUniqueName = ProjectName;
+                _packageSpec.RestoreMetadata.ProjectName = ProjectName;
+                _packageSpec.RestoreMetadata.ProjectPath = ProjectPath;
+                _packageSpec.RestoreMetadata.ProjectStyle = Type;
+                _packageSpec.RestoreMetadata.OutputPath = AssetsFileOutputPath;
+                _packageSpec.RestoreMetadata.OriginalTargetFrameworks = OriginalFrameworkStrings;
+                _packageSpec.RestoreMetadata.TargetFrameworks = Frameworks
+                    .Select(f => new ProjectRestoreMetadataFrameworkInfo(f.Framework))
+                    .ToList();
+                _packageSpec.RestoreMetadata.Sources = Sources.ToList();
+                _packageSpec.RestoreMetadata.PackagesPath = GlobalPackagesFolder;
+                _packageSpec.RestoreMetadata.FallbackFolders = FallbackFolders;
+                if (Type == ProjectStyle.ProjectJson)
                 {
-                    _packageSpec = new PackageSpec(Frameworks
-                        .Select(f => new TargetFrameworkInformation() { FrameworkName = f.Framework })
-                        .ToList());
-                    _packageSpec.RestoreMetadata = new ProjectRestoreMetadata();
-                    _packageSpec.Name = ProjectName;
-                    _packageSpec.FilePath = ProjectPath;
-                    _packageSpec.RestoreMetadata.ProjectUniqueName = ProjectName;
-                    _packageSpec.RestoreMetadata.ProjectName = ProjectName;
-                    _packageSpec.RestoreMetadata.ProjectPath = ProjectPath;
-                    _packageSpec.RestoreMetadata.ProjectStyle = Type;
-                    _packageSpec.RestoreMetadata.OutputPath = AssetsFileOutputPath;
-                    _packageSpec.RestoreMetadata.OriginalTargetFrameworks = OriginalFrameworkStrings;
-                    _packageSpec.RestoreMetadata.TargetFrameworks = Frameworks
-                        .Select(f => new ProjectRestoreMetadataFrameworkInfo(f.Framework))
-                        .ToList();
-                    _packageSpec.RestoreMetadata.Sources = Sources.ToList();
-                    _packageSpec.RestoreMetadata.PackagesPath = GlobalPackagesFolder;
-                    _packageSpec.RestoreMetadata.FallbackFolders = FallbackFolders;
-                    if (Type == ProjectStyle.ProjectJson)
-                    {
-                        _packageSpec.RestoreMetadata.ProjectJsonPath = Path.Combine(Path.GetDirectoryName(ProjectPath), "project.json");
-                    }
-                    if (Frameworks.Count() > 1)
-                    {
-                        _packageSpec.RestoreMetadata.CrossTargeting = true;
-                    }
+                    _packageSpec.RestoreMetadata.ProjectJsonPath = Path.Combine(Path.GetDirectoryName(ProjectPath), "project.json");
+                }
+                if (Frameworks.Count() > 1)
+                {
+                    _packageSpec.RestoreMetadata.CrossTargeting = true;
                 }
 
                 return _packageSpec;
@@ -411,7 +424,8 @@ namespace NuGet.Test.Utility
 
                     ProjectFileUtils.AddProperties(xml, new Dictionary<string, string>()
                     {
-                        { tfPropName, string.Join(";", Frameworks.Select(f => f.Framework.GetShortFolderName())) },
+                        { tfPropName, OriginalFrameworkStrings.Count != 0 ? string.Join(";", OriginalFrameworkStrings): 
+                        string.Join(";", Frameworks.Select(f => f.Framework.GetShortFolderName())) },
                     });
                 }
 

@@ -1,8 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NuGet.Frameworks;
 using NuGet.LibraryModel;
 using NuGet.Shared;
@@ -66,9 +67,20 @@ namespace NuGet.ProjectModel
             }
 
             return EqualityUtility.EqualsWithNullCheck(FrameworkName, other.FrameworkName) &&
-                   Dependencies.SequenceEqualWithNullCheck(other.Dependencies) &&
+                   Dependencies.OrderedEquals(other.Dependencies, dependency => dependency.Name, StringComparer.Ordinal) &&
                    Imports.SequenceEqualWithNullCheck(other.Imports) &&
                    AssetTargetFallback == other.AssetTargetFallback;
+        }
+
+        public TargetFrameworkInformation Clone()
+        {
+            var clonedObject = new TargetFrameworkInformation();
+            clonedObject.FrameworkName = FrameworkName;
+            clonedObject.Dependencies = Dependencies.Select(item => (LibraryDependency)item.Clone()).ToList();
+            clonedObject.Imports = new List<NuGetFramework>(Imports);
+            clonedObject.AssetTargetFallback = AssetTargetFallback;
+            clonedObject.Warn = Warn;
+            return clonedObject;
         }
     }
 }

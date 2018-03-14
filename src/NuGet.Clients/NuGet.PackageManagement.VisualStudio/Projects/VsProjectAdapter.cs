@@ -28,6 +28,7 @@ namespace NuGet.PackageManagement.VisualStudio
         private readonly Lazy<EnvDTE.Project> _dteProject;
         private readonly IDeferredProjectWorkspaceService _workspaceService;
         private readonly IVsProjectThreadingService _threadingService;
+        private readonly string _projectTypeGuid;
 
         #endregion Private members
 
@@ -148,7 +149,7 @@ namespace NuGet.PackageManagement.VisualStudio
                     return EnvDTEProjectUtility.IsSupported(Project);
                 }
 
-                return true;
+                return VsHierarchyUtility.IsSupported(VsHierarchy, _projectTypeGuid);
             }
         }
 
@@ -188,21 +189,6 @@ namespace NuGet.PackageManagement.VisualStudio
 
         public ProjectNames ProjectNames { get; private set; }
 
-        public string[] ProjectTypeGuids
-        {
-            get
-            {
-                if (!IsDeferred)
-                {
-                    return VsHierarchyUtility.GetProjectTypeGuids(Project);
-                }
-                else
-                {
-                    return VsHierarchyUtility.GetProjectTypeGuids(VsHierarchy);
-                }
-            }
-        }
-
         public string UniqueName => ProjectNames.UniqueName;
 
         public string Version
@@ -229,7 +215,7 @@ namespace NuGet.PackageManagement.VisualStudio
 
         public IVsHierarchy VsHierarchy => _vsHierarchyItem.VsHierarchy;
 
-        public string RestoreAdditionalProjectSources => BuildProperties.GetPropertyValue(ProjectBuildProperties.AssetTargetFallback);
+        public string RestoreAdditionalProjectSources => BuildProperties.GetPropertyValue(ProjectBuildProperties.RestoreAdditionalProjectSources);
 
         public string RestoreAdditionalProjectFallbackFolders => BuildProperties.GetPropertyValue(ProjectBuildProperties.RestoreAdditionalProjectFallbackFolders);
 
@@ -247,6 +233,7 @@ namespace NuGet.PackageManagement.VisualStudio
             VsHierarchyItem vsHierarchyItem,
             ProjectNames projectNames,
             string fullProjectPath,
+            string projectTypeGuid,
             Func<IVsHierarchy, EnvDTE.Project> loadDteProject,
             IProjectBuildProperties buildProperties,
             IVsProjectThreadingService threadingService,
@@ -258,6 +245,7 @@ namespace NuGet.PackageManagement.VisualStudio
             _dteProject = new Lazy<EnvDTE.Project>(() => loadDteProject(_vsHierarchyItem.VsHierarchy));
             _workspaceService = workspaceService;
             _threadingService = threadingService;
+            _projectTypeGuid = projectTypeGuid;
 
             FullProjectPath = fullProjectPath;
             ProjectNames = projectNames;
@@ -267,6 +255,31 @@ namespace NuGet.PackageManagement.VisualStudio
         #endregion Constructors
 
         #region Getters
+
+        public async Task<string[]> GetProjectTypeGuidsAsync()
+        {
+            if (!IsDeferred)
+            {
+                return VsHierarchyUtility.GetProjectTypeGuids(Project);
+            }
+            else
+            {
+                // Get ProjectTypeGuids from msbuild property, if it doesn't exist, fall back to projectTypeGuid.
+                var projectTypeGuids = await BuildProperties.GetPropertyValueAsync(ProjectBuildProperties.ProjectTypeGuids);
+
+                if (!string.IsNullOrEmpty(projectTypeGuids))
+                {
+                    return MSBuildStringUtility.Split(projectTypeGuids);
+                }
+
+                if (!string.IsNullOrEmpty(_projectTypeGuid))
+                {
+                    return new string[] { _projectTypeGuid };
+                }
+
+                return new string[0];
+            }
+        }
 
         public async Task<FrameworkName> GetDotNetFrameworkNameAsync()
         {
@@ -294,7 +307,8 @@ namespace NuGet.PackageManagement.VisualStudio
             }
             else
             {
-                if (ProjectTypeGuids.All(SupportedProjectTypes.IsSupportedForAddingReferences))
+                var projectTypeGuids = await GetProjectTypeGuidsAsync();
+                if (projectTypeGuids.All(SupportedProjectTypes.IsSupportedForAddingReferences))
                 {
                     return await _workspaceService.GetProjectReferencesAsync(FullProjectPath);
                 }

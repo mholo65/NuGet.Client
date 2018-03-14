@@ -1,6 +1,8 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
+using System.Collections.Generic;
 using System.Xml.Linq;
 using NuGet.Packaging;
 
@@ -24,7 +26,9 @@ namespace NuGet.ProjectManagement
         FileConflictAction ResolveFileConflict(string message);
 
         PackageExtractionContext PackageExtractionContext { get; set; }
+
         ISourceControlManagerProvider SourceControlManagerProvider { get; }
+
         ExecutionContext ExecutionContext { get; }
 
         /// <summary>
@@ -35,7 +39,7 @@ namespace NuGet.ProjectManagement
 
         NuGetActionType ActionType { get; set; }
 
-        TelemetryServiceHelper TelemetryService { get; set; }
+        Guid OperationId { get; set; }
     }
 
     /// <summary>

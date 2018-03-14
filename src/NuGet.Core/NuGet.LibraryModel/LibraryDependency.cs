@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -27,6 +27,24 @@ namespace NuGet.LibraryModel
         /// True if the PackageReference is added by the SDK and not the user.
         /// </summary>
         public bool AutoReferenced { get; set; }
+
+        public LibraryDependency() { }
+
+        public LibraryDependency(
+            LibraryRange libraryRange,
+            LibraryDependencyType type,
+            LibraryIncludeFlags includeType,
+            LibraryIncludeFlags suppressParent,
+            IList<NuGetLogCode> noWarn,
+            bool autoReferenced)
+        {
+            LibraryRange = libraryRange;
+            Type = type;
+            IncludeType = includeType;
+            SuppressParent = suppressParent;
+            NoWarn = noWarn;
+            AutoReferenced = autoReferenced;
+        }
 
         public override string ToString()
         {
@@ -88,19 +106,10 @@ namespace NuGet.LibraryModel
 
         public LibraryDependency Clone()
         {
-            return new LibraryDependency
-            {
-                IncludeType = IncludeType,
-                LibraryRange = new LibraryRange
-                {
-                    Name = LibraryRange.Name,
-                    TypeConstraint = LibraryRange.TypeConstraint,
-                    VersionRange = LibraryRange.VersionRange
-                },
-                SuppressParent = SuppressParent,
-                Type = Type,
-                AutoReferenced = AutoReferenced
-            };
+            var clonedLibraryRange = new LibraryRange(LibraryRange.Name, LibraryRange.VersionRange, LibraryRange.TypeConstraint);
+            var clonedNoWarn = new List<NuGetLogCode>(NoWarn);
+
+            return new LibraryDependency(clonedLibraryRange, Type, IncludeType, SuppressParent, clonedNoWarn, AutoReferenced);
         }
     }
 }

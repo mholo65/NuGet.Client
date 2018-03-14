@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -13,6 +13,8 @@ using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.PackageExtraction;
+using NuGet.Packaging.Signing;
 using NuGet.ProjectManagement;
 using NuGet.ProjectManagement.Projects;
 using NuGet.Protocol.Core.Types;
@@ -155,12 +157,12 @@ namespace NuGet.PackageManagement
         private async Task<Dictionary<PackageReference, List<string>>> GetPackagesReferencesDictionaryAsync(CancellationToken token)
         {
             var packageReferencesDict = new Dictionary<PackageReference, List<string>>(new PackageReferenceComparer());
-            if (!SolutionManager.IsSolutionAvailable)
+            if (!await SolutionManager.IsSolutionAvailableAsync())
             {
                 return packageReferencesDict;
             }
 
-            foreach (var nuGetProject in SolutionManager.GetNuGetProjects())
+            foreach (var nuGetProject in (await SolutionManager.GetNuGetProjectsAsync()))
             {
                 // skip project k projects and build aware projects
                 if (nuGetProject is INuGetIntegratedProject)
@@ -168,17 +170,24 @@ namespace NuGet.PackageManagement
                     continue;
                 }
 
-                var nuGetProjectName = NuGetProject.GetUniqueNameOrName(nuGetProject);
-                var installedPackageReferences = await nuGetProject.GetInstalledPackagesAsync(token);
-                foreach (var installedPackageReference in installedPackageReferences)
+                try
                 {
-                    List<string> projectNames = null;
-                    if (!packageReferencesDict.TryGetValue(installedPackageReference, out projectNames))
+                    var nuGetProjectName = NuGetProject.GetUniqueNameOrName(nuGetProject);
+                    var installedPackageReferences = await nuGetProject.GetInstalledPackagesAsync(token);
+                    foreach (var installedPackageReference in installedPackageReferences)
                     {
-                        projectNames = new List<string>();
-                        packageReferencesDict.Add(installedPackageReference, projectNames);
+                        List<string> projectNames = null;
+                        if (!packageReferencesDict.TryGetValue(installedPackageReference, out projectNames))
+                        {
+                            projectNames = new List<string>();
+                            packageReferencesDict.Add(installedPackageReference, projectNames);
+                        }
+                        projectNames.Add(nuGetProjectName);
                     }
-                    projectNames.Add(nuGetProjectName);
+                }
+                catch (Exception)
+                {
+                    // ignore failed projects, and continue with other projects
                 }
             }
 
@@ -205,7 +214,10 @@ namespace NuGet.PackageManagement
 
             using (var cacheContext = new SourceCacheContext())
             {
-                var downloadContext = new PackageDownloadContext(cacheContext);
+                var downloadContext = new PackageDownloadContext(cacheContext)
+                {
+                    ParentId = nuGetProjectContext.OperationId
+                };
 
                 return await RestoreMissingPackagesAsync(
                     solutionDirectory,
@@ -294,7 +306,15 @@ namespace NuGet.PackageManagement
             // and not have to determine if the package is a satellite package beforehand
             if (nuGetProjectContext.PackageExtractionContext == null)
             {
-                nuGetProjectContext.PackageExtractionContext = new PackageExtractionContext(new LoggerAdapter(nuGetProjectContext));
+                var signedPackageVerifier = new PackageSignatureVerifier(
+                           SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
+                           SignedPackageVerifierSettings.Default);
+
+                nuGetProjectContext.PackageExtractionContext = new PackageExtractionContext(
+                    PackageSaveMode.Defaultv2,
+                    PackageExtractionBehavior.XmlDocFileSaveMode,
+                    new LoggerAdapter(nuGetProjectContext),
+                    signedPackageVerifier);
             }
 
             nuGetProjectContext.PackageExtractionContext.CopySatelliteFiles = false;

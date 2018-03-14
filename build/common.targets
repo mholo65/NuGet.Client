@@ -142,6 +142,14 @@
     </MsBuild>
   </Target>
 
+  <Target Name="GetXPLATProject" Returns="@(XPLATProjects)">
+    <ItemGroup Condition="'$(XPLATProject)' == 'true'">
+      <XPLATProjects Include="$(MSBuildProjectFullPath)">
+      </XPLATProjects>
+    </ItemGroup>
+  </Target>
+
+
   <Target Name="_GetLocalizedDllsForSigning" Returns="@(LocalizedDllsToSign)">
     <ItemGroup>
       <LocalizedDllsToSign Include="$(OutputPath)**\$(AssemblyName).resources.dll">
@@ -201,23 +209,23 @@
     ============================================================
   -->
   <!--Target is invoked by build\build.proj\MoveLocalizedFilesToLocalizedArtifacts to get all the localized files from all projects-->
-  <Target Name="GetLocalizedFilesInProjectOutputPath" Returns="@(_LocalizedDllsWithRelativePath)" Condition=" '$(PackProject)' == 'true' ">
+  <Target Name="GetNetCoreLocalizedFilesInProjectOutputPath" Returns="@(_LocalizedNetCoreDllsWithRelativeTargetPath)" Condition=" '$(PackProject)' == 'true' ">
     <ItemGroup>
       <_LocalizedDllsNetCoreApp Include="$(OutputPath)netcoreapp1.0\**\$(AssemblyName).resources.dll"/>
       <_LocalizedDllsNetStandard13 Include="$(OutputPath)netstandard1.3\**\$(AssemblyName).resources.dll"/>
       <_LocalizedDllsNetStandard10 Include="$(OutputPath)netstandard1.0\**\$(AssemblyName).resources.dll"/>
 
-      <_LocalizedDllsWithRelativePath Include="@(_LocalizedDllsNetCoreApp)" Condition=" '@(_LocalizedDllsNetCoreApp)' != '' ">
-        <RelativeTargetPath>netstandard1.3\%(_LocalizedDllsNetCoreApp.RecursiveDir)\%(_LocalizedDllsNetCoreApp.FileName)%(_LocalizedDllsNetCoreApp.Extension)</RelativeTargetPath>
-      </_LocalizedDllsWithRelativePath>
+      <_LocalizedNetCoreDllsWithRelativeTargetPath Include="@(_LocalizedDllsNetCoreApp)" Condition=" '@(_LocalizedDllsNetCoreApp)' != '' ">
+        <RelativeTargetPath>netstandard1.3\%(_LocalizedDllsNetCoreApp.RecursiveDir)%(_LocalizedDllsNetCoreApp.FileName)%(_LocalizedDllsNetCoreApp.Extension)</RelativeTargetPath>
+      </_LocalizedNetCoreDllsWithRelativeTargetPath>
 
-      <_LocalizedDllsWithRelativePath Include="@(_LocalizedDllsNetStandard10)" Condition=" '@(_LocalizedDllsNetStandard10)' != '' ">
-        <RelativeTargetPath>netstandard1.3\%(_LocalizedDllsNetStandard10.RecursiveDir)\%(_LocalizedDllsNetStandard10.FileName)%(_LocalizedDllsNetStandard10.Extension)</RelativeTargetPath>
-      </_LocalizedDllsWithRelativePath>
+      <_LocalizedNetCoreDllsWithRelativeTargetPath Include="@(_LocalizedDllsNetStandard10)" Condition=" '@(_LocalizedDllsNetStandard10)' != '' ">
+        <RelativeTargetPath>netstandard1.3\%(_LocalizedDllsNetStandard10.RecursiveDir)%(_LocalizedDllsNetStandard10.FileName)%(_LocalizedDllsNetStandard10.Extension)</RelativeTargetPath>
+      </_LocalizedNetCoreDllsWithRelativeTargetPath>
 
-      <_LocalizedDllsWithRelativePath Include="@(_LocalizedDllsNetStandard13)" Condition=" '@(_LocalizedDllsNetStandard13)' != '' ">
-        <RelativeTargetPath>netstandard1.3\%(_LocalizedDllsNetStandard13.RecursiveDir)\%(_LocalizedDllsNetStandard13.FileName)%(_LocalizedDllsNetStandard13.Extension)</RelativeTargetPath>
-      </_LocalizedDllsWithRelativePath>
+      <_LocalizedNetCoreDllsWithRelativeTargetPath Include="@(_LocalizedDllsNetStandard13)" Condition=" '@(_LocalizedDllsNetStandard13)' != '' ">
+        <RelativeTargetPath>netstandard1.3\%(_LocalizedDllsNetStandard13.RecursiveDir)%(_LocalizedDllsNetStandard13.FileName)%(_LocalizedDllsNetStandard13.Extension)</RelativeTargetPath>
+      </_LocalizedNetCoreDllsWithRelativeTargetPath>
     </ItemGroup>
   </Target>
 
@@ -265,7 +273,7 @@
   -->
   <Target Name="RunTestsInner">
     <PropertyGroup>
-      <TestAssemblyPath>$(OutputPath)$(AssemblyName).exe</TestAssemblyPath>
+      <TestAssemblyPath>$(OutputPath)$(AssemblyName).dll</TestAssemblyPath>
     </PropertyGroup>
     <Message Text="Running tests on $(TestAssemblyPath)" Importance="high" />
 
@@ -314,8 +322,7 @@
           Returns="@(TestAssemblyPath)">
 
     <PropertyGroup>
-      <TestAssemblyRelativePath Condition=" '$(IsDesktop)' == 'true' ">$(OutputPath)$(AssemblyName).exe</TestAssemblyRelativePath>
-      <TestAssemblyRelativePath Condition=" '$(IsDesktop)' != 'true' ">$(OutputPath)$(AssemblyName).dll</TestAssemblyRelativePath>
+      <TestAssemblyRelativePath>$(OutputPath)$(AssemblyName).dll</TestAssemblyRelativePath>
     </PropertyGroup>
 
     <ConvertToAbsolutePath Paths="$(TestAssemblyRelativePath)">

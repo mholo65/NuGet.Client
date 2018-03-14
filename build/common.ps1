@@ -5,11 +5,11 @@ $DefaultMSBuildVersion = 15
 
 # The pack version can be inferred from the .nuspec files on disk. This is only necessary as long
 # as the following issue is open: https://github.com/NuGet/Home/issues/3530
-$PackageReleaseVersion = "4.3.0"
+$PackageReleaseVersion = "4.6.0"
 
 $NuGetClientRoot = Split-Path -Path $PSScriptRoot -Parent
 $CLIRoot = Join-Path $NuGetClientRoot cli
-$CLIRootTest = Join-Path $NuGetClientRoot cli_test
+$CLIRootForPack = Join-Path $NuGetClientRoot "cli1.0.4"
 $Artifacts = Join-Path $NuGetClientRoot artifacts
 $Nupkgs = Join-Path $Artifacts nupkgs
 $ReleaseNupkgs = Join-Path $Artifacts ReleaseNupkgs
@@ -17,7 +17,6 @@ $ConfigureJson = Join-Path $Artifacts configure.json
 $ILMergeOutputDir = Join-Path $Artifacts "VS14"
 
 $DotNetExe = Join-Path $CLIRoot 'dotnet.exe'
-$DotNetExeTest = Join-Path $CLIRootTest 'dotnet.exe'
 $NuGetExe = Join-Path $NuGetClientRoot '.nuget\nuget.exe'
 $XunitConsole = Join-Path $NuGetClientRoot 'packages\xunit.runner.console.2.1.0\tools\xunit.console.exe'
 $ILMerge = Join-Path $NuGetClientRoot 'packages\ILMerge.2.14.1208\tools\ILMerge.exe'
@@ -183,7 +182,7 @@ Function Install-NuGet {
     if ($Force -or -not (Test-Path $NuGetExe)) {
         Trace-Log 'Downloading nuget.exe'
 
-        wget https://dist.nuget.org/win-x86-commandline/v4.0.0/nuget.exe -OutFile $NuGetExe
+        wget https://dist.nuget.org/win-x86-commandline/v4.4.1/nuget.exe -OutFile $NuGetExe
     }
 
     # Display nuget info
@@ -199,6 +198,41 @@ Function Install-DotnetCLI {
     $cli = @{
             Root = $CLIRoot
             DotNetExe = Join-Path $CLIRoot 'dotnet.exe'
+            DotNetInstallUrl = 'https://raw.githubusercontent.com/dotnet/cli/4bd9bb92cc3636421cd01baedbd8ef3e41aa1e22/scripts/obtain/dotnet-install.ps1'
+        }
+
+    $env:DOTNET_HOME=$cli.Root
+    $env:DOTNET_INSTALL_DIR=$NuGetClientRoot
+
+    if ($Force -or -not (Test-Path $cli.DotNetExe)) {
+        Trace-Log 'Downloading .NET CLI'
+
+        New-Item -ItemType Directory -Force -Path $cli.Root | Out-Null
+
+        $DotNetInstall = Join-Path $cli.Root 'dotnet-install.ps1'
+
+        Invoke-WebRequest $cli.DotNetInstallUrl -OutFile $DotNetInstall
+
+        & $DotNetInstall -Channel Master -i $cli.Root -Version 2.2.0-preview1-007853
+    }
+
+    if (-not (Test-Path $cli.DotNetExe)) {
+        Error-Log "Unable to find dotnet.exe. The CLI install may have failed." -Fatal
+    }
+
+    # Display build info
+    & $cli.DotNetExe --info
+}
+
+Function Install-DotnetCLIToILMergePack {
+    [CmdletBinding()]
+    param(
+        [switch]$Force
+    )
+
+    $cli = @{
+            Root = $CLIRootForPack
+            DotNetExe = Join-Path $CLIRootForPack 'dotnet.exe'
             DotNetInstallUrl = 'https://raw.githubusercontent.com/dotnet/cli/58b0566d9ac399f5fa973315c6827a040b7aae1f/scripts/obtain/dotnet-install.ps1'
             Version = '1.0.1'
         }
@@ -285,7 +319,9 @@ Function Test-BuildEnvironment {
         [switch]$CI
     )
     if (-not (Test-Path $ConfigureJson)) {
-        Error-Log 'Build environment is not configured. Please run configure.ps1 first.' -Fatal
+        # Run the configure script if it hasn't been executed
+        $configureScriptPath = Join-Path $NuGetClientRoot configure.ps1
+        Invoke-Expression $configureScriptPath
     }
 
     $Installed = (Test-Path $DotNetExe) -and (Test-Path $NuGetExe)
@@ -374,7 +410,7 @@ Function Set-DelaySigning {
 }
 
 Function Get-BuildNumber() {
-    $SemanticVersionDate = '2017-02-27'
+    $SemanticVersionDate = '2017-10-12'
     try {
         [uint16](((Get-Date) - (Get-Date $SemanticVersionDate)).TotalMinutes / 5)
     }

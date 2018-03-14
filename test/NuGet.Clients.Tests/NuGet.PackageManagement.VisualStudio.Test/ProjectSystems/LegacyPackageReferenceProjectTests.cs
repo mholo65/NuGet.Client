@@ -49,7 +49,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             using (var testDirectory = TestDirectory.Create())
             {
                 var testBaseIntermediateOutputPath = Path.Combine(testDirectory, "obj");
-                TestDirectory.Create(testBaseIntermediateOutputPath);
+                Directory.CreateDirectory(testBaseIntermediateOutputPath);
                 var projectAdapter = Mock.Of<IVsProjectAdapter>();
                 Mock.Get(projectAdapter)
                     .SetupGet(x => x.BaseIntermediateOutputPath)
@@ -103,7 +103,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             {
                 var testProj = "project.csproj";
                 var testBaseIntermediateOutputPath = Path.Combine(testDirectory, "obj");
-                TestDirectory.Create(testBaseIntermediateOutputPath);
+                Directory.CreateDirectory(testBaseIntermediateOutputPath);
                 var projectAdapter = Mock.Of<IVsProjectAdapter>();
                 Mock.Get(projectAdapter)
                     .SetupGet(x => x.BaseIntermediateOutputPath)
@@ -161,7 +161,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             {
                 var testProj = "project.csproj";
                 var testBaseIntermediateOutputPath = Path.Combine(testDirectory, "obj");
-                TestDirectory.Create(testBaseIntermediateOutputPath);
+                Directory.CreateDirectory(testBaseIntermediateOutputPath);
                 var projectAdapter = Mock.Of<IVsProjectAdapter>();
                 Mock.Get(projectAdapter)
                     .SetupGet(x => x.BaseIntermediateOutputPath)
@@ -503,8 +503,10 @@ namespace NuGet.PackageManagement.VisualStudio.Test
 
                 var actualRestoreSpec = packageSpecs.Single();
                 SpecValidationUtility.ValidateProjectSpec(actualRestoreSpec);
+                //No top level dependencies
+                Assert.Equal(0, actualRestoreSpec.Dependencies.Count);
 
-                var actualDependency = actualRestoreSpec.Dependencies.Single();
+                var actualDependency = actualRestoreSpec.TargetFrameworks.SingleOrDefault().Dependencies.Single();
                 Assert.NotNull(actualDependency);
                 Assert.Equal("packageA", actualDependency.LibraryRange.Name);
                 Assert.Equal(VersionRange.Parse("1.*"), actualDependency.LibraryRange.VersionRange);
@@ -775,7 +777,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
                 .ReturnsAsync(NuGetFramework.Parse("netstandard13"));
 
             var testBaseIntermediateOutputPath = Path.Combine(fullPath, "obj");
-            TestDirectory.Create(testBaseIntermediateOutputPath);
+            Directory.CreateDirectory(testBaseIntermediateOutputPath);
             projectAdapter
                 .Setup(x => x.BaseIntermediateOutputPath)
                 .Returns(testBaseIntermediateOutputPath);

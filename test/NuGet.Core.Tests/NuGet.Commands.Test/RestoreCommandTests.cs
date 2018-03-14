@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -7,11 +7,13 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Moq;
 using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Frameworks;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.ProjectModel;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
@@ -949,6 +951,142 @@ namespace NuGet.Commands.Test
         }
 
         [Fact]
+        public async Task RestoreCommand_InvalidSignedPackage()
+        {
+            // Arrange
+            var sources = new List<PackageSource>();
+
+            var project1Json = @"
+            {
+              ""version"": ""1.0.0"",
+              ""description"": """",
+              ""authors"": [ ""author"" ],
+              ""tags"": [ """" ],
+              ""projectUrl"": """",
+              ""licenseUrl"": """",
+              ""frameworks"": {
+                ""net46"": {
+                    ""dependencies"": {
+                        ""packageA"": ""1.0.0""
+                    }
+                }
+              }
+            }";
+
+            using (var workingDir = TestDirectory.Create())
+            {
+                var packagesDir = new DirectoryInfo(Path.Combine(workingDir, "globalPackages"));
+                var packageSource = new DirectoryInfo(Path.Combine(workingDir, "packageSource"));
+                var project1 = new DirectoryInfo(Path.Combine(workingDir, "projects", "project1"));
+                packagesDir.Create();
+                packageSource.Create();
+                project1.Create();
+                sources.Add(new PackageSource(packageSource.FullName));
+
+                File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
+
+                var specPath1 = Path.Combine(project1.FullName, "project.json");
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1);
+
+                var logger = new TestLogger();
+
+                var signedPackageVerifier = new Mock<IPackageSignatureVerifier>(MockBehavior.Strict);
+
+                signedPackageVerifier.Setup(x => x.VerifySignaturesAsync(
+                    It.IsAny<ISignedPackageReader>(),
+                    It.IsAny<CancellationToken>(),
+                    It.IsAny<Guid>())).
+                    ReturnsAsync(new VerifySignaturesResult(false));
+
+                var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
+                {
+                    LockFilePath = Path.Combine(project1.FullName, "project.lock.json"),
+                    PackageSignatureVerifier = signedPackageVerifier.Object
+                };
+
+                var packageAContext = new SimpleTestPackageContext("packageA");
+                packageAContext.AddFile("lib/net46/a.dll");
+
+                SimpleTestPackageUtility.CreateFullPackage(packageSource.FullName, packageAContext);
+
+                // Act
+                var command = new RestoreCommand(request);
+                var result = await command.ExecuteAsync();
+               
+                // Assert
+                Assert.False(result.Success);
+            }
+        }
+
+        [Fact]
+        public async Task RestoreCommand_SignedPackage()
+        {
+            // Arrange
+            var sources = new List<PackageSource>();
+
+            var project1Json = @"
+            {
+              ""version"": ""1.0.0"",
+              ""description"": """",
+              ""authors"": [ ""author"" ],
+              ""tags"": [ """" ],
+              ""projectUrl"": """",
+              ""licenseUrl"": """",
+              ""frameworks"": {
+                ""net46"": {
+                    ""dependencies"": {
+                        ""packageA"": ""1.0.0""
+                    }
+                }
+              }
+            }";
+
+            using (var workingDir = TestDirectory.Create())
+            {
+                var packagesDir = new DirectoryInfo(Path.Combine(workingDir, "globalPackages"));
+                var packageSource = new DirectoryInfo(Path.Combine(workingDir, "packageSource"));
+                var project1 = new DirectoryInfo(Path.Combine(workingDir, "projects", "project1"));
+                packagesDir.Create();
+                packageSource.Create();
+                project1.Create();
+                sources.Add(new PackageSource(packageSource.FullName));
+
+                File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
+
+                var specPath1 = Path.Combine(project1.FullName, "project.json");
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1);
+
+                var logger = new TestLogger();
+
+                var signedPackageVerifier = new Mock<IPackageSignatureVerifier>(MockBehavior.Strict);
+
+                signedPackageVerifier.Setup(x => x.VerifySignaturesAsync(
+                    It.IsAny<ISignedPackageReader>(),
+                    It.IsAny<CancellationToken>(),
+                    It.IsAny<Guid>())).
+                    ReturnsAsync(new VerifySignaturesResult(true));
+
+                var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
+                {
+                    LockFilePath = Path.Combine(project1.FullName, "project.lock.json"),
+                    PackageSignatureVerifier = signedPackageVerifier.Object
+                };
+
+                var packageAContext = new SimpleTestPackageContext("packageA");
+                packageAContext.AddFile("lib/net46/a.dll");
+
+                SimpleTestPackageUtility.CreateFullPackage(packageSource.FullName, packageAContext);
+
+                // Act
+                var command = new RestoreCommand(request);
+                var result = await command.ExecuteAsync();
+
+                // Assert
+                Assert.True(result.Success);
+            }
+        }
+
+        [Fact]
         public async Task RestoreCommand_PathInPackageLibrary()
         {
             // Arrange
@@ -1054,8 +1192,7 @@ namespace NuGet.Commands.Test
 
                 // Assert
                 Assert.False(result.Success);
-                Assert.Equal(1, result.GetAllUnresolved().Count);
-                Assert.True(logger.ErrorMessages.Any(s => s.Contains("Unable to resolve 'project1 (>= 1.0.0)' for '.NETFramework,Version=v4.5'.")));
+                Assert.True(logger.ErrorMessages.Any(s => s.Contains("Cycle detected")));
             }
         }
 

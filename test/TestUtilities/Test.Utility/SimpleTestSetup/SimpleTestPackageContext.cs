@@ -1,12 +1,14 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Text;
 using System.Xml.Linq;
-using NuGet.Common;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.Versioning;
 
 namespace NuGet.Test.Utility
@@ -48,6 +50,11 @@ namespace NuGet.Test.Utility
         public string NoWarn { get; set; }
 
         /// <summary>
+        /// Package signatures.
+        /// </summary>
+        public List<Signature> Signatures { get; set; } = new List<Signature>();
+
+        /// <summary>
         /// runtime.json
         /// </summary>
         public string RuntimeJson { get; set; }
@@ -77,6 +84,51 @@ namespace NuGet.Test.Utility
             }
 
             Files.Add(new KeyValuePair<string, byte[]>(path, bytes));
+        }
+
+        /// <summary>
+        /// Creates the package as a ZipArchive.
+        /// </summary>
+        public ZipArchive Create()
+        {
+            return Create(ZipArchiveMode.Update);
+        }
+
+        /// <summary>
+        /// Creates the package as a ZipArchive.
+        /// </summary>
+        public ZipArchive Create(ZipArchiveMode mode)
+        {
+            return new ZipArchive(CreateAsStream(), ZipArchiveMode.Update, leaveOpen: false);
+        }
+
+        /// <summary>
+        /// Creates a ZipArchive and writes it to a stream.
+        /// </summary>
+        public MemoryStream CreateAsStream()
+        {
+            var stream = new MemoryStream();
+            SimpleTestPackageUtility.CreatePackage(stream, this);
+            return stream;
+        }
+
+        /// <summary>
+        /// Creates a file and writes to it.
+        /// </summary>
+        /// <param name="testDirectory">The directory for the new file.</param>
+        /// <param name="fileName">The file name.</param>
+        /// <returns>A <see cref="FileInfo" /> object.</returns>
+        public FileInfo CreateAsFile(TestDirectory testDirectory, string fileName)
+        {
+            var packageFile = new FileInfo(Path.Combine(testDirectory, fileName));
+
+            using (var readStream = CreateAsStream())
+            using (var writeStream = packageFile.OpenWrite())
+            {
+                readStream.CopyTo(writeStream);
+            }
+
+            return packageFile;
         }
     }
 }

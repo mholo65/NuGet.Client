@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -7,9 +7,12 @@ using System.Linq;
 using System.Management.Automation;
 using System.Threading.Tasks;
 using NuGet.Common;
+using NuGet.PackageManagement.Telemetry;
 using NuGet.PackageManagement.VisualStudio;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.ProjectManagement;
+using NuGet.Protocol.Core.Types;
 using NuGet.Resolver;
 using NuGet.Versioning;
 using NuGet.VisualStudio;
@@ -19,7 +22,6 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
     [Cmdlet(VerbsData.Update, "Package", DefaultParameterSetName = "All")]
     public class UpdatePackageCommand : PackageActionBaseCommand
     {
-        private ResolutionContext _context;
         private UninstallationContext _uninstallcontext;
         private string _id;
         private string _projectName;
@@ -80,7 +82,7 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
             ParseUserInputForVersion();
             if (!_projectSpecified)
             {
-                Projects = VsSolutionManager.GetNuGetProjects().ToList();
+                Projects = NuGetUIThreadHelper.JoinableTaskFactory.Run(async () => await VsSolutionManager.GetNuGetProjectsAsync()).ToList();
             }
             else
             {
@@ -101,11 +103,8 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
         {
             var startTime = DateTimeOffset.Now;
 
-            // Set to log telemetry granular events for this update operation 
-            TelemetryService = new TelemetryServiceHelper();
-
             // start timer for telemetry event
-            TelemetryUtility.StartorResumeTimer();
+            TelemetryServiceUtility.StartOrResumeTimer();
 
             // Run Preprocess outside of JTF
             Preprocess();
@@ -135,18 +134,19 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
             });
 
             // stop timer for telemetry event and create action telemetry event instance
-            TelemetryUtility.StopTimer();
-            var actionTelemetryEvent = TelemetryUtility.GetActionTelemetryEvent(
+            TelemetryServiceUtility.StopTimer();
+            var actionTelemetryEvent = VSTelemetryServiceUtility.GetActionTelemetryEvent(
+                OperationId.ToString(),
                 new[] { Project },
                 NuGetOperationType.Update,
                 OperationSource.PMC,
                 startTime,
                 _status,
                 _packageCount,
-                TelemetryUtility.GetTimerElapsedTimeInSeconds());
+                TelemetryServiceUtility.GetTimerElapsedTimeInSeconds());
 
-            // emit telemetry event along with granular level for update operation
-            ActionsTelemetryService.Instance.EmitActionEvent(actionTelemetryEvent, TelemetryService.TelemetryEvents);
+            // emit telemetry event along with granular level events
+            TelemetryActivity.EmitTelemetryEvent(actionTelemetryEvent);
         }
 
         /// <summary>
@@ -157,25 +157,45 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
         {
             try
             {
-                // if the source is explicitly specified we will use exclusively that source otherwise use ALL enabled sources
-                var actions = await PackageManager.PreviewUpdatePackagesAsync(
-                    Projects,
-                    ResolutionContext,
-                    this,
-                    PrimarySourceRepositories,
-                    PrimarySourceRepositories,
-                    Token);
-
-                if (!actions.Any())
+                using (var sourceCacheContext = new SourceCacheContext())
                 {
-                    _status = NuGetOperationStatus.NoOp;
-                }
-                else
-                {
-                    _packageCount = actions.Select(action => action.PackageIdentity.Id).Distinct().Count();
-                }
+                    var resolutionContext = new ResolutionContext(
+                        GetDependencyBehavior(),
+                        _allowPrerelease,
+                        false,
+                        DetermineVersionConstraints(),
+                        new GatherCache(),
+                        sourceCacheContext);
 
-                await ExecuteActions(actions);
+                    // if the source is explicitly specified we will use exclusively that source otherwise use ALL enabled sources
+                    var actions = await PackageManager.PreviewUpdatePackagesAsync(
+                        Projects,
+                        resolutionContext,
+                        this,
+                        PrimarySourceRepositories,
+                        PrimarySourceRepositories,
+                        Token);
+
+                    if (!actions.Any())
+                    {
+                        _status = NuGetOperationStatus.NoOp;
+                    }
+                    else
+                    {
+                        _packageCount = actions.Select(action => action.PackageIdentity.Id).Distinct().Count();
+                    }
+
+                    await ExecuteActions(actions, sourceCacheContext);
+                }
+            }
+            catch (SignatureException ex)
+            {
+                // set nuget operation status to failed when an exception is thrown
+                _status = NuGetOperationStatus.Failed;
+
+                var logMessages = ex.Results.SelectMany(p => p.Issues).Select(p => p.ToLogMessage()).ToList();
+
+                logMessages.ForEach(p => Log(LogUtility.LogLevelToMessageLevel(p.Level), p.Message));
             }
             catch (Exception ex)
             {
@@ -210,6 +230,15 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
                     Log(MessageLevel.Error, Resources.Cmdlet_PackageNotInstalledInAnyProject, Id);
                 }
             }
+            catch (SignatureException ex)
+            {
+                // set nuget operation status to failed when an exception is thrown
+                _status = NuGetOperationStatus.Failed;
+
+                var logMessages = ex.Results.SelectMany(p => p.Issues).Select(p => p.ToLogMessage()).ToList();
+
+                logMessages.ForEach(p => Log(LogUtility.LogLevelToMessageLevel(p.Level), p.Message));
+            }
             catch (Exception ex)
             {
                 _status = NuGetOperationStatus.Failed;
@@ -229,41 +258,52 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
         {
             var actions = Enumerable.Empty<NuGetProjectAction>();
 
-            // If -Version switch is specified
-            if (!string.IsNullOrEmpty(Version))
+            using (var sourceCacheContext = new SourceCacheContext())
             {
-                actions = await PackageManager.PreviewUpdatePackagesAsync(
-                    new PackageIdentity(Id, PowerShellCmdletsUtility.GetNuGetVersionFromString(Version)),
-                    Projects,
-                    ResolutionContext,
-                    this,
-                    PrimarySourceRepositories,
-                    EnabledSourceRepositories,
-                    Token);
-            }
-            else
-            {
-                actions = await PackageManager.PreviewUpdatePackagesAsync(
-                    Id,
-                    Projects,
-                    ResolutionContext,
-                    this,
-                    PrimarySourceRepositories,
-                    EnabledSourceRepositories,
-                    Token);
-            }
+                var resolutionContext = new ResolutionContext(
+                    GetDependencyBehavior(),
+                    _allowPrerelease,
+                    false,
+                    DetermineVersionConstraints(),
+                    new GatherCache(),
+                    sourceCacheContext);
 
-            if (!actions.Any())
-            {
-                _status = NuGetOperationStatus.NoOp;
-            }
-            else
-            {
-                _packageCount = actions.Select(
-                    action => action.PackageIdentity.Id).Distinct().Count();
-            }
+                // If -Version switch is specified
+                if (!string.IsNullOrEmpty(Version))
+                {
+                    actions = await PackageManager.PreviewUpdatePackagesAsync(
+                        new PackageIdentity(Id, PowerShellCmdletsUtility.GetNuGetVersionFromString(Version)),
+                        Projects,
+                        resolutionContext,
+                        this,
+                        PrimarySourceRepositories,
+                        EnabledSourceRepositories,
+                        Token);
+                }
+                else
+                {
+                    actions = await PackageManager.PreviewUpdatePackagesAsync(
+                        Id,
+                        Projects,
+                        resolutionContext,
+                        this,
+                        PrimarySourceRepositories,
+                        EnabledSourceRepositories,
+                        Token);
+                }
 
-            await ExecuteActions(actions);
+                if (!actions.Any())
+                {
+                    _status = NuGetOperationStatus.NoOp;
+                }
+                else
+                {
+                    _packageCount = actions.Select(
+                        action => action.PackageIdentity.Id).Distinct().Count();
+                }
+
+                await ExecuteActions(actions, sourceCacheContext);
+            }
         }
 
         /// <summary>
@@ -291,20 +331,20 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
         /// </summary>
         /// <param name="actions"></param>
         /// <returns></returns>
-        private async Task ExecuteActions(IEnumerable<NuGetProjectAction> actions)
+        private async Task ExecuteActions(IEnumerable<NuGetProjectAction> actions, SourceCacheContext sourceCacheContext)
         {
             // stop telemetry event timer to avoid ui interaction
-            TelemetryUtility.StopTimer();
+            TelemetryServiceUtility.StopTimer();
 
             if (!ShouldContinueDueToDotnetDeprecation(actions, WhatIf.IsPresent))
             {
                 // resume telemetry event timer after ui interaction
-                TelemetryUtility.StartorResumeTimer();
+                TelemetryServiceUtility.StartOrResumeTimer();
                 return;
             }
 
             // resume telemetry event timer after ui interaction
-            TelemetryUtility.StartorResumeTimer();
+            TelemetryServiceUtility.StartOrResumeTimer();
 
             if (WhatIf.IsPresent)
             {
@@ -314,7 +354,10 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
             else
             {
                 // Execute project actions by Package Manager
-                await PackageManager.ExecuteNuGetProjectActionsAsync(Projects, actions, this, Token);
+                await PackageManager.ExecuteNuGetProjectActionsAsync(Projects, actions, this, sourceCacheContext, Token);
+
+                // Refresh Manager UI if needed
+                RefreshUI(actions);
             }
         }
 
@@ -333,23 +376,6 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
                 }
             }
             _allowPrerelease = IncludePrerelease.IsPresent || _versionSpecifiedPrerelease;
-        }
-
-        /// <summary>
-        /// Resolution Context for Update-Package command
-        /// </summary>
-        public ResolutionContext ResolutionContext
-        {
-            get
-            {
-                // ResolutionContext contains a cache, this should only be created once per command
-                if (_context == null)
-                {
-                    _context = new ResolutionContext(GetDependencyBehavior(), _allowPrerelease, false, DetermineVersionConstraints());
-                }
-
-                return _context;
-            }
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -9,6 +9,8 @@ namespace NuGet.Build.Tasks.Pack
 {
     public class PackTaskRequest : IPackTaskRequest<IMSBuildItem>
     {
+        public string[] AllowedOutputExtensionsInPackageBuildOutputFolder { get; set; }
+        public string[] AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder { get; set; }
         public string AssemblyName { get; set; }
         public string[] Authors { get; set; }
         public IMSBuildItem[] BuildOutputInPackage { get; set; }
@@ -37,6 +39,7 @@ namespace NuGet.Build.Tasks.Pack
         public string[] PackageTypes { get; set; }
         public string PackageVersion { get; set; }
         public IMSBuildItem PackItem { get; set; }
+        public IMSBuildItem[] ProjectReferencesWithVersions { get; set; }
         public string ProjectUrl { get; set; }
         public string NuspecBasePath { get; set; }
         public string[] NuspecProperties { get; set; }
