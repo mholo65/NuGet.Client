@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -12,6 +13,7 @@ using NuGet.Common;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Packaging.PackageExtraction;
+using NuGet.Packaging.Signing;
 
 namespace NuGet.Protocol.Core.Types
 {
@@ -193,22 +195,31 @@ namespace NuGet.Protocol.Core.Types
                             ? PackageSaveMode.Defaultv3
                             : PackageSaveMode.Nuspec | PackageSaveMode.Nupkg;
 
-                        var versionFolderPathContext = new VersionFolderPathContext(
-                            packageIdentity,
-                            source,
+                        var signedPackageVerifier = new PackageSignatureVerifier(
+                            SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
+                            SignedPackageVerifierSettings.Default);
+
+                        var packageExtractionContext = new PackageExtractionContext(
+                            packageSaveMode,
+                            PackageExtractionBehavior.XmlDocFileSaveMode,
                             logger,
-                            packageSaveMode: packageSaveMode,
-                            xmlDocFileSaveMode: PackageExtractionBehavior.XmlDocFileSaveMode);
+                            signedPackageVerifier);
+
+                        var versionFolderPathResolver = new VersionFolderPathResolver(source);
 
                         using (var packageDownloader = new LocalPackageArchiveDownloader(
                             packagePath,
                             packageIdentity,
                             logger))
                         {
+                            // Set Empty parentId here.
                             await PackageExtractor.InstallFromSourceAsync(
+                                packageIdentity,
                                 packageDownloader,
-                                versionFolderPathContext,
-                                token);
+                                versionFolderPathResolver,
+                                packageExtractionContext,
+                                token,
+                                Guid.Empty);
                         }
 
                         var message = string.Format(

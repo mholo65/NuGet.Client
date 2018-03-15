@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="AfterBuild" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'README.md'))\build\common.props" />
-  <Import Project="$(SolutionPackagesFolder)microbuild.core.0.2.0\build\MicroBuild.Core.props"/>
-  
+  <Import Project="$(MicroBuildDirectory)MicroBuild.Core.props"/>
+
   <!-- Configuration/global properties -->
   <PropertyGroup>
     <CommonMSBuildProperties>
@@ -27,7 +27,7 @@
       </FilesToSign>
       <FilesToSign Include="$(ArtifactsDirectory)Microsoft.Web.Xdt.2.1.1\lib\net40\**\Microsoft.Web.XmlTransform.resources.dll">
         <Authenticode>Microsoft</Authenticode>
-        <StrongName>25</StrongName>
+        <StrongName>67</StrongName>
       </FilesToSign>
     </ItemGroup>
     <MSBuild
@@ -50,5 +50,5 @@
   </Target>
 
   <Target Name="AfterBuild" DependsOnTargets="$(SignTargetsDependOn)"/>
-  <Import Project="$(SolutionPackagesFolder)microbuild.core.0.2.0\build\MicroBuild.Core.targets" />
+  <Import Project="$(MicroBuildDirectory)MicroBuild.Core.targets" />
 </Project>

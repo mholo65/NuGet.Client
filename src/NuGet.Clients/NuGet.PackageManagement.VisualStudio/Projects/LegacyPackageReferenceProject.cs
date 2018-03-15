@@ -322,15 +322,16 @@ namespace NuGet.PackageManagement.VisualStudio
             // In legacy CSProj, we only have one target framework per project
             var tfis = new TargetFrameworkInformation[] { projectTfi };
 
+            var projectName = _projectName ?? _projectUniqueName;
+
             return new PackageSpec(tfis)
             {
-                Name = _projectName ?? _projectUniqueName,
+                Name = projectName,
                 Version = new NuGetVersion(_vsProjectAdapter.Version),
                 Authors = new string[] { },
                 Owners = new string[] { },
                 Tags = new string[] { },
                 ContentFiles = new string[] { },
-                Dependencies = packageReferences,
                 FilePath = _projectFullPath,
                 RuntimeGraph = runtimeGraph,
                 RestoreMetadata = new ProjectRestoreMetadata
@@ -338,7 +339,7 @@ namespace NuGet.PackageManagement.VisualStudio
                     ProjectStyle = ProjectStyle.PackageReference,
                     OutputPath = GetBaseIntermediatePath(),
                     ProjectPath = _projectFullPath,
-                    ProjectName = _projectName ?? _projectUniqueName,
+                    ProjectName = projectName,
                     ProjectUniqueName = _projectFullPath,
                     OriginalTargetFrameworks = tfis
                         .Select(tfi => tfi.FrameworkName.GetShortFolderName())

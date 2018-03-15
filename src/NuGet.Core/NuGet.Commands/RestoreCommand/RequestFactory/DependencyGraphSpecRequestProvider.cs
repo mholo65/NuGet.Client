@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -24,7 +24,6 @@ namespace NuGet.Commands
 
         private readonly DependencyGraphSpec _dgFile;
         private readonly RestoreCommandProvidersCache _providerCache;
-        private readonly Dictionary<string, PackageSpec> _projectJsonCache = new Dictionary<string, PackageSpec>(StringComparer.Ordinal);
 
         public DependencyGraphSpecRequestProvider(
             RestoreCommandProvidersCache providerCache,
@@ -151,10 +150,11 @@ namespace NuGet.Commands
                 restoreArgs.Log)
             {
                 // Set properties from the restore metadata
-                ProjectStyle = project.PackageSpec.RestoreMetadata.ProjectStyle, 
+                ProjectStyle = project.PackageSpec.RestoreMetadata.ProjectStyle,
                 RestoreOutputPath = project.PackageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.ProjectJson ? rootPath : project.PackageSpec.RestoreMetadata.OutputPath,
                 DependencyGraphSpec = projectDgSpec,
-                BaseIntermediateOutputPath = projectPackageSpec.RestoreMetadata.OutputPath
+                BaseIntermediateOutputPath = projectPackageSpec.RestoreMetadata.OutputPath,
+                ParentId = restoreArgs.ParentId
             };
             
             var restoreLegacyPackagesDirectory = project.PackageSpec?.RestoreMetadata?.LegacyPackagesDirectory
@@ -171,7 +171,7 @@ namespace NuGet.Commands
             var summaryRequest = new RestoreSummaryRequest(
                 request,
                 project.MSBuildProjectPath,
-                settings,
+                SettingsUtility.GetConfigFilePaths(settings),
                 sources);
 
             return summaryRequest;

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -33,6 +33,8 @@ namespace NuGet.Build.Tasks.Pack
                 NoPackageAnalysis = request.NoPackageAnalysis,
                 PackTargetArgs = new MSBuildPackTargetArgs
                 {
+                    AllowedOutputExtensionsInPackageBuildOutputFolder = InitOutputExtensions(request.AllowedOutputExtensionsInPackageBuildOutputFolder),
+                    AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder = InitOutputExtensions(request.AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder),
                     TargetPathsToAssemblies = InitLibFiles(request.BuildOutputInPackage),
                     TargetPathsToSymbols = InitLibFiles(request.TargetPathsToSymbols),
                     AssemblyName = request.AssemblyName,
@@ -181,7 +183,19 @@ namespace NuGet.Build.Tasks.Pack
                     assetsFilePath));
             }
 
-            PopulateProjectAndPackageReferences(builder, assetsFile);
+            var projectRefToVersionMap = new Dictionary<string, string>(PathUtility.GetStringComparerBasedOnOS());
+
+            if (request.ProjectReferencesWithVersions != null && request.ProjectReferencesWithVersions.Any())
+            {
+                projectRefToVersionMap = request
+                    .ProjectReferencesWithVersions
+                    .ToDictionary(msbuildItem => msbuildItem.Identity,
+                    msbuildItem => msbuildItem.GetProperty("ProjectVersion"), PathUtility.GetStringComparerBasedOnOS());
+            }
+
+            PopulateProjectAndPackageReferences(builder,
+                assetsFile,
+                projectRefToVersionMap);
             PopulateFrameworkAssemblyReferences(builder, request);
             return builder;
         }
@@ -191,7 +205,7 @@ namespace NuGet.Build.Tasks.Pack
             // First add all the assembly references which are not specific to a certain TFM.
             var tfmSpecificRefs = new Dictionary<string, IList<string>>(StringComparer.OrdinalIgnoreCase);
             // Then add the TFM specific framework assembly references, and ignore any which have already been added above.
-            foreach(var tfmRef in request.FrameworkAssemblyReferences)
+            foreach (var tfmRef in request.FrameworkAssemblyReferences)
             {
                 var targetFramework = tfmRef.GetProperty("TargetFramework");
 
@@ -202,7 +216,7 @@ namespace NuGet.Build.Tasks.Pack
                 else
                 {
                     tfmSpecificRefs.Add(tfmRef.Identity, new List<string>() { targetFramework });
-                }                
+                }
             }
 
             builder.FrameworkReferences.AddRange(
@@ -424,6 +438,7 @@ namespace NuGet.Build.Tasks.Pack
                         newTargetPaths.Add(PathUtility.GetStringComparerBasedOnOS().
                             Compare(Path.GetExtension(fileName),
                             Path.GetExtension(targetPath)) == 0
+                            && !String.IsNullOrEmpty(Path.GetExtension(fileName))
                                 ? targetPath
                                 : Path.Combine(targetPath, recursiveDir));
                     }
@@ -503,7 +518,8 @@ namespace NuGet.Build.Tasks.Pack
             {
                 var currentPath = targetPath;
                 var fileName = Path.GetFileName(sourcePath);
-                if (!Path.GetExtension(fileName)
+                if (String.IsNullOrEmpty(Path.GetExtension(fileName)) ||
+                    !Path.GetExtension(fileName)
                     .Equals(Path.GetExtension(targetPath), StringComparison.OrdinalIgnoreCase))
                 {
                     currentPath = Path.Combine(targetPath, fileName);
@@ -568,11 +584,12 @@ namespace NuGet.Build.Tasks.Pack
             return sourceFiles;
         }
 
-        private void PopulateProjectAndPackageReferences(PackageBuilder packageBuilder, LockFile assetsFile)
+        private void PopulateProjectAndPackageReferences(PackageBuilder packageBuilder, LockFile assetsFile,
+            IDictionary<string, string> projectRefToVersionMap)
         {
             var dependenciesByFramework = new Dictionary<NuGetFramework, HashSet<LibraryDependency>>();
 
-            InitializeProjectDependencies(assetsFile, dependenciesByFramework);
+            InitializeProjectDependencies(assetsFile, dependenciesByFramework, projectRefToVersionMap);
             InitializePackageDependencies(assetsFile, dependenciesByFramework);
 
             foreach (var pair in dependenciesByFramework)
@@ -583,7 +600,8 @@ namespace NuGet.Build.Tasks.Pack
 
         private static void InitializeProjectDependencies(
             LockFile assetsFile,
-            Dictionary<NuGetFramework, HashSet<LibraryDependency>> dependenciesByFramework)
+            IDictionary<NuGetFramework, HashSet<LibraryDependency>> dependenciesByFramework,
+            IDictionary<string, string> projectRefToVersionMap)
         {
             // From the package spec, all we know is each absolute path to the project reference the the target
             // framework that project reference applies to.
@@ -638,6 +656,13 @@ namespace NuGet.Build.Tasks.Pack
                         continue;
                     }
 
+                    var versionToUse = targetLibrary.Version;
+
+                    // Use the project reference version obtained at build time if it exists, otherwise fallback to the one in assets file. 
+                    if (projectRefToVersionMap.TryGetValue(projectReference.ProjectPath, out var projectRefVersion))
+                    {
+                        versionToUse = NuGetVersion.Parse(projectRefVersion);
+                    }
                     // TODO: Implement <TreatAsPackageReference>false</TreatAsPackageReference>
                     //   https://github.com/NuGet/Home/issues/3891
                     //
@@ -646,7 +671,7 @@ namespace NuGet.Build.Tasks.Pack
                     {
                         LibraryRange = new LibraryRange(
                             targetLibrary.Name,
-                            new VersionRange(targetLibrary.Version),
+                            new VersionRange(versionToUse),
                             LibraryDependencyTarget.All),
                         IncludeType = projectReference.IncludeAssets & ~projectReference.ExcludeAssets,
                         SuppressParent = projectReference.PrivateAssets
@@ -719,6 +744,11 @@ namespace NuGet.Build.Tasks.Pack
             }
 
             return dictionary;
+        }
+
+        private HashSet<string> InitOutputExtensions(IEnumerable<string> outputExtensions)
+        {
+            return new HashSet<string>(outputExtensions.Distinct(StringComparer.OrdinalIgnoreCase));
         }
     }
 }

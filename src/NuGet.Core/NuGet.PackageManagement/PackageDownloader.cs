@@ -180,7 +180,16 @@ namespace NuGet.PackageManagement
 
                 foreach (var task in failedTasks)
                 {
-                    var message = ExceptionUtilities.DisplayMessage(task.Exception);
+                    string message;
+
+                    if (task.Exception == null)
+                    {
+                        message = task.Status.ToString();
+                    }
+                    else
+                    {
+                        message = ExceptionUtilities.DisplayMessage(task.Exception);
+                    }
 
                     errors.AppendLine($"  {tasksLookup[task].PackageSource.Source}: {message}");
                 }
@@ -305,12 +314,18 @@ namespace NuGet.PackageManagement
                 result.PackageStream.Seek(0, SeekOrigin.Begin);
                 var packageReader = new PackageArchiveReader(result.PackageStream);
                 result.PackageStream.Seek(0, SeekOrigin.Begin);
-                result = new DownloadResourceResult(result.PackageStream, packageReader, sourceRepository.PackageSource.Source);
+                result = new DownloadResourceResult(result.PackageStream, packageReader, sourceRepository.PackageSource.Source)
+                {
+                    SignatureVerified = result.SignatureVerified
+                };
             }
             else if (result.Status != DownloadResourceResultStatus.AvailableWithoutStream)
             {
                 // bind the source
-                result = new DownloadResourceResult(result.PackageStream, result.PackageReader, sourceRepository.PackageSource.Source);
+                result = new DownloadResourceResult(result.PackageStream, result.PackageReader, sourceRepository.PackageSource.Source)
+                {
+                    SignatureVerified = result.SignatureVerified
+                };
             }
 
             return result;

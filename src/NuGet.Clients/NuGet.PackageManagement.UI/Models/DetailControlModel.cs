@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -76,6 +76,7 @@ namespace NuGet.PackageManagement.UI
             _filter = filter;
             OnPropertyChanged(nameof(Id));
             OnPropertyChanged(nameof(IconUrl));
+            OnPropertyChanged(nameof(PrefixReserved));
 
             var getVersionsTask = searchResultPackage.GetVersionsAsync();
 
@@ -153,7 +154,11 @@ namespace NuGet.PackageManagement.UI
                 return;
             }
 
-            _allPackageVersions = versions.Select(v => v.Version).ToList();
+            // Get the list of available versions, ignoring null versions
+            _allPackageVersions = versions
+                .Where(v => v?.Version != null)
+                .Select(v => v.Version)
+                .ToList();
 
             // hook event handler for dependency behavior changed
             Options.SelectedChanged += DependencyBehavior_SelectedChanged;
@@ -274,6 +279,11 @@ namespace NuGet.PackageManagement.UI
             get { return _searchResultPackage?.IconUrl; }
         }
 
+        public bool PrefixReserved
+        {
+            get { return _searchResultPackage?.PrefixReserved ?? false; }
+        }
+
         private DetailedPackageMetadata _packageMetadata;
 
         public DetailedPackageMetadata PackageMetadata
@@ -307,7 +317,7 @@ namespace NuGet.PackageManagement.UI
             get { return _selectedVersion; }
             set
             {
-                if (_selectedVersion != value)
+                if (_selectedVersion != value && (value == null || value.IsValidVersion))
                 {
                     _selectedVersion = value;
 

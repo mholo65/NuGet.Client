@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -402,7 +402,7 @@
   <data name="Log_ProjectsIncompatible" xml:space="preserve">
     <value>One or more projects are incompatible with {0}.</value>
   </data>
-  <data name="InputFileNotSpecified" xml:space="preserve">
+  <data name="Error_InputFileNotSpecified" xml:space="preserve">
     <value>Please specify a nuspec, project.json, or project file to use</value>
   </data>
   <data name="Error_BuildFailed" xml:space="preserve">
@@ -593,5 +593,92 @@ For more information, visit http://docs.nuget.org/docs/reference/command-line-re
   </data>
   <data name="UnsupportedProject" xml:space="preserve">
     <value>Skipping restore for project '{0}'. The project file may be invalid or missing targets required for restore.</value>
+  </data>
+  <data name="Error_EmptySourceFilePath" xml:space="preserve">
+    <value>A source file was added with an empty path.</value>
+  </data>
+  <data name="Error_EmptySourceFileProjectDirectory" xml:space="preserve">
+    <value>The project directory for the source file '{0}' could not be found.</value>
+  </data>
+  <data name="Error_WriteResolvedNuSpecOverwriteOriginal" xml:space="preserve">
+    <value>Unable to output resolved nuspec file because it would overwrite the original at '{0}'</value>
+  </data>
+  <data name="Log_PackageCommandInstallPackageToOutputPath" xml:space="preserve">
+    <value>Install {0} to output path '{1}'</value>
+  </data>
+  <data name="Warning_VersionAboveUpperBound" xml:space="preserve">
+    <value>Detected package version outside of dependency constraint: {0} requires {1} but version {2} was resolved.</value>
+  </data>
+  <data name="SignCommandDisplayCertificate" xml:space="preserve">
+    <value>Signing package(s) with certificate:</value>
+  </data>
+  <data name="SignCommandDialogMessage" xml:space="preserve">
+    <value>Please select a valid certificate</value>
+  </data>
+  <data name="SignCommandDialogTitle" xml:space="preserve">
+    <value>NuGet Sign Certificate Selection</value>
+  </data>
+  <data name="SignCommandMultipleCertException" xml:space="preserve">
+    <value>Multiple certificates were found that meet all the given criteria. Use the '-{0}' option with the hash of the desired certificate.</value>
+    <comment>0 - CertificateFingerprint option</comment>
+  </data>
+  <data name="SignCommandNoCertException" xml:space="preserve">
+    <value>No certificates were found that meet all the given criteria. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference</value>
+  </data>
+  <data name="SignCommandSuccess" xml:space="preserve">
+    <value>Package(s) signed successfully.</value>
+  </data>
+  <data name="SignCommandCertificateFileNotFound" xml:space="preserve">
+    <value>Certificate file '{0}' not found. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference</value>
+    <comment>{0} is the certificate file path</comment>
+  </data>
+  <data name="SignCommandInvalidCertException" xml:space="preserve">
+    <value>Certificate file '{0}' is invalid. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference</value>
+    <comment>0 - certificate file path</comment>
+  </data>
+  <data name="SignCommandInvalidPasswordException" xml:space="preserve">
+    <value>Invalid password was provided for the certificate file '{0}'. Please provide a valid password using the '-{1}' option</value>
+    <comment>0 - certificate file path
+1 - certificate password option</comment>
+  </data>
+  <data name="NonMatchingProperties" xml:space="preserve">
+    <value>Properties '{0}':'{1}' and '{2}':'{3}' do not match.</value>
+    <comment>0 - first property name
+1 - first property value
+2 - second property name
+3 - second property value</comment>
+  </data>
+  <data name="SignCommandDisplayTimestamper" xml:space="preserve">
+    <value>Timestamping package(s) with:</value>
+  </data>
+  <data name="VerifyCommand_PackageIsNotValid" xml:space="preserve">
+    <value>'{0}' is not a valid package file.</value>
+  </data>
+  <data name="VerifyCommand_VerificationTypeNotSupported" xml:space="preserve">
+    <value>Verification type not supported. Please use only one of the following supported types: -All, -Signatures</value>
+  </data>
+  <data name="SignCommandOutputPath" xml:space="preserve">
+    <value>Signed package(s) output path:</value>
+  </data>
+  <data name="SignCommandInvalidCertEku" xml:space="preserve">
+    <value>The following certificate cannot be used for signing a package as it does not have Code Signing enhanced key usage:</value>
+  </data>
+  <data name="VerifyCommand_FinishedWithErrors" xml:space="preserve">
+    <value>Finished with {0} errors and {1} warnings.</value>
+    <comment>{0} is the number of errors produced and {1} is the number of warnings.</comment>
+  </data>
+  <data name="VerifyCommand_Success" xml:space="preserve">
+    <value>Successfully verified package(s).</value>
+  </data>
+  <data name="VerifyCommand_VerifyingPackage" xml:space="preserve">
+    <value>Verifying {0}</value>
+    <comment>{0} should be the package identity of the package to verify</comment>
+  </data>
+  <data name="VerifyCommand_Failed" xml:space="preserve">
+    <value>Package signature validation failed.</value>
+  </data>
+  <data name="SignCommandCertificateStoreNotFound" xml:space="preserve">
+    <value>Certificate store '{0}' not found. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference</value>
+    <comment>{0} is the certificate store name</comment>
   </data>
 </root>

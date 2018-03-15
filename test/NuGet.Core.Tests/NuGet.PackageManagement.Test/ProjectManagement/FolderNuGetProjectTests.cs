@@ -25,9 +25,9 @@ namespace NuGet.ProjectManagement.Test
         [Fact]
         public void Constructor_String_ThrowsForNullRoot()
         {
-            var exception = Assert.Throws<ArgumentNullException>(() => new FolderNuGetProject(root: null));
+            var exception = Assert.Throws<ArgumentException>(() => new FolderNuGetProject(root: null));
 
-            Assert.Equal("root", exception.ParamName);
+            Assert.Equal("rootDirectory", exception.ParamName);
         }
 
         [Fact]
@@ -457,7 +457,7 @@ namespace NuGet.ProjectManagement.Test
         {
             using (var test = new FolderNuGetProjectTest())
             {
-                await test.InstallAsync(PackageSaveMode.Defaultv2);
+                await test.InstallAsync(packageSaveMode);
 
                 Assert.True(test.Project.PackageExists(test.PackageIdentity, PackageSaveMode.Defaultv2));
             }

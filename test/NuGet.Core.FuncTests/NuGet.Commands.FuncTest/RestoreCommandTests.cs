@@ -448,13 +448,14 @@ namespace NuGet.Commands.FuncTest
                     logger))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
+                        new PackageIdentity("packageA", NuGetVersion.Parse("1.0.0")),
                         packageDownloader,
-                        new VersionFolderPathContext(
-                            new PackageIdentity("packageA", NuGetVersion.Parse("1.0.0")),
-                            packagesDir,
-                            logger,
+                        new VersionFolderPathResolver(packagesDir),
+                        new PackageExtractionContext(
                             PackageSaveMode.Defaultv3,
-                            XmlDocFileSaveMode.None),
+                            XmlDocFileSaveMode.None,
+                            logger,
+                            signedPackageVerifier: null),
                         CancellationToken.None);
                 }
 
@@ -1963,7 +1964,7 @@ namespace NuGet.Commands.FuncTest
                     context.IgnoreFailedSources = true;
                     var cachingSourceProvider = new CachingSourceProvider(new PackageSourceProvider(NullSettings.Instance));
 
-                    var provider = RestoreCommandProviders.Create(packagesDir, new List<string>(), sources.Select(p => cachingSourceProvider.CreateRepository(p)), context, logger);
+                    var provider = RestoreCommandProviders.Create(packagesDir, new List<string>(), sources.Select(p => cachingSourceProvider.CreateRepository(p)), context, new LocalPackageFileCache(), logger);
                     var request = new RestoreRequest(spec, provider, context, logger);
 
                     request.LockFilePath = Path.Combine(projectDir, "project.lock.json");
@@ -2012,7 +2013,7 @@ namespace NuGet.Commands.FuncTest
                     context.IgnoreFailedSources = true;
                     var cachingSourceProvider = new CachingSourceProvider(new PackageSourceProvider(NullSettings.Instance));
 
-                    var provider = RestoreCommandProviders.Create(packagesDir, new List<string>(), sources.Select(p => cachingSourceProvider.CreateRepository(p)), context, logger);
+                    var provider = RestoreCommandProviders.Create(packagesDir, new List<string>(), sources.Select(p => cachingSourceProvider.CreateRepository(p)), context, new LocalPackageFileCache(), logger);
                     var request = new RestoreRequest(spec, provider, context, logger);
 
                     request.LockFilePath = Path.Combine(projectDir, "project.lock.json");

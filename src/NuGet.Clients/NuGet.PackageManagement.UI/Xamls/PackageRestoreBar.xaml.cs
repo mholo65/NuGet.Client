@@ -1,7 +1,8 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using Microsoft.VisualStudio.Shell;
+using NuGet.Common;
 using NuGet.Packaging;
 using NuGet.ProjectManagement;
 using NuGet.VisualStudio;
@@ -40,7 +42,7 @@ namespace NuGet.PackageManagement.UI
 
         public NuGetActionType ActionType { get; set; }
 
-        public TelemetryServiceHelper TelemetryService { get; set; }
+        public Guid OperationId { get; set; }
 
         public PackageRestoreBar(ISolutionManager solutionManager, IPackageRestoreManager packageRestoreManager)
         {
@@ -136,6 +138,7 @@ namespace NuGet.PackageManagement.UI
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             ShowProgressUI();
+            OperationId = Guid.NewGuid();
 
             try
             {

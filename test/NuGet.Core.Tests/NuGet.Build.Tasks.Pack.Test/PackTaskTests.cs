@@ -1,8 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.Build.Framework;
 using Moq;
@@ -10,7 +11,9 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using NuGet.Commands;
+using NuGet.Common;
 using NuGet.Packaging;
+using NuGet.Versioning;
 using Xunit;
 
 namespace NuGet.Build.Tasks.Pack.Test
@@ -51,6 +54,49 @@ namespace NuGet.Build.Tasks.Pack.Test
             logic.Verify(x => x.GetPackageBuilder(request));
             logic.Verify(x => x.GetPackCommandRunner(request, packArgs, packageBuilder));
             logic.Verify(x => x.BuildPackage(packCommandRunner));
+        }
+
+        [Fact]
+        public void PackTask_Dispose()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(dir);
+
+            var nuspecPath = Path.Combine(dir, "test.nuspec");
+            File.WriteAllText(nuspecPath, @"
+<package xmlns=""http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd"">
+  <metadata>
+    <id>Test</id>
+    <summary>Summary</summary>
+    <description>Description</description>
+    <version>1.0.0</version>
+    <authors>Microsoft</authors>
+    <dependencies>
+      <dependency id=""System.Collections.Immutable"" version=""4.3.0"" />
+    </dependencies>
+  </metadata>
+</package>
+");
+
+            var builder = new PackageBuilder();
+
+            var runner = new PackCommandRunner(
+                new PackArgs
+                {
+                    CurrentDirectory = dir,
+                    OutputDirectory = dir,
+                    Path = nuspecPath,
+                    Exclude = Array.Empty<string>(),
+                    Logger = NullLogger.Instance
+                },
+                MSBuildProjectFactory.ProjectCreator,
+                builder);
+
+            runner.BuildPackage();
+
+            // It should be possible to delete the entire directory.
+            // If this fails the runner left some files open.
+            Directory.Delete(dir, recursive: true);
         }
 
         [Fact]
@@ -264,6 +310,8 @@ namespace NuGet.Build.Tasks.Pack.Test
                 AssemblyName = "AssemblyName",
                 FrameworkAssemblyReferences = new ITaskItem[0],
                 Authors = new string[0],
+                AllowedOutputExtensionsInPackageBuildOutputFolder = new string[0],
+                AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder = new string[0],
                 BuildOutputFolder = "BuildOutputFolder",
                 ContentTargetFolders = new string[] { "ContentTargetFolders" } ,
                 ContinuePackingAfterGeneratingNuspec = true,
@@ -287,6 +335,7 @@ namespace NuGet.Build.Tasks.Pack.Test
                 PackageOutputPath = "PackageOutputPath",
                 PackageTypes = new string[0],
                 PackageVersion = "PackageVersion",
+                ProjectReferencesWithVersions = new ITaskItem[0],
                 ProjectUrl = "ProjectUrl",
                 ReleaseNotes = "ReleaseNotes",
                 RepositoryType = "RepositoryType",

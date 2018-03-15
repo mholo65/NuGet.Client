@@ -107,6 +107,33 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to A source file was added with an empty path..
+        /// </summary>
+        internal static string Error_EmptySourceFilePath {
+            get {
+                return ResourceManager.GetString("Error_EmptySourceFilePath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The project directory for the source file &apos;{0}&apos; could not be found..
+        /// </summary>
+        internal static string Error_EmptySourceFileProjectDirectory {
+            get {
+                return ResourceManager.GetString("Error_EmptySourceFileProjectDirectory", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Please specify a nuspec, project.json, or project file to use.
+        /// </summary>
+        internal static string Error_InputFileNotSpecified {
+            get {
+                return ResourceManager.GetString("Error_InputFileNotSpecified", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to PackageTargetFallback and AssetTargetFallback cannot be used together. Remove PackageTargetFallback(deprecated) references from the project environment..
         /// </summary>
         internal static string Error_InvalidATF {
@@ -278,6 +305,15 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Unable to output resolved nuspec file because it would overwrite the original at &apos;{0}&apos;.
+        /// </summary>
+        internal static string Error_WriteResolvedNuSpecOverwriteOriginal {
+            get {
+                return ResourceManager.GetString("Error_WriteResolvedNuSpecOverwriteOriginal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Invalid input &apos;{0}&apos;. XProj support has been removed. Support for XProj and standalone project.json files has been removed, to continue working with legacy projects use NuGet 3.5.x from https://nuget.org/downloads.
         /// </summary>
         internal static string Error_XPROJNotAllowed {
@@ -319,15 +355,6 @@ namespace NuGet.Commands {
         internal static string FoundVersionsInSourceWithoutMatch {
             get {
                 return ResourceManager.GetString("FoundVersionsInSourceWithoutMatch", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Please specify a nuspec, project.json, or project file to use.
-        /// </summary>
-        internal static string InputFileNotSpecified {
-            get {
-                return ResourceManager.GetString("InputFileNotSpecified", resourceCulture);
             }
         }
         
@@ -720,6 +747,15 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Install {0} to output path &apos;{1}&apos;.
+        /// </summary>
+        internal static string Log_PackageCommandInstallPackageToOutputPath {
+            get {
+                return ResourceManager.GetString("Log_PackageCommandInstallPackageToOutputPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Successfully created package &apos;{0}&apos;..
         /// </summary>
         internal static string Log_PackageCommandSuccess {
@@ -1098,6 +1134,15 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Properties &apos;{0}&apos;:&apos;{1}&apos; and &apos;{2}&apos;:&apos;{3}&apos; do not match..
+        /// </summary>
+        internal static string NonMatchingProperties {
+            get {
+                return ResourceManager.GetString("NonMatchingProperties", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to http://docs.nuget.org/.
         /// </summary>
         internal static string NuGetDocs {
@@ -1166,6 +1211,123 @@ namespace NuGet.Commands {
         internal static string ResolverRequest_ToStringFormat {
             get {
                 return ResourceManager.GetString("ResolverRequest_ToStringFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Certificate file &apos;{0}&apos; not found. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference.
+        /// </summary>
+        internal static string SignCommandCertificateFileNotFound {
+            get {
+                return ResourceManager.GetString("SignCommandCertificateFileNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Certificate store &apos;{0}&apos; not found. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference.
+        /// </summary>
+        internal static string SignCommandCertificateStoreNotFound {
+            get {
+                return ResourceManager.GetString("SignCommandCertificateStoreNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Please select a valid certificate.
+        /// </summary>
+        internal static string SignCommandDialogMessage {
+            get {
+                return ResourceManager.GetString("SignCommandDialogMessage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to NuGet Sign Certificate Selection.
+        /// </summary>
+        internal static string SignCommandDialogTitle {
+            get {
+                return ResourceManager.GetString("SignCommandDialogTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Signing package(s) with certificate:.
+        /// </summary>
+        internal static string SignCommandDisplayCertificate {
+            get {
+                return ResourceManager.GetString("SignCommandDisplayCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Timestamping package(s) with:.
+        /// </summary>
+        internal static string SignCommandDisplayTimestamper {
+            get {
+                return ResourceManager.GetString("SignCommandDisplayTimestamper", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The following certificate cannot be used for signing a package as it does not have Code Signing enhanced key usage:.
+        /// </summary>
+        internal static string SignCommandInvalidCertEku {
+            get {
+                return ResourceManager.GetString("SignCommandInvalidCertEku", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Certificate file &apos;{0}&apos; is invalid. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference.
+        /// </summary>
+        internal static string SignCommandInvalidCertException {
+            get {
+                return ResourceManager.GetString("SignCommandInvalidCertException", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid password was provided for the certificate file &apos;{0}&apos;. Please provide a valid password using the &apos;-{1}&apos; option.
+        /// </summary>
+        internal static string SignCommandInvalidPasswordException {
+            get {
+                return ResourceManager.GetString("SignCommandInvalidPasswordException", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Multiple certificates were found that meet all the given criteria. Use the &apos;-{0}&apos; option with the hash of the desired certificate..
+        /// </summary>
+        internal static string SignCommandMultipleCertException {
+            get {
+                return ResourceManager.GetString("SignCommandMultipleCertException", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to No certificates were found that meet all the given criteria. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference.
+        /// </summary>
+        internal static string SignCommandNoCertException {
+            get {
+                return ResourceManager.GetString("SignCommandNoCertException", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Signed package(s) output path:.
+        /// </summary>
+        internal static string SignCommandOutputPath {
+            get {
+                return ResourceManager.GetString("SignCommandOutputPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Package(s) signed successfully..
+        /// </summary>
+        internal static string SignCommandSuccess {
+            get {
+                return ResourceManager.GetString("SignCommandSuccess", resourceCulture);
             }
         }
         
@@ -1274,6 +1436,60 @@ namespace NuGet.Commands {
         internal static string UsingPackagesConfigForDependencies {
             get {
                 return ResourceManager.GetString("UsingPackagesConfigForDependencies", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Package signature validation failed..
+        /// </summary>
+        internal static string VerifyCommand_Failed {
+            get {
+                return ResourceManager.GetString("VerifyCommand_Failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Finished with {0} errors and {1} warnings..
+        /// </summary>
+        internal static string VerifyCommand_FinishedWithErrors {
+            get {
+                return ResourceManager.GetString("VerifyCommand_FinishedWithErrors", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is not a valid package file..
+        /// </summary>
+        internal static string VerifyCommand_PackageIsNotValid {
+            get {
+                return ResourceManager.GetString("VerifyCommand_PackageIsNotValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Successfully verified package(s)..
+        /// </summary>
+        internal static string VerifyCommand_Success {
+            get {
+                return ResourceManager.GetString("VerifyCommand_Success", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Verification type not supported. Please use only one of the following supported types: -All, -Signatures.
+        /// </summary>
+        internal static string VerifyCommand_VerificationTypeNotSupported {
+            get {
+                return ResourceManager.GetString("VerifyCommand_VerificationTypeNotSupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Verifying {0}.
+        /// </summary>
+        internal static string VerifyCommand_VerifyingPackage {
+            get {
+                return ResourceManager.GetString("VerifyCommand_VerifyingPackage", resourceCulture);
             }
         }
         
@@ -1409,6 +1625,15 @@ namespace NuGet.Commands {
         internal static string Warning_UnspecifiedField {
             get {
                 return ResourceManager.GetString("Warning_UnspecifiedField", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Detected package version outside of dependency constraint: {0} requires {1} but version {2} was resolved..
+        /// </summary>
+        internal static string Warning_VersionAboveUpperBound {
+            get {
+                return ResourceManager.GetString("Warning_VersionAboveUpperBound", resourceCulture);
             }
         }
     }

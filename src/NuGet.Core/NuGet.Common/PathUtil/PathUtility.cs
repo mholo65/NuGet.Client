@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -13,6 +13,7 @@ namespace NuGet.Common
     public static class PathUtility
     {
         private static readonly Lazy<bool> _isFileSystemCaseInsensitive = new Lazy<bool>(CheckIfFileSystemIsCaseInsensitive);
+
         /// <summary>
         /// Returns OrdinalIgnoreCase windows and mac. Ordinal for linux.
         /// </summary>
@@ -52,10 +53,12 @@ namespace NuGet.Common
 
         /// <summary>
         /// Replace all back slashes with forward slashes.
+        /// If the path does not contain a back slash
+        /// the original string is returned.
         /// </summary>
         public static string GetPathWithForwardSlashes(string path)
         {
-            if (path != null && path.IndexOf('\\') >= -1)
+            if (path != null && path.IndexOf('\\') > -1)
             {
                 return path.Replace('\\', '/');
             }
@@ -121,16 +124,21 @@ namespace NuGet.Common
             }
             else
             {
-                if (RuntimeEnvironmentHelper.IsWindows)
-                {
-                    // Windows has both '/' and '\' as valid directory separators.
-                    return (path[path.Length - 1] == Path.DirectorySeparatorChar ||
-                            path[path.Length - 1] == Path.AltDirectorySeparatorChar);
-                }
-                else
-                {
-                    return path[path.Length - 1] == Path.DirectorySeparatorChar;
-                }
+                return IsDirectorySeparatorChar(path[path.Length - 1]);
+            }
+        }
+
+        public static bool IsDirectorySeparatorChar(char ch)
+        {
+            if (RuntimeEnvironmentHelper.IsWindows)
+            {
+                // Windows has both '/' and '\' as valid directory separators.
+                return (ch == Path.DirectorySeparatorChar ||
+                        ch == Path.AltDirectorySeparatorChar);
+            }
+            else
+            {
+                return ch == Path.DirectorySeparatorChar;
             }
         }
         
@@ -171,7 +179,7 @@ namespace NuGet.Common
             {
                 compare = StringComparison.OrdinalIgnoreCase;
                 // check if paths are on the same volume
-                if (!string.Equals(Path.GetPathRoot(path1), Path.GetPathRoot(path2)))
+                if (!string.Equals(Path.GetPathRoot(path1), Path.GetPathRoot(path2), compare))
                 {
                     // on different volumes, "relative" path is just path2
                     return path2;

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -13,10 +14,11 @@ using Microsoft;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Threading;
 using NuGet.Commands;
+using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.PackageManagement;
 using NuGet.PackageManagement.VisualStudio;
-using NuGet.Packaging;
+using NuGet.Packaging.Signing;
 using NuGet.ProjectManagement;
 using NuGet.ProjectManagement.Projects;
 using NuGet.ProjectModel;
@@ -40,10 +42,10 @@ namespace NuGet.SolutionRestoreManager
         private readonly ISourceRepositoryProvider _sourceRepositoryProvider;
         private readonly ISettings _settings;
         private readonly IRestoreEventsPublisher _restoreEventsPublisher;
-        private readonly ILightWeightProjectWorkspaceService _lightWeightProjectWorkspaceService;
 
         private RestoreOperationLogger _logger;
         private INuGetProjectContext _nuGetProjectContext;
+        private PackageRestoreConsent _packageRestoreConsent;
 
         private NuGetOperationStatus _status;
         private int _packageCount;
@@ -61,8 +63,7 @@ namespace NuGet.SolutionRestoreManager
             IVsSolutionManager solutionManager,
             ISourceRepositoryProvider sourceRepositoryProvider,
             IRestoreEventsPublisher restoreEventsPublisher,
-            ISettings settings,
-            ILightWeightProjectWorkspaceService lightWeightProjectWorkspaceService)
+            ISettings settings)
         {
             Assumes.Present(serviceProvider);
             Assumes.Present(packageRestoreManager);
@@ -77,7 +78,7 @@ namespace NuGet.SolutionRestoreManager
             _sourceRepositoryProvider = sourceRepositoryProvider;
             _restoreEventsPublisher = restoreEventsPublisher;
             _settings = settings;
-            _lightWeightProjectWorkspaceService = lightWeightProjectWorkspaceService;
+            _packageRestoreConsent = new PackageRestoreConsent(_settings);
         }
 
         /// <summary>
@@ -108,6 +109,7 @@ namespace NuGet.SolutionRestoreManager
 
             // update instance attributes with the shared context values
             _nuGetProjectContext = jobContext.NuGetProjectContext;
+            _nuGetProjectContext.OperationId = request.OperationId;
 
             using (var ctr1 = token.Register(() => _status = NuGetOperationStatus.Cancelled))
             {
@@ -128,14 +130,15 @@ namespace NuGet.SolutionRestoreManager
             return _status == NuGetOperationStatus.NoOp || _status == NuGetOperationStatus.Succeeded;
         }
 
+
+
         private async Task RestoreAsync(bool forceRestore, RestoreOperationSource restoreSource, CancellationToken token)
         {
             var startTime = DateTimeOffset.Now;
             _status = NuGetOperationStatus.NoOp;
 
             // start timer for telemetry event
-            TelemetryUtility.StartorResumeTimer();
-
+            var stopWatch = Stopwatch.StartNew();
             var projects = Enumerable.Empty<NuGetProject>();
 
             _packageRestoreManager.PackageRestoredEvent += PackageRestoreManager_PackageRestored;
@@ -144,7 +147,7 @@ namespace NuGet.SolutionRestoreManager
             try
             {
                 var solutionDirectory = _solutionManager.SolutionDirectory;
-                var isSolutionAvailable = _solutionManager.IsSolutionAvailable;
+                var isSolutionAvailable = await _solutionManager.IsSolutionAvailableAsync();
 
                 if (solutionDirectory == null)
                 {
@@ -157,29 +160,19 @@ namespace NuGet.SolutionRestoreManager
                     return;
                 }
 
-                // Check if solution has deferred projects
-                var deferredProjectsData = new DeferredProjectRestoreData(new Dictionary<PackageReference, List<string>>(), new List<PackageSpec>());
-                if (await DeferredProjectVSUtility.SolutionHasDeferredProjectsAsync())
-                {
-                    var deferredProjectsPath = await DeferredProjectVSUtility.GetDeferredProjectsFilePathAsync();
-
-                    deferredProjectsData = await DeferredProjectRestoreUtility.GetDeferredProjectsData(_lightWeightProjectWorkspaceService, deferredProjectsPath, _settings, token);
-                }
-
                 // Get the projects from the SolutionManager
                 // Note that projects that are not supported by NuGet, will not show up in this list
-                projects = _solutionManager.GetNuGetProjects();
+                projects = await _solutionManager.GetNuGetProjectsAsync();
 
                 // Check if there are any projects that are not INuGetIntegratedProject, that is,
                 // projects with packages.config. OR 
                 // any of the deferred project is type of packages.config, If so, perform package restore on them
-                if (projects.Any(project => !(project is INuGetIntegratedProject)) ||
-                   deferredProjectsData.PackageReferenceDict.Count > 0)
+                if (projects.Any(project => !(project is INuGetIntegratedProject)))
                 {
                     await RestorePackagesOrCheckForMissingPackagesAsync(
                         solutionDirectory,
                         isSolutionAvailable,
-                        deferredProjectsData.PackageReferenceDict,
+                        restoreSource,
                         token);
                 }
 
@@ -191,7 +184,7 @@ namespace NuGet.SolutionRestoreManager
                     dependencyGraphProjects,
                     forceRestore,
                     isSolutionAvailable,
-                    deferredProjectsData.PackageSpecs,
+                    restoreSource,
                     token);
 
 #if !VS14
@@ -210,11 +203,18 @@ namespace NuGet.SolutionRestoreManager
                 _packageRestoreManager.PackageRestoredEvent -= PackageRestoreManager_PackageRestored;
                 _packageRestoreManager.PackageRestoreFailedEvent -= PackageRestoreManager_PackageRestoreFailedEvent;
 
-                TelemetryUtility.StopTimer();
+                stopWatch.Stop();
+                var duration = stopWatch.Elapsed;
 
-                var duration = TelemetryUtility.GetTimerElapsedTime();
-                await _logger.WriteSummaryAsync(_status, duration);
-
+                // Do not log any restore message if user disabled restore.
+                if (_packageRestoreConsent.IsGranted)
+                {
+                    await _logger.WriteSummaryAsync(_status, duration);
+                }
+                else
+                {
+                    _logger.LogDebug(Resources.PackageRefNotRestoredBecauseOfNoConsent);
+                }
                 // Emit telemetry event for restore operation
                 EmitRestoreTelemetryEvent(
                     projects,
@@ -235,7 +235,7 @@ namespace NuGet.SolutionRestoreManager
                 project => project.GetMetadata<string>(NuGetProjectMetadataKeys.ProjectId)).ToArray();
 
             var restoreTelemetryEvent = new RestoreTelemetryEvent(
-                Guid.NewGuid().ToString(),
+                _nuGetProjectContext.OperationId.ToString(),
                 projectIds,
                 source,
                 startTime,
@@ -245,24 +245,23 @@ namespace NuGet.SolutionRestoreManager
                 DateTimeOffset.Now,
                 duration);
 
-            RestoreTelemetryService.Instance.EmitRestoreEvent(restoreTelemetryEvent);
+            TelemetryActivity.EmitTelemetryEvent(restoreTelemetryEvent);
         }
 
         private async Task RestorePackageSpecProjectsAsync(
-           List<IDependencyGraphProject> projects,
-           bool forceRestore,
-           bool isSolutionAvailable,
-           IReadOnlyList<PackageSpec> packageSpecs,
-           CancellationToken token)
+            List<IDependencyGraphProject> projects,
+            bool forceRestore,
+            bool isSolutionAvailable,
+            RestoreOperationSource restoreSource,
+            CancellationToken token)
         {
             // Only continue if there are some build integrated type projects.
-            if (!(projects.Any(project => project is BuildIntegratedNuGetProject) ||
-                packageSpecs.Any(project => IsProjectBuildIntegrated(project))))
+            if (!(projects.Any(project => project is BuildIntegratedNuGetProject)))
             {
                 return;
             }
 
-            if (IsConsentGranted(_settings))
+            if (_packageRestoreConsent.IsGranted)
             {
                 if (!isSolutionAvailable)
                 {
@@ -289,11 +288,7 @@ namespace NuGet.SolutionRestoreManager
                 var cacheContext = new DependencyGraphCacheContext(_logger, _settings);
                 var pathContext = NuGetPathContext.Create(_settings);
 
-                // add deferred projects package spec in cacheContext packageSpecCache
-                cacheContext.DeferredPackageSpecs.AddRange(packageSpecs);
-
                 // Get full dg spec
-                // TODO: pass this down instead of creating it twice.
                 var dgSpec = await DependencyGraphRestoreUtility.GetSolutionRestoreSpec(_solutionManager, cacheContext);
 
                 // Avoid restoring solutions with zero potential PackageReference projects.
@@ -321,6 +316,7 @@ namespace NuGet.SolutionRestoreManager
                                 providerCache,
                                 cacheModifier,
                                 sources,
+                                _nuGetProjectContext.OperationId,
                                 forceRestore,
                                 dgSpec,
                                 l,
@@ -341,6 +337,14 @@ namespace NuGet.SolutionRestoreManager
                         },
                         token);
                 }
+            }
+            else if (restoreSource == RestoreOperationSource.Explicit)
+            {
+                // Log an error when restore is disabled and user explicitly restore.
+                await _logger.DoAsync((l, _) =>
+                {
+                    l.ShowError(Resources.PackageRefNotRestoredBecauseOfNoConsent);
+                });
             }
         }
 
@@ -386,12 +390,23 @@ namespace NuGet.SolutionRestoreManager
                 return;
             }
 
+            if (args.Exception is SignatureException)
+            {
+                _status = NuGetOperationStatus.Failed;
+
+                var ex = args.Exception as SignatureException;
+
+                ex.Results.SelectMany(p => p.Issues).ToList().ForEach(p => _logger.Log(p.ToLogMessage()));
+
+                return;
+            }
+
             if (args.ProjectNames.Any())
             {
                 _status = NuGetOperationStatus.Failed;
 
                 _logger.Do((l, _) =>
-                {
+                { 
                     foreach (var projectName in args.ProjectNames)
                     {
                         var exceptionMessage =
@@ -414,7 +429,7 @@ namespace NuGet.SolutionRestoreManager
         private async Task RestorePackagesOrCheckForMissingPackagesAsync(
             string solutionDirectory,
             bool isSolutionAvailable,
-            IReadOnlyDictionary<PackageReference, List<string>> packageReferencesDict,
+            RestoreOperationSource restoreSource,
             CancellationToken token)
         {
             if (string.IsNullOrEmpty(solutionDirectory))
@@ -426,11 +441,7 @@ namespace NuGet.SolutionRestoreManager
             var packages = (await _packageRestoreManager.GetPackagesInSolutionAsync(
                 solutionDirectory, token)).ToList();
 
-            packages.AddRange(
-                _packageRestoreManager.GetPackagesRestoreData(
-                    solutionDirectory, packageReferencesDict.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList())));
-
-            if (IsConsentGranted(_settings))
+            if (_packageRestoreConsent.IsGranted)
             {
                 _currentCount = 0;
 
@@ -470,12 +481,12 @@ namespace NuGet.SolutionRestoreManager
                     _status = NuGetOperationStatus.Succeeded;
                 }
             }
-            else
+            else if (restoreSource == RestoreOperationSource.Explicit)
             {
                 // When the user consent is not granted, missing packages may not be restored.
                 // So, we just check for them, and report them as warning(s) on the error list window
                 await _logger.RunWithProgressAsync(
-                    (_, __, ___) => CheckForMissingPackages(packages),
+                    (_, __, ___) => CheckForMissingPackagesAsync(packages),
                     token);
             }
 
@@ -488,16 +499,18 @@ namespace NuGet.SolutionRestoreManager
         /// Checks if there are missing packages that should be restored. If so, a warning will
         /// be added to the error list.
         /// </summary>
-        private void CheckForMissingPackages(IEnumerable<PackageRestoreData> missingPackages)
+        private async Task CheckForMissingPackagesAsync(IEnumerable<PackageRestoreData> installedPackages)
         {
+            var missingPackages = installedPackages.Where(p => p.IsMissing);
+
             if (missingPackages.Any())
             {
-                _logger.Do((l, _) =>
+                await _logger.DoAsync((l, _) =>
                 {
                     var errorText = string.Format(
                         CultureInfo.CurrentCulture,
                         Resources.PackageNotRestoredBecauseOfNoConsent,
-                        string.Join(", ", missingPackages.Select(p => p.ToString())));
+                        string.Join(", ", missingPackages.Select(p => p.PackageReference.PackageIdentity.ToString())));
                     l.ShowError(errorText);
                 });
             }
@@ -512,7 +525,10 @@ namespace NuGet.SolutionRestoreManager
 
             using (var cacheContext = new SourceCacheContext())
             {
-                var downloadContext = new PackageDownloadContext(cacheContext);
+                var downloadContext = new PackageDownloadContext(cacheContext)
+                {
+                    ParentId = _nuGetProjectContext.OperationId
+                };
 
                 await _packageRestoreManager.RestoreMissingPackagesAsync(
                     solutionDirectory,

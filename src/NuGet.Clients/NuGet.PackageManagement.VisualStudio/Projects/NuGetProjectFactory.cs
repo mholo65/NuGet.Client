@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -7,6 +7,7 @@ using System.ComponentModel.Composition;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft;
+using Microsoft.VisualStudio.ProjectSystem;
 using Microsoft.VisualStudio.Utilities;
 using NuGet.ProjectManagement;
 using NuGet.VisualStudio;
@@ -22,6 +23,11 @@ namespace NuGet.PackageManagement.VisualStudio
         private readonly INuGetProjectProvider[] _providers;
         private readonly IVsProjectThreadingService _threadingService;
         private readonly Common.ILogger _logger;
+
+        // Reason it's lazy<object> is because we don't want to load any CPS assemblies until
+        // we're really going to use any of CPS api. Which is why we also don't use nameof or typeof apis.
+        [Import("Microsoft.VisualStudio.ProjectSystem.IProjectServiceAccessor")]
+        private Lazy<object> ProjectServiceAccessor { get; set; }
 
         [ImportingConstructor]
         public NuGetProjectFactory(
@@ -54,48 +60,48 @@ namespace NuGet.PackageManagement.VisualStudio
         /// <param name="result">New project instance when <code>true</code> is returned. 
         /// Otherwise - <code>null</code>.</param>
         /// <returns><code>true</code> when new project instance has been successfully created.</returns>
-        public bool TryCreateNuGetProject(
+        public async Task<NuGetProject> TryCreateNuGetProjectAsync(
             IVsProjectAdapter vsProjectAdapter,
-            ProjectProviderContext context,
-            out NuGetProject result)
+            ProjectProviderContext context)
         {
             Assumes.Present(vsProjectAdapter);
             Assumes.Present(context);
 
-            _threadingService.ThrowIfNotOnUIThread();
+            await _threadingService.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            var exceptions = new List<Exception>();
-            result = _providers
-                .Select(p =>
-                {
-                    try
-                    {
-                        if (p.TryCreateNuGetProject(
-                            vsProjectAdapter,
-                            context,
-                            forceProjectType: false,
-                            result: out var nuGetProject))
-                        {
-                            return nuGetProject;
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        // Ignore failures. If this method returns null, the problem falls 
-                        // into one of the other NuGet project types.
-                        exceptions.Add(e);
-                    }
-
-                    return null;
-                })
-                .FirstOrDefault(p => p != null);
-
-            if (result == null)
+            if (vsProjectAdapter.VsHierarchy != null &&
+                VsHierarchyUtility.IsCPSCapabilityComplaint(vsProjectAdapter.VsHierarchy))
             {
-                exceptions.ForEach(e => _logger.LogError(e.ToString()));
+                // Lazy load the CPS enabled JoinableTaskFactory for the UI.
+                NuGetUIThreadHelper.SetJoinableTaskFactoryFromService(ProjectServiceAccessor.Value as IProjectServiceAccessor);
             }
 
-            return result != null;
+            var exceptions = new List<Exception>();
+            foreach (var provider in _providers)
+            {
+                try
+                {
+                    var nuGetProject = await provider.TryCreateNuGetProjectAsync(
+                        vsProjectAdapter,
+                        context,
+                        forceProjectType: false);
+
+                    if (nuGetProject != null)
+                    {
+                        return nuGetProject;
+                    }
+                }
+                catch (Exception e)
+                {
+                    // Ignore failures. If this method returns null, the problem falls 
+                    // into one of the other NuGet project types.
+                    exceptions.Add(e);
+                }
+            }
+
+            exceptions.ForEach(e => _logger.LogError(e.ToString()));
+
+            return null;
         }
 
         /// <summary>
@@ -123,15 +129,23 @@ namespace NuGet.PackageManagement.VisualStudio
                 return null;
             }
 
+            if (vsProjectAdapter.VsHierarchy != null &&
+                VsHierarchyUtility.IsCPSCapabilityComplaint(vsProjectAdapter.VsHierarchy))
+            {
+                // Lazy load the CPS enabled JoinableTaskFactory for the UI.
+                NuGetUIThreadHelper.SetJoinableTaskFactoryFromService(ProjectServiceAccessor.Value as IProjectServiceAccessor);
+            }
+
             try
             {
-                if (provider.TryCreateNuGetProject(
+                var nuGetProject = await provider.TryCreateNuGetProjectAsync(
                     vsProjectAdapter,
                     optionalContext,
-                    forceProjectType: true,
-                    result: out NuGetProject result))
+                    forceProjectType: true);
+
+                if (nuGetProject != null)
                 {
-                    return result as TProject;
+                    return nuGetProject as TProject;
                 }
             }
             catch (Exception e)

@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -22,8 +22,6 @@ namespace NuGet.ProjectManagement
             Logger = NullLogger.Instance;
             Settings = NullSettings.Instance;
         }
-
-        public List<PackageSpec> DeferredPackageSpecs { get; set; } = new List<PackageSpec>();
 
         /// <summary>
         /// Unique name to dg

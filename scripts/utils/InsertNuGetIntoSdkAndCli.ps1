@@ -32,10 +32,15 @@ param
     [Parameter(Mandatory=$True)]
     [string]$BranchName,
     [Parameter(Mandatory=$True)]
+    [string]$FilePath,
+    [Parameter(Mandatory=$True)]
     [string]$NuGetTag,
     [Parameter(Mandatory=$True)]
     [string]$BuildOutputPath
 )
+
+# set security protocol for Invoke-RestMethod
+. "$PSScriptRoot\SetSecurityProtocol.ps1"
 
 $repoOwner = "dotnet"
 $Base64Token = [System.Convert]::ToBase64String([char[]]$PersonalAccessToken)
@@ -58,7 +63,7 @@ Function UpdateNuGetVersionInXmlFile {
         [string]$NuGetTag
     )
 
-$xmlString = $XmlContents.Split([environment]::NewLine) | where { $_ -cmatch $NuGetTag }
+$xmlString = $XmlContents.Split([environment]::NewLine) | where { $_ -cmatch "<$NuGetTag>" }
 Write-Host $xmlString
 $newXmlString = "<$NuGetTag>$NuGetVersion</$NuGetTag>"
 Write-Host $newXmlString
@@ -196,12 +201,12 @@ $PullRequestUrl | Set-Content $mdFile
 Write-Host "##vso[task.addattachment type=Distributedtask.Core.Summary;name=$RepositoryName Pull Request Url;]$mdFile"  
 }
 
-$xml = GetDependencyVersionPropsFile -RepositoryName $RepositoryName -BranchName $BranchName -FilePath build/DependencyVersions.props
+$xml = GetDependencyVersionPropsFile -RepositoryName $RepositoryName -BranchName $BranchName -FilePath $FilePath
 Write-Host $xml
 
 $updatedXml = UpdateNuGetVersionInXmlFile -XmlContents $xml -NuGetVersion $ProductVersion -NuGetTag $NuGetTag
 
 CreateBranchForPullRequest -RepositoryName $RepositoryName -Headers $Headers -BranchName $BranchName
-UpdateFileContent -RepositoryName $RepositoryName -Headers $Headers -FilePath build/DependencyVersions.props -FileContent $updatedXml
+UpdateFileContent -RepositoryName $RepositoryName -Headers $Headers -FilePath $FilePath -FileContent $updatedXml
 $PullRequestUrl = CreatePullRequest -RepositoryName $RepositoryName -Headers $Headers -CreatedBranchName $CreatedBranchName -BaseBranch $BranchName
 PrintPullRequestUrlToVsts -RepositoryName $RepositoryName -PullRequestUrl $PullRequestUrl

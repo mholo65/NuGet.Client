@@ -78,8 +78,8 @@ namespace NuGet.Build.Tasks.Test
 
             var baseConfigPath = "NuGet.Config";
 
-            using (var machineWide = TestDirectory.Create())
-            using (var mockBaseDirectory = TestDirectory.Create())
+            using (var machineWide = TestDirectory.CreateInTemp())
+            using (var mockBaseDirectory = TestDirectory.CreateInTemp())
             {
                 var subFolder = Path.Combine(mockBaseDirectory, "sub");
                 var solutionDirectoryConfig = Path.Combine(mockBaseDirectory, NuGetConstants.NuGetSolutionSettingsFolder);
@@ -111,8 +111,8 @@ namespace NuGet.Build.Tasks.Test
         public void GetRestoreSettingsTask_FindConfigInProjectFolder()
         {
             // Verifies that we include any config file found in the project folder
-            using (var machineWide = TestDirectory.Create())
-            using (var workingDir = TestDirectory.Create())
+            using (var machineWide = TestDirectory.CreateInTemp())
+            using (var workingDir = TestDirectory.CreateInTemp())
             {
                 // Arrange
                 ConfigurationFileTestUtility.CreateConfigurationFile(Settings.DefaultSettingsFileName, machineWide, machineWideSettingsConfig);
@@ -143,7 +143,7 @@ namespace NuGet.Build.Tasks.Test
         [Fact]
         public void GetRestoreSettingsTask_VerifyRestoreAdditionalProjectSourcesAreAppended()
         {
-            using (var testDir = TestDirectory.Create())
+            using (var testDir = TestDirectory.CreateInTemp())
             {
                 // Arrange
                 var buildEngine = new TestBuildEngine();
@@ -175,7 +175,7 @@ namespace NuGet.Build.Tasks.Test
         [Fact]
         public void GetRestoreSettingsTask_VerifyRestoreAdditionalProjectFallbackFoldersAreAppended()
         {
-            using (var testDir = TestDirectory.Create())
+            using (var testDir = TestDirectory.CreateInTemp())
             {
                 // Arrange
                 var buildEngine = new TestBuildEngine();
@@ -207,7 +207,7 @@ namespace NuGet.Build.Tasks.Test
         [Fact]
         public void GetRestoreSettingsTask_VerifyRestoreAdditionalProjectFallbackFoldersWithExcludeAreNotAdded()
         {
-            using (var testDir = TestDirectory.Create())
+            using (var testDir = TestDirectory.CreateInTemp())
             {
                 // Arrange
                 var buildEngine = new TestBuildEngine();
@@ -244,7 +244,7 @@ namespace NuGet.Build.Tasks.Test
         [Fact]
         public void GetRestoreSettingsTask_VerifyAggregationAcrossFrameworks()
         {
-            using (var testDir = TestDirectory.Create())
+            using (var testDir = TestDirectory.CreateInTemp())
             {
                 // Arrange
                 var buildEngine = new TestBuildEngine();
@@ -299,7 +299,7 @@ namespace NuGet.Build.Tasks.Test
         [Fact]
         public void GetRestoreSettingsTask_VerifyNullPerFrameworkSettings()
         {
-            using (var testDir = TestDirectory.Create())
+            using (var testDir = TestDirectory.CreateInTemp())
             {
                 // Arrange
                 var buildEngine = new TestBuildEngine();
@@ -327,7 +327,7 @@ namespace NuGet.Build.Tasks.Test
         [Fact]
         public void GetRestoreSettingsTask_VerifyEmptyPerFrameworkSettings()
         {
-            using (var testDir = TestDirectory.Create())
+            using (var testDir = TestDirectory.CreateInTemp())
             {
                 // Arrange
                 var buildEngine = new TestBuildEngine();
@@ -352,6 +352,42 @@ namespace NuGet.Build.Tasks.Test
             }
         }
 
+
+        [Fact]
+        public void GetRestoreSettingsTask_VerifyDisabledSourcesAreExcluded()
+        {
+
+            using (var testDir = TestDirectory.CreateInTemp())
+            {
+                // Arrange
+                var buildEngine = new TestBuildEngine();
+                var testLogger = buildEngine.TestLogger;
+
+
+                var configFile = Path.Combine(testDir, Settings.DefaultSettingsFileName);
+
+                var projectDirectory = Path.GetDirectoryName(configFile);
+                Directory.CreateDirectory(projectDirectory);
+
+                File.WriteAllText(configFile, DisableSourceConfig);
+
+                var task = new GetRestoreSettingsTask()
+                {
+                    BuildEngine = buildEngine,
+                    ProjectUniqueName = Path.Combine(testDir, "a.csproj"),
+                    RestoreFallbackFolders = new[] { Path.Combine(testDir, "base") },
+                    RestoreSettingsPerFramework = new ITaskItem[0]
+                };
+
+                // Act
+                var result = task.Execute();
+
+                // Assert
+                result.Should().BeTrue();
+                task.OutputSources.ShouldBeEquivalentTo(new[] { @"https://nuget.org/v2/api" });
+            }
+        }
+
         private static string machineWideSettingsConfig = @"<?xml version=""1.0"" encoding=""utf-8""?>
                 <configuration>
                 </configuration>";
@@ -371,5 +407,20 @@ namespace NuGet.Build.Tasks.Test
                   <add key=""outer-key"" value=""outer-value"" />
                 </SectionName>
               </configuration>";
+
+        private static string DisableSourceConfig =
+            @"<?xml version=""1.0"" encoding=""utf-8""?>
+             <configuration>
+              <packageSources>
+                <Clear/>
+                <add key=""NuGet"" value=""https://api.nuget.org/v3/index.json"" />
+                <add key=""NuGet.v2"" value=""https://nuget.org/v2/api"" />
+              </packageSources>
+              <disabledPackageSources>
+                 <Clear/>
+                 <add key=""NuGet"" value=""true"" />
+              </disabledPackageSources>
+            </configuration>";
+
     }
 }

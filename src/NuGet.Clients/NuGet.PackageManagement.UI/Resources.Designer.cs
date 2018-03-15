@@ -999,6 +999,15 @@ namespace NuGet.PackageManagement.UI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Refresh.
+        /// </summary>
+        public static string RefreshButtonLabel {
+            get {
+                return ResourceManager.GetString("RefreshButtonLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Multiple packages failed to uninstall. Restart Visual Studio to finish the process..
         /// </summary>
         public static string RequestRestartToCompleteUninstallMultiplePackages {
@@ -1040,6 +1049,15 @@ namespace NuGet.PackageManagement.UI {
         public static string ShowDetails {
             get {
                 return ResourceManager.GetString("ShowDetails", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Applying setting failed..
+        /// </summary>
+        public static string ShowError_ApplySettingFailed {
+            get {
+                return ResourceManager.GetString("ShowError_ApplySettingFailed", resourceCulture);
             }
         }
         
@@ -1406,15 +1424,6 @@ namespace NuGet.PackageManagement.UI {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Review Changes.
-        /// </summary>
-        public static string Text_ReviewChanges {
-            get {
-                return ResourceManager.GetString("Text_ReviewChanges", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Search ({0}).
         /// </summary>
         public static string Text_SearchBoxText {
@@ -1537,6 +1546,15 @@ namespace NuGet.PackageManagement.UI {
         public static string ToolTip_PackageInstalled {
             get {
                 return ResourceManager.GetString("ToolTip_PackageInstalled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The ID prefix of this package has been reserved for the owner of the package by the currently selected feed.
+        /// </summary>
+        public static string Tooltip_PrefixReserved {
+            get {
+                return ResourceManager.GetString("Tooltip_PrefixReserved", resourceCulture);
             }
         }
         
@@ -1685,11 +1703,11 @@ namespace NuGet.PackageManagement.UI {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Preview.
+        ///   Looks up a localized string similar to Preview Changes.
         /// </summary>
-        public static string WindowTitle_Preview {
+        public static string WindowTitle_PreviewChanges {
             get {
-                return ResourceManager.GetString("WindowTitle_Preview", resourceCulture);
+                return ResourceManager.GetString("WindowTitle_PreviewChanges", resourceCulture);
             }
         }
         

@@ -29,11 +29,6 @@ namespace NuGet.PackageManagement.VisualStudio
         private readonly IVsProjectThreadingService _threadingService;
         private readonly AsyncLazy<IComponentModel> _componentModel;
 
-        // Reason it's lazy<object> is because we don't want to load any CPS assemblies untill
-        // we're really going to use any of CPS api. Which is why we also don't use nameof or typeof apis.
-        [Import("Microsoft.VisualStudio.ProjectSystem.IProjectServiceAccessor")]
-        private Lazy<object> ProjectServiceAccessor { get; set; }
-
         public RuntimeTypeHandle ProjectType => typeof(LegacyPackageReferenceProject).TypeHandle;
 
         [ImportingConstructor]
@@ -59,35 +54,29 @@ namespace NuGet.PackageManagement.VisualStudio
                 _threadingService.JoinableTaskFactory);
         }
 
-        public bool TryCreateNuGetProject(
+        public async Task<NuGetProject> TryCreateNuGetProjectAsync(
             IVsProjectAdapter vsProjectAdapter,
             ProjectProviderContext _,
-            bool forceProjectType,
-            out NuGetProject result)
+            bool forceProjectType)
         {
             Assumes.Present(vsProjectAdapter);
 
-            _threadingService.ThrowIfNotOnUIThread();
+            await _threadingService.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            result = null;
-
-            var projectServices = _threadingService.ExecuteSynchronously(
-                () => TryCreateProjectServicesAsync(
-                    vsProjectAdapter,
-                    forceCreate: forceProjectType));
+            var projectServices = await TryCreateProjectServicesAsync(
+                vsProjectAdapter,
+                forceCreate: forceProjectType);
 
             if (projectServices == null)
             {
-                return false;
+                return null;
             }
 
-            result = new LegacyPackageReferenceProject(
+            return new LegacyPackageReferenceProject(
                 vsProjectAdapter,
                 vsProjectAdapter.ProjectId,
                 projectServices,
                 _threadingService);
-
-            return true;
         }
 
         /// <summary>
@@ -162,9 +151,6 @@ namespace NuGet.PackageManagement.VisualStudio
         private INuGetProjectServices CreateCoreProjectSystemServices(
                 IVsProjectAdapter vsProjectAdapter, IComponentModel componentModel)
         {
-            // Lazy load the CPS enabled JoinableTaskFactory for the UI.
-            NuGetUIThreadHelper.SetJoinableTaskFactoryFromService(ProjectServiceAccessor.Value as ProjectSystem.IProjectServiceAccessor);
-
             return new VsManagedLanguagesProjectSystemServices(vsProjectAdapter, componentModel);
         }
     }
