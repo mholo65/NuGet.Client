@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -22,7 +22,7 @@ namespace NuGet.Protocol.Tests
         private const string NuGetClientVersionHeader = "X-NuGet-Client-Version";
 
         [Fact]
-        public async Task PackageUpdateResource_IncludesApiKeyWhenDeleting()
+        public async Task PackageUpdateResource_IncludesApiKeyWhenDeletingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -51,6 +51,7 @@ namespace NuGet.Protocol.Tests
                     packageVersion: "1.4.0.1-rc",
                     getApiKey: _ => apiKey,
                     confirm: _ => true,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -69,7 +70,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task PackageUpdateResource_AllowsNoApiKeyWhenDeleting()
+        public async Task PackageUpdateResource_AllowsNoApiKeyWhenDeletingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -98,6 +99,7 @@ namespace NuGet.Protocol.Tests
                     packageVersion: "1.4.0.1-rc",
                     getApiKey: _ => apiKey,
                     confirm: _ => true,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -115,7 +117,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task PackageUpdateResource_AllowsApiKeyWhenPushing()
+        public async Task PackageUpdateResource_AllowsApiKeyWhenPushingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -138,7 +140,7 @@ namespace NuGet.Protocol.Tests
                 var resource = await repo.GetResourceAsync<PackageUpdateResource>();
                 var apiKey = "SomeApiKey";
 
-                var packageInfo = SimpleTestPackageUtility.CreateFullPackage(workingDir, "test", "1.0.0");
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
 
                 // Act
                 await resource.Push(
@@ -148,6 +150,7 @@ namespace NuGet.Protocol.Tests
                     disableBuffering: false,
                     getApiKey: _ => apiKey,
                     getSymbolApiKey: _ => null,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -166,7 +169,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task PackageUpdateResource_AllowsNoApiKeyWhenPushing()
+        public async Task PackageUpdateResource_AllowsNoApiKeyWhenPushingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -189,7 +192,7 @@ namespace NuGet.Protocol.Tests
                 var resource = await repo.GetResourceAsync<PackageUpdateResource>();
                 var apiKey = string.Empty;
 
-                var packageInfo = SimpleTestPackageUtility.CreateFullPackage(workingDir, "test", "1.0.0");
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
 
                 // Act
                 await resource.Push(
@@ -199,6 +202,7 @@ namespace NuGet.Protocol.Tests
                     disableBuffering: false,
                     getApiKey: _ => apiKey,
                     getSymbolApiKey: _ => null,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -220,7 +224,7 @@ namespace NuGet.Protocol.Tests
         [InlineData("http://nuget.smbsrc.net/")]
         [InlineData("https://nuget.smbsrc.net")]
         [InlineData("https://nuget.smbsrc.net/api/v2/package/")]
-        public async Task PackageUpdateResource_SourceAndSymbolNuGetOrgPushing(string symbolSource)
+        public async Task PackageUpdateResource_SourceAndSymbolNuGetOrgPushingAsync(string symbolSource)
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -230,8 +234,8 @@ namespace NuGet.Protocol.Tests
                 HttpRequestMessage symbolRequest = null;
                 var apiKey = "serverapikey";
 
-                var packageInfo = SimpleTestPackageUtility.CreateFullPackage(workingDir, "test", "1.0.0");
-                var symbolPackageInfo = SimpleTestPackageUtility.CreateSymbolPackage(workingDir, "test", "1.0.0");
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
+                var symbolPackageInfo = await SimpleTestPackageUtility.CreateSymbolPackageAsync(workingDir, "test", "1.0.0");
 
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
                 {
@@ -263,9 +267,10 @@ namespace NuGet.Protocol.Tests
                         "https://www.nuget.org/api/v2/package/create-verification-key/test/1.0.0",
                         request =>
                         {
-                            var content = new StringContent(String.Format(JsonData.tempApiKeyJsonData,"tempkey"), Encoding.UTF8, "application/json");
-                            var response = new HttpResponseMessage(HttpStatusCode.OK);
-                            response.Content = content;
+                            var content = new StringContent(string.Format(JsonData.TempApiKeyJsonData,"tempkey"), Encoding.UTF8, "application/json");
+                            var response = new HttpResponseMessage(HttpStatusCode.OK){
+                            Content = content
+};
                             return Task.FromResult(response);
                         }
                     }
@@ -284,6 +289,7 @@ namespace NuGet.Protocol.Tests
                     disableBuffering: false,
                     getApiKey: _ => apiKey,
                     getSymbolApiKey: _ => apiKey,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -301,7 +307,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task PackageUpdateResource_NuGetOrgSourceOnlyPushing()
+        public async Task PackageUpdateResource_NuGetOrgSourceOnlyPushingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -312,8 +318,8 @@ namespace NuGet.Protocol.Tests
                 HttpRequestMessage symbolRequest = null;
                 var apiKey = "serverapikey";
 
-                var packageInfo = SimpleTestPackageUtility.CreateFullPackage(workingDir, "test", "1.0.0");
-                var symbolPackageInfo = SimpleTestPackageUtility.CreateSymbolPackage(workingDir, "test", "1.0.0");
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
+                var symbolPackageInfo = await SimpleTestPackageUtility.CreateSymbolPackageAsync(workingDir, "test", "1.0.0");
 
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
                 {
@@ -347,6 +353,7 @@ namespace NuGet.Protocol.Tests
                     disableBuffering: false,
                     getApiKey: _ => apiKey,
                     getSymbolApiKey: _ => apiKey,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -364,7 +371,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task PackageUpdateResource_SymbolSourceOnlyPushing()
+        public async Task PackageUpdateResource_SymbolSourceOnlyPushingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -375,8 +382,8 @@ namespace NuGet.Protocol.Tests
                 HttpRequestMessage symbolRequest = null;
                 var apiKey = "serverapikey";
 
-                var packageInfo = SimpleTestPackageUtility.CreateFullPackage(workingDir, "test", "1.0.0");
-                var symbolPackageInfo = SimpleTestPackageUtility.CreateSymbolPackage(workingDir, "test", "1.0.0");
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
+                var symbolPackageInfo = await SimpleTestPackageUtility.CreateSymbolPackageAsync(workingDir, "test", "1.0.0");
 
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
                 {
@@ -418,6 +425,7 @@ namespace NuGet.Protocol.Tests
                     disableBuffering: false,
                     getApiKey: _ => apiKey,
                     getSymbolApiKey: _ => apiKey,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -437,15 +445,15 @@ namespace NuGet.Protocol.Tests
         [InlineData("http://nuget.smbsrc.net/")]
         [InlineData("https://nuget.smbsrc.net")]
         [InlineData("https://nuget.smbsrc.net/api/v2/package/")]
-        public async Task PackageUpdateResource_NoSymbolSourcePushingSymbol(string source)
+        public async Task PackageUpdateResource_NoSymbolSourcePushingSymbolAsync(string source)
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
             {
                 HttpRequestMessage symbolRequest = null;
                 var apiKey = "serverapikey";
-                var packageInfo = SimpleTestPackageUtility.CreateFullPackage(workingDir, "test", "1.0.0");
-                var symbolPackageInfo = SimpleTestPackageUtility.CreateSymbolPackage(workingDir, "test", "1.0.0");
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
+                var symbolPackageInfo = await SimpleTestPackageUtility.CreateSymbolPackageAsync(workingDir, "test", "1.0.0");
 
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
                 {
@@ -469,9 +477,10 @@ namespace NuGet.Protocol.Tests
                         "https://www.nuget.org/api/v2/package/create-verification-key/test/1.0.0",
                         request =>
                         {
-                            var content = new StringContent(String.Format(JsonData.tempApiKeyJsonData,"tempkey"), Encoding.UTF8, "application/json");
-                            var response = new HttpResponseMessage(HttpStatusCode.OK);
-                            response.Content = content;
+                            var content = new StringContent(string.Format(JsonData.TempApiKeyJsonData,"tempkey"), Encoding.UTF8, "application/json");
+                            var response = new HttpResponseMessage(HttpStatusCode.OK){
+                            Content = content
+};
                             return Task.FromResult(response);
                         }
                     }
@@ -490,6 +499,7 @@ namespace NuGet.Protocol.Tests
                     disableBuffering: false,
                     getApiKey: _ => apiKey,
                     getSymbolApiKey: _ => null,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -504,7 +514,103 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task PackageUpdateResource_PackageNotExistOnNuGetOrgPushing()
+        public async Task PackageUpdateResource_NoServiceEndpointOnCustomServerAsync()
+        {
+            // Arrange
+            using (var workingDir = TestDirectory.Create())
+            {
+                var source = "https://nuget.customsrc.net/";
+
+                HttpRequestMessage sourceRequest = null;
+                var apiKey = "serverapikey";
+
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
+
+                var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
+                {
+                    {
+                        "https://nuget.customsrc.net/",
+                        request =>
+                        {
+                            sourceRequest = request;
+                            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+                        }
+                    }
+                };
+
+                var repo = StaticHttpHandler.CreateSource(source, Repository.Provider.GetCoreV3(), responses);
+                var resource = await repo.GetResourceAsync<PackageUpdateResource>();
+                UserAgent.SetUserAgentString(new UserAgentStringBuilder("test client"));
+
+                // Act
+                await resource.Push(
+                    packagePath: packageInfo.FullName,
+                    symbolSource: null,
+                    timeoutInSecond: 5,
+                    disableBuffering: false,
+                    getApiKey: _ => apiKey,
+                    getSymbolApiKey: _ => null,
+                    noServiceEndpoint: true,
+                    log: NullLogger.Instance);
+
+                // Assert
+                Assert.NotNull(sourceRequest);
+                Assert.Equal(HttpMethod.Put, sourceRequest.Method);
+                Assert.Equal(source, sourceRequest.RequestUri.AbsoluteUri);
+
+            }
+        }
+
+        [Fact]
+        public async Task PackageUpdateResource_NoServiceEndpointOnCustomServer_ShouldAddEndpointAsync()
+        {
+            // Arrange
+            using (var workingDir = TestDirectory.Create())
+            {
+                var source = "https://nuget.customsrc.net/";
+
+                HttpRequestMessage sourceRequest = null;
+                var apiKey = "serverapikey";
+
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
+
+                var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
+                {
+                    {
+                        "https://nuget.customsrc.net/api/v2/package/",
+                        request =>
+                        {
+                            sourceRequest = request;
+                            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+                        }
+                    }
+                };
+
+                var repo = StaticHttpHandler.CreateSource(source, Repository.Provider.GetCoreV3(), responses);
+                var resource = await repo.GetResourceAsync<PackageUpdateResource>();
+                UserAgent.SetUserAgentString(new UserAgentStringBuilder("test client"));
+
+                // Act
+                await resource.Push(
+                    packagePath: packageInfo.FullName,
+                    symbolSource: null,
+                    timeoutInSecond: 5,
+                    disableBuffering: false,
+                    getApiKey: _ => apiKey,
+                    getSymbolApiKey: _ => null,
+                    noServiceEndpoint: false,
+                    log: NullLogger.Instance);
+
+                // Assert
+                Assert.NotNull(sourceRequest);
+                Assert.Equal(HttpMethod.Put, sourceRequest.Method);
+                Assert.Equal(source+"api/v2/package/", sourceRequest.RequestUri.AbsoluteUri);
+
+            }
+        }
+
+        [Fact]
+        public async Task PackageUpdateResource_PackageNotExistOnNuGetOrgPushingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -514,8 +620,8 @@ namespace NuGet.Protocol.Tests
                 HttpRequestMessage symbolRequest = null;
                 var apiKey = "serverapikey";
 
-                var packageInfo = SimpleTestPackageUtility.CreateFullPackage(workingDir, "test", "1.0.0");
-                var symbolPackageInfo = SimpleTestPackageUtility.CreateSymbolPackage(workingDir, "test", "1.0.0");
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
+                var symbolPackageInfo = await SimpleTestPackageUtility.CreateSymbolPackageAsync(workingDir, "test", "1.0.0");
 
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
                 {
@@ -531,9 +637,10 @@ namespace NuGet.Protocol.Tests
                         "https://www.nuget.org/api/v2/package/create-verification-key/test/1.0.0",
                         request =>
                         {
-                            var content = new StringContent(String.Format(JsonData.tempApiKeyJsonData, "tempkey"), Encoding.UTF8, "application/json");
-                            var response = new HttpResponseMessage(HttpStatusCode.OK);
-                            response.Content = content;
+                            var content = new StringContent(string.Format(JsonData.TempApiKeyJsonData, "tempkey"), Encoding.UTF8, "application/json");
+                            var response = new HttpResponseMessage(HttpStatusCode.OK){
+                            Content = content
+};
                             return Task.FromResult(response);
                         }
                     }
@@ -552,6 +659,7 @@ namespace NuGet.Protocol.Tests
                     disableBuffering: false,
                     getApiKey: _ => apiKey,
                     getSymbolApiKey: _ => null,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert
@@ -566,7 +674,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task PackageUpdateResource_GetErrorFromCreateKeyPushing()
+        public async Task PackageUpdateResource_GetErrorFromCreateKeyPushingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -577,8 +685,8 @@ namespace NuGet.Protocol.Tests
                 HttpRequestMessage symbolRequest = null;
                 var apiKey = "serverapikey";
 
-                var packageInfo = SimpleTestPackageUtility.CreateFullPackage(workingDir, "test", "1.0.0");
-                var symbolPackageInfo = SimpleTestPackageUtility.CreateSymbolPackage(workingDir, "test", "1.0.0");
+                var packageInfo = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "test", "1.0.0");
+                var symbolPackageInfo = await SimpleTestPackageUtility.CreateSymbolPackageAsync(workingDir, "test", "1.0.0");
 
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
                 {
@@ -621,6 +729,7 @@ namespace NuGet.Protocol.Tests
                         disableBuffering: false,
                         getApiKey: _ => apiKey,
                         getSymbolApiKey: _ => apiKey,
+                        noServiceEndpoint: false,
                         log: NullLogger.Instance));
 
                 // Assert
@@ -630,7 +739,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task PackageUpdateResource_RetryNuGetSymbolPushing()
+        public async Task PackageUpdateResource_RetryNuGetSymbolPushingAsync()
         {
             // Arrange
             using (var workingDir = TestDirectory.Create())
@@ -641,7 +750,7 @@ namespace NuGet.Protocol.Tests
                 var symbolSourceRequestCount = 0;
                 var createKeyRequestCount = 0;
 
-                var symbolPackageInfo = SimpleTestPackageUtility.CreateSymbolPackage(workingDir, "test", "1.0.0");
+                var symbolPackageInfo = await SimpleTestPackageUtility.CreateSymbolPackageAsync(workingDir, "test", "1.0.0");
 
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
                 {
@@ -663,9 +772,10 @@ namespace NuGet.Protocol.Tests
                          request =>
                          {
                             createKeyRequestCount++;
-                            var content = new StringContent(string.Format(JsonData.tempApiKeyJsonData, $"tempkey{createKeyRequestCount}"), Encoding.UTF8, "application/json");
-                            var response = new HttpResponseMessage(HttpStatusCode.OK);
-                            response.Content = content;
+                            var content = new StringContent(string.Format(JsonData.TempApiKeyJsonData, $"tempkey{createKeyRequestCount}"), Encoding.UTF8, "application/json");
+                            var response = new HttpResponseMessage(HttpStatusCode.OK){
+                            Content = content
+};
                             return Task.FromResult(response);
                          }
                     }
@@ -684,6 +794,7 @@ namespace NuGet.Protocol.Tests
                     disableBuffering: false,
                     getApiKey: _ => apiKey,
                     getSymbolApiKey: _ => null,
+                    noServiceEndpoint: false,
                     log: NullLogger.Instance);
 
                 // Assert

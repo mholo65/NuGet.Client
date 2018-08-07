@@ -1,10 +1,11 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'README.md'))\build\common.legacy.props" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Shipping>true</Shipping>
     <IncludeInVSIX>true</IncludeInVSIX>
+    <PackProject>true</PackProject>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <ProjectGuid>{306CDDFA-FF0B-4299-930C-9EC6C9308160}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -16,6 +17,7 @@
     <SkipValidatePackageReferences>true</SkipValidatePackageReferences>
     <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup Condition="'$(VisualStudioVersion)' == '14.0'">
     <Reference Include="Microsoft.VisualStudio.VCProjectEngine, Version=14.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
@@ -98,18 +100,12 @@
     <Compile Include="Common\PackageCollectionExtensions.cs" />
     <Compile Include="Common\PackageCollectionItem.cs" />
     <Compile Include="Common\PackageCollectionItemExtensions.cs" />
-    <Compile Include="DeferredProjectsUtility\DeferredProjectRestoreData.cs" />
-    <Compile Include="DeferredProjectsUtility\DeferredProjectRestoreUtility.cs" />
-    <Compile Include="DeferredProjectsUtility\DeferredProjectVSUtility.cs" />
-    <Compile Include="DeferredProjectsUtility\LightWeightProjectWorkspaceService.cs" />
-    <Compile Include="DeferredProjectsUtility\ILightWeightProjectWorkspaceService.cs" />
     <Compile Include="ProjectServices\DeferredProjectCapabilities.cs" />
     <Compile Include="ProjectServices\GlobalProjectServiceProvider.cs" />
     <Compile Include="ProjectServices\NetCoreProjectSystemServices.cs" />
     <Compile Include="ProjectServices\VsCoreProjectSystemReferenceReader.cs" />
     <Compile Include="ProjectSystems\VsCoreProjectSystem.cs" />
     <Compile Include="Projects\VsMSBuildProjectSystemServices.cs" />
-    <Compile Include="Utility\SupportedProjectTypes.cs" />
     <Compile Include="Common\VersionCollectionExtensions.cs" />
     <Compile Include="DefaultVSCredentialServiceProvider.cs" />
     <Compile Include="Handlers\ProjectRetargetingHandler.cs" />
@@ -180,15 +176,15 @@
     <Compile Include="Setting\WritableSettingsStoreWrapper.cs" />
     <Compile Include="SourceControl\DTESourceControlUtility.cs" />
     <Compile Include="SourceControl\VsSourceControlTracker.cs" />
-    <Compile Include="Telemetry\ActionsTelemetryService.cs" />
     <Compile Include="Telemetry\NuGetProjectType.cs" />
     <Compile Include="Telemetry\ProjectTelemetryEvent.cs" />
-    <Compile Include="Telemetry\NuGetProjectTelemetryService.cs" />
+    <Compile Include="Telemetry\VSTelemetryServiceUtility.cs" />
     <Compile Include="Utility\EnvDTEProjectUtility.cs" />
     <Compile Include="Utility\EnvDTESolutionUtility.cs" />
     <Compile Include="Utility\FrameworkAssembly.cs" />
     <Compile Include="Utility\FrameworkAssemblyResolver.cs" />
     <Compile Include="Utility\NativeMethods.cs" />
+    <Compile Include="Utility\NuGetProjectUpgradeUtility.cs" />
     <Compile Include="Utility\ProjectRetargetingUtility.cs" />
     <Compile Include="Utility\RefreshFileUtility.cs" />
     <Compile Include="Utility\RegistrySettingUtility.cs" />
@@ -217,8 +213,7 @@
     <Compile Include="ProjectServices\DeferredProjectServicesProxy.cs" />
     <Compile Include="Projects\IVsProjectAdapterProvider.cs" />
     <Compile Include="Services\IVsProjectThreadingService.cs" />
-    <Compile Include="ProjectServices\VsCoreProjectBuildProperties.cs" />
-    <Compile Include="ProjectServices\VsManagedLanguagesProjectBuildProperties.cs" />
+    <Compile Include="ProjectServices\VsProjectBuildProperties.cs" />
     <Compile Include="ProjectServices\VsManagedLanguagesProjectSystemServices.cs" Condition="'$(VisualStudioVersion)' == '15.0'" />
     <Compile Include="Projects\VsProjectAdapter.cs" />
     <Compile Include="Projects\VsProjectAdapterProvider.cs" />
@@ -316,6 +311,12 @@
     <PackageReference Include="VSLangProj2">
       <Version>7.0.5000</Version>
     </PackageReference>
+    <PackageReference Include="VSLangProj157">
+      <Version>15.7.0</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NuGet.Build.Tasks.Pack" Version="4.4.0" PrivateAssets="all" />
   </ItemGroup>
   <Import Project="$(BuildCommonDirectory)common.targets" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

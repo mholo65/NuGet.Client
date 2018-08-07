@@ -1,9 +1,9 @@
-﻿using System;
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using NuGet.Common;
 using Xunit;
 
 namespace NuGet.Test.Utility
@@ -68,12 +68,12 @@ namespace NuGet.Test.Utility
 
         private string[] GetAllPlatforms()
         {
-            var platforms = new HashSet<string>(Platforms ?? new string[0], StringComparer.OrdinalIgnoreCase)
+            var platforms = new HashSet<string>(Platforms ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase)
             {
                 Platform
             };
 
-            var skipPlatforms = new HashSet<string>(SkipPlatforms ?? new string[0], StringComparer.OrdinalIgnoreCase)
+            var skipPlatforms = new HashSet<string>(SkipPlatforms ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase)
             {
                 SkipPlatform
             };

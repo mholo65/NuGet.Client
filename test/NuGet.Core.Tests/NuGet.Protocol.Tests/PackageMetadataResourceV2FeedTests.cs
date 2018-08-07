@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Moq;
 using NuGet.Common;
 using NuGet.Packaging.Core;
 using NuGet.Protocol.Core.Types;
@@ -21,11 +22,11 @@ namespace NuGet.Protocol.Tests
         public async Task PackageMetadataResource_Basic()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "FindPackagesById()?id='WindowsAzure.Storage'&semVerLevel=2.0.0",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageFindPackagesById.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -33,7 +34,7 @@ namespace NuGet.Protocol.Tests
             var packageMetadataResource = await repo.GetResourceAsync<PackageMetadataResource>();
 
             // Act
-            var metadata = await packageMetadataResource.GetMetadataAsync("WindowsAzure.Storage", true, false, NullLogger.Instance, CancellationToken.None);
+            var metadata = await packageMetadataResource.GetMetadataAsync("WindowsAzure.Storage", true, false, NullSourceCacheContext.Instance, NullLogger.Instance, CancellationToken.None);
             var latestPackage = (PackageSearchMetadataV2Feed) metadata.OrderByDescending(e => e.Identity.Version, VersionComparer.VersionRelease).FirstOrDefault();
 
             // Assert
@@ -64,11 +65,11 @@ namespace NuGet.Protocol.Tests
         public async Task PackageMetadataResource_UsesReferenceCache()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "FindPackagesById()?id='afine'&semVerLevel=2.0.0",
-                TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.FindPackagesByIdWithDuplicateBesidesVersion.xml", GetType()));
+                ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.FindPackagesByIdWithDuplicateBesidesVersion.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -76,7 +77,7 @@ namespace NuGet.Protocol.Tests
             var packageMetadataResource = await repo.GetResourceAsync<PackageMetadataResource>();
 
             // Act
-            var metadata = (IEnumerable<PackageSearchMetadataV2Feed>) await packageMetadataResource.GetMetadataAsync("afine", true, false, NullLogger.Instance, CancellationToken.None);
+            var metadata = (IEnumerable<PackageSearchMetadataV2Feed>) await packageMetadataResource.GetMetadataAsync("afine", true, false, NullSourceCacheContext.Instance, NullLogger.Instance, CancellationToken.None);
 
             var first = metadata.ElementAt(0);
             var second = metadata.ElementAt(1);
@@ -89,11 +90,11 @@ namespace NuGet.Protocol.Tests
         public async Task PackageMetadataResource_NotFound()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "FindPackagesById()?id='not-found'&semVerLevel=2.0.0",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.NotFoundFindPackagesById.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.NotFoundFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -101,7 +102,7 @@ namespace NuGet.Protocol.Tests
             var packageMetadataResource = await repo.GetResourceAsync<PackageMetadataResource>();
 
             // Act
-            var metadata = await packageMetadataResource.GetMetadataAsync("not-found", true, false, NullLogger.Instance, CancellationToken.None);
+            var metadata = await packageMetadataResource.GetMetadataAsync("not-found", true, false, NullSourceCacheContext.Instance, NullLogger.Instance, CancellationToken.None);
 
             // Assert
             Assert.Equal(0, metadata.Count());
@@ -111,11 +112,11 @@ namespace NuGet.Protocol.Tests
         public async Task PackageMetadataResource_PackageIdentity()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "Packages(Id='WindowsAzure.Storage',Version='4.3.2-preview')",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageGetPackages.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageGetPackages.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -125,7 +126,7 @@ namespace NuGet.Protocol.Tests
             var packageIdentity = new PackageIdentity("WindowsAzure.Storage", new NuGetVersion("4.3.2-preview"));
 
             // Act
-            var metadata = await packageMetadataResource.GetMetadataAsync(packageIdentity, NullLogger.Instance, CancellationToken.None);
+            var metadata = await packageMetadataResource.GetMetadataAsync(packageIdentity, NullSourceCacheContext.Instance, NullLogger.Instance, CancellationToken.None);
 
             // Assert
             Assert.Equal("WindowsAzure.Storage", metadata.Identity.Id);
@@ -136,13 +137,13 @@ namespace NuGet.Protocol.Tests
         public async Task PackageMetadataResource_PackageIdentity_NotFound()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "FindPackagesById()?id='WindowsAzure.Storage'&semVerLevel=2.0.0",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.NotFoundFindPackagesById.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.NotFoundFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress + "Packages(Id='WindowsAzure.Storage',Version='0.0.0')",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.NotFoundFindPackagesById.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.NotFoundFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -152,7 +153,7 @@ namespace NuGet.Protocol.Tests
             var packageIdentity = new PackageIdentity("WindowsAzure.Storage", new NuGetVersion("0.0.0"));
 
             // Act
-            var metadata = await packageMetadataResource.GetMetadataAsync(packageIdentity, NullLogger.Instance, CancellationToken.None);
+            var metadata = await packageMetadataResource.GetMetadataAsync(packageIdentity, NullSourceCacheContext.Instance, NullLogger.Instance, CancellationToken.None);
 
             // Assert
             Assert.Null(metadata);

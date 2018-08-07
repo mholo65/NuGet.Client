@@ -79,7 +79,7 @@ namespace NuGet.PackageManagement.VisualStudio
         public override async Task<string> GetCacheFilePathAsync()
         {
             await _threadingService.JoinableTaskFactory.SwitchToMainThreadAsync();
-            return NoOpRestoreUtilities.GetProjectCacheFilePath(cacheRoot: GetBaseIntermediatePath(), projectPath: _projectFullPath);
+            return NoOpRestoreUtilities.GetProjectCacheFilePath(cacheRoot: GetMSBuildProjectExtensionsPath(), projectPath: _projectFullPath);
         }
 
         public override async Task<string> GetAssetsFilePathOrNullAsync()
@@ -91,14 +91,14 @@ namespace NuGet.PackageManagement.VisualStudio
         {
             await _threadingService.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            var baseIntermediatePath = GetBaseIntermediatePath(shouldThrow);
+            var msbuildProjectExtensionsPath = GetMSBuildProjectExtensionsPath(shouldThrow);
 
-            if (baseIntermediatePath == null)
+            if (msbuildProjectExtensionsPath == null)
             {
                 return null;
             }
 
-            return Path.Combine(baseIntermediatePath, LockFileFormat.AssetsFileName);
+            return Path.Combine(msbuildProjectExtensionsPath, LockFileFormat.AssetsFileName);
         }
 
         #endregion BuildIntegratedNuGetProject
@@ -164,25 +164,26 @@ namespace NuGet.PackageManagement.VisualStudio
 
         #endregion
 
-        private string GetBaseIntermediatePath(bool shouldThrow = true)
+        private string GetMSBuildProjectExtensionsPath(bool shouldThrow = true)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            var baseIntermediatePath = _vsProjectAdapter.BaseIntermediateOutputPath;
+            var msbuildProjectExtensionsPath = _vsProjectAdapter.MSBuildProjectExtensionsPath;
 
-            if (string.IsNullOrEmpty(baseIntermediatePath))
+            if (string.IsNullOrEmpty(msbuildProjectExtensionsPath))
             {
                 if (shouldThrow)
                 {
                     throw new InvalidDataException(string.Format(
-                        Strings.BaseIntermediateOutputPathNotFound,
+                        Strings.MSBuildPropertyNotFound,
+                        ProjectBuildProperties.MSBuildProjectExtensionsPath,
                         _vsProjectAdapter.ProjectDirectory));
                 }
 
                 return null;
             }
 
-            return baseIntermediatePath;
+            return msbuildProjectExtensionsPath;
         }
 
         private string GetPackagesPath(ISettings settings)
@@ -322,23 +323,24 @@ namespace NuGet.PackageManagement.VisualStudio
             // In legacy CSProj, we only have one target framework per project
             var tfis = new TargetFrameworkInformation[] { projectTfi };
 
+            var projectName = _projectName ?? _projectUniqueName;
+
             return new PackageSpec(tfis)
             {
-                Name = _projectName ?? _projectUniqueName,
+                Name = projectName,
                 Version = new NuGetVersion(_vsProjectAdapter.Version),
                 Authors = new string[] { },
                 Owners = new string[] { },
                 Tags = new string[] { },
                 ContentFiles = new string[] { },
-                Dependencies = packageReferences,
                 FilePath = _projectFullPath,
                 RuntimeGraph = runtimeGraph,
                 RestoreMetadata = new ProjectRestoreMetadata
                 {
                     ProjectStyle = ProjectStyle.PackageReference,
-                    OutputPath = GetBaseIntermediatePath(),
+                    OutputPath = GetMSBuildProjectExtensionsPath(),
                     ProjectPath = _projectFullPath,
-                    ProjectName = _projectName ?? _projectUniqueName,
+                    ProjectName = projectName,
                     ProjectUniqueName = _projectFullPath,
                     OriginalTargetFrameworks = tfis
                         .Select(tfi => tfi.FrameworkName.GetShortFolderName())
@@ -356,7 +358,7 @@ namespace NuGet.PackageManagement.VisualStudio
                     Sources = GetSources(settings),
                     FallbackFolders = GetFallbackFolders(settings),
                     ConfigFilePaths = GetConfigFilePaths(settings),
-                    ProjectWideWarningProperties = MSBuildRestoreUtility.GetWarningProperties(
+                    ProjectWideWarningProperties = WarningProperties.GetWarningProperties(
                         treatWarningsAsErrors: _vsProjectAdapter.TreatWarningsAsErrors, 
                         noWarn: _vsProjectAdapter.NoWarn,
                         warningsAsErrors: _vsProjectAdapter.WarningsAsErrors)

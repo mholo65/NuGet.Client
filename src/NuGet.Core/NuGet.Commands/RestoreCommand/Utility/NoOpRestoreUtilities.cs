@@ -26,7 +26,7 @@ namespace NuGet.Commands
         }
 
         /// <summary>
-        /// The cache file path is $(BaseIntermediateOutputPath)\$(project).nuget.cache
+        /// The cache file path is $(MSBuildProjectExtensionsPath)\$(project).nuget.cache
         /// </summary>
         private static string GetBuildIntegratedProjectCacheFilePath(RestoreRequest request)
         {
@@ -35,7 +35,7 @@ namespace NuGet.Commands
                 || request.ProjectStyle == ProjectStyle.PackageReference
                 || request.ProjectStyle == ProjectStyle.Standalone)
             {
-                var cacheRoot = request.BaseIntermediateOutputPath ?? request.RestoreOutputPath;
+                var cacheRoot = request.MSBuildProjectExtensionsPath ?? request.RestoreOutputPath;
                 return request.Project.RestoreMetadata.CacheFilePath = GetProjectCacheFilePath(cacheRoot, request.Project.RestoreMetadata.ProjectPath);
             }
 
@@ -153,7 +153,7 @@ namespace NuGet.Commands
             packageFolderPaths.AddRange(request.Project.RestoreMetadata.FallbackFolders);
             var pathResolvers = packageFolderPaths.Select(path => new VersionFolderPathResolver(path));
 
-            ISet<PackageIdentity> packagesChecked = new HashSet<PackageIdentity>();
+            var packagesChecked = new HashSet<PackageIdentity>();
 
             var packages = request.ExistingLockFile.Libraries.Where(library => library.Type == LibraryType.Package);
 
@@ -172,16 +172,9 @@ namespace NuGet.Commands
                         // Verify the SHA for each package
                         var hashPath = resolver.GetHashPath(library.Name, library.Version);
 
-                        if (File.Exists(hashPath))
+                        if (request.DependencyProviders.PackageFileCache.Sha512Exists(hashPath))
                         {
                             found = true;
-                            var sha512 = File.ReadAllText(hashPath);
-
-                            if (library.Sha512 != sha512)
-                            {
-                                // A package has changed
-                                return false;
-                            }
 
                             // Skip checking the rest of the package folders
                             break;
@@ -210,26 +203,80 @@ namespace NuGet.Commands
 
                 var uniqueName = request.DependencyGraphSpec.Restore.First();
                 var dgSpec = request.DependencyGraphSpec.WithProjectClosure(uniqueName);
-                var projectSpec = dgSpec.GetProjectSpec(uniqueName);
 
-                // The project path where the tool is declared does not affect restore and is only used for logging and transparency.
-                if (request.Project.RestoreMetadata.ProjectStyle == ProjectStyle.DotnetCliTool)
-                {
-                    projectSpec.RestoreMetadata.ProjectPath = null;
-                    projectSpec.FilePath = null;
+                foreach (var projectSpec in dgSpec.Projects){
+                    // The project path where the tool is declared does not affect restore and is only used for logging and transparency.
+                    if (request.Project.RestoreMetadata.ProjectStyle == ProjectStyle.DotnetCliTool)
+                    {
+                        projectSpec.RestoreMetadata.ProjectPath = null;
+                        projectSpec.FilePath = null;
+                    }
+
+                    //Ignore the restore settings for package ref projects.
+                    //This is set by default for net core projects in VS while it's not set in commandline.
+                    //This causes a discrepancy and the project does not cross-client no - op.MSBuild / NuGet.exe vs VS.
+                    else if (request.Project.RestoreMetadata.ProjectStyle == ProjectStyle.PackageReference)
+                    {
+                        projectSpec.RestoreSettings = null;
+                    }
                 }
 
-                //Ignore the restore settings for package ref projects.
-                //This is set by default for net core projects in VS while it's not set in commandline.
-                //This causes a discrepancy and the project does not cross-client no - op.MSBuild / NuGet.exe vs VS.
-                else if (request.Project.RestoreMetadata.ProjectStyle == ProjectStyle.PackageReference)
-                {
-                    projectSpec.RestoreSettings = null;
-                }
+                PersistHashedDGFileIfDebugging(dgSpec, request.Log);
                 return dgSpec.GetHash();
             }
 
+            PersistHashedDGFileIfDebugging(request.DependencyGraphSpec, request.Log);
             return request.DependencyGraphSpec.GetHash();
+        }
+
+
+        /// <summary>
+        /// Write the dg file to a temp location if NUGET_PERSIST_NOOP_DG.
+        /// </summary>
+        /// <remarks>This is a noop if NUGET_PERSIST_NOOP_DG is not set to true.</remarks>
+        private static void PersistHashedDGFileIfDebugging(DependencyGraphSpec spec, ILogger log)
+        {
+            if (_isPersistDGSet.Value)
+            {
+                string path;
+                var envPath = Environment.GetEnvironmentVariable("NUGET_PERSIST_NOOP_DG_PATH");
+                if (!string.IsNullOrEmpty(envPath))
+                {
+                    path = envPath;
+                    Directory.CreateDirectory(Path.GetDirectoryName(path));
+                }
+                else
+                {
+                    path = Path.Combine(
+                        NuGetEnvironment.GetFolderPath(NuGetFolderPath.Temp),
+                        "nuget-dg",
+                        $"{spec.GetProjectSpec(spec.Restore.FirstOrDefault()).RestoreMetadata.ProjectName}-{DateTime.Now.ToString("yyyyMMddHHmmss")}.dg");
+                    DirectoryUtility.CreateSharedDirectory(Path.GetDirectoryName(path));
+                }
+
+                log.LogMinimal($"Persisting no-op dg to {path}");
+
+                spec.Save(path);
+            }
+        }
+
+        private static readonly Lazy<bool> _isPersistDGSet = new Lazy<bool>(() => IsPersistDGSet());
+
+        /// <summary>
+        /// True if NUGET_PERSIST_NOOP_DG is set to true.
+        /// </summary>
+        private static bool IsPersistDGSet()
+        {
+            var settingValue = Environment.GetEnvironmentVariable("NUGET_PERSIST_NOOP_DG");
+
+            bool val;
+            if (!string.IsNullOrEmpty(settingValue)
+                && bool.TryParse(settingValue, out val))
+            {
+                return val;
+            }
+
+            return false;
         }
 
         /// <summary>

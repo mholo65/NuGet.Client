@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections.Generic;
@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Moq;
 using NuGet.Frameworks;
 using NuGet.Packaging.Core;
 using NuGet.Protocol.Core.Types;
@@ -20,7 +21,7 @@ namespace NuGet.Protocol.Tests
     {
 
         [Fact]
-        public async Task LocalDependencyInfoResource_Basic()
+        public async Task LocalDependencyInfoResource_BasicAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -83,16 +84,16 @@ namespace NuGet.Protocol.Tests
                     packageX
                 };
 
-                SimpleTestPackageUtility.CreatePackages(root, packageContexts);
+                await SimpleTestPackageUtility.CreatePackagesAsync(root, packageContexts);
 
                 var source = Repository.Factory.GetCoreV3(root);
                 var localResource = new FindLocalPackagesResourceV2(root);
                 var resource = new LocalDependencyInfoResource(localResource, source);
 
                 // Act
-                var resultsA = (await resource.ResolvePackages("a", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
-                var resultsX = (await resource.ResolvePackages("x", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
-                var resultsY = (await resource.ResolvePackages("y", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
+                var resultsA = (await resource.ResolvePackages("a", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
+                var resultsX = (await resource.ResolvePackages("x", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
+                var resultsY = (await resource.ResolvePackages("y", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
 
                 // Assert
                 Assert.Equal(1, resultsA.Count);
@@ -118,7 +119,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_NoDependencies()
+        public async Task LocalDependencyInfoResource_NoDependenciesAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -144,14 +145,14 @@ namespace NuGet.Protocol.Tests
                     packageX
                 };
 
-                SimpleTestPackageUtility.CreatePackages(root, packageContexts);
+                await SimpleTestPackageUtility.CreatePackagesAsync(root, packageContexts);
 
                 var source = Repository.Factory.GetCoreV3(root);
                 var localResource = new FindLocalPackagesResourceV2(root);
                 var resource = new LocalDependencyInfoResource(localResource, source);
 
                 // Act
-                var results = (await resource.ResolvePackages("x", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
+                var results = (await resource.ResolvePackages("x", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
 
                 // Assert
                 // no dependencies
@@ -164,7 +165,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_IdNotFound()
+        public async Task LocalDependencyInfoResource_IdNotFoundAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -182,14 +183,14 @@ namespace NuGet.Protocol.Tests
                     packageX
                 };
 
-                SimpleTestPackageUtility.CreatePackages(root, packageContexts);
+                await SimpleTestPackageUtility.CreatePackagesAsync(root, packageContexts);
 
                 var source = Repository.Factory.GetCoreV3(root);
                 var localResource = new FindLocalPackagesResourceV2(root);
                 var resource = new LocalDependencyInfoResource(localResource, source);
 
                 // Act
-                var resultsY = (await resource.ResolvePackages("y", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
+                var resultsY = (await resource.ResolvePackages("y", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
 
                 // Assert
                 Assert.Equal(0, resultsY.Count);
@@ -197,7 +198,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_EmptyFolder()
+        public async Task LocalDependencyInfoResource_EmptyFolderAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -209,7 +210,7 @@ namespace NuGet.Protocol.Tests
                 var resource = new LocalDependencyInfoResource(localResource, source);
 
                 // Act
-                var results = (await resource.ResolvePackages("notfound", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
+                var results = (await resource.ResolvePackages("notfound", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
 
                 // Assert
                 Assert.Equal(0, results.Count);
@@ -217,7 +218,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_FolderDoesNotExist()
+        public async Task LocalDependencyInfoResource_FolderDoesNotExistAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -231,7 +232,7 @@ namespace NuGet.Protocol.Tests
                 Directory.Delete(root);
 
                 // Act
-                var results = (await resource.ResolvePackages("notfound", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
+                var results = (await resource.ResolvePackages("notfound", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
 
                 // Assert
                 Assert.Equal(0, results.Count);
@@ -239,7 +240,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_MissingDependency()
+        public async Task LocalDependencyInfoResource_MissingDependencyAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -265,7 +266,7 @@ namespace NuGet.Protocol.Tests
                     packageX
                 };
 
-                SimpleTestPackageUtility.CreatePackages(root, packageContexts);
+                await SimpleTestPackageUtility.CreatePackagesAsync(root, packageContexts);
 
                 foreach (var file in Directory.GetFiles(root))
                 {
@@ -280,8 +281,8 @@ namespace NuGet.Protocol.Tests
                 var resource = new LocalDependencyInfoResource(localResource, source);
 
                 // Act
-                var results = (await resource.ResolvePackages("a", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
-                var resultsX = (await resource.ResolvePackages("x", NuGetFramework.Parse("net46"), testLogger, CancellationToken.None)).ToList();
+                var results = (await resource.ResolvePackages("a", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
+                var resultsX = (await resource.ResolvePackages("x", NuGetFramework.Parse("net46"), NullSourceCacheContext.Instance, testLogger, CancellationToken.None)).ToList();
 
                 // Assert
                 Assert.Equal(1, results.Count);
@@ -295,7 +296,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_SinglePackage()
+        public async Task LocalDependencyInfoResource_SinglePackageAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -321,7 +322,7 @@ namespace NuGet.Protocol.Tests
                     packageX
                 };
 
-                SimpleTestPackageUtility.CreatePackages(root, packageContexts);
+                await SimpleTestPackageUtility.CreatePackagesAsync(root, packageContexts);
 
                 var source = Repository.Factory.GetCoreV3(root);
                 var localResource = new FindLocalPackagesResourceV2(root);
@@ -331,6 +332,7 @@ namespace NuGet.Protocol.Tests
                 var result = (await resource.ResolvePackage(
                     packageA.Identity,
                     NuGetFramework.Parse("net46"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None));
 
@@ -344,7 +346,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_SinglePackageNotFound()
+        public async Task LocalDependencyInfoResource_SinglePackageNotFoundAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -370,7 +372,7 @@ namespace NuGet.Protocol.Tests
                     packageX
                 };
 
-                SimpleTestPackageUtility.CreatePackages(root, packageContexts);
+                await SimpleTestPackageUtility.CreatePackagesAsync(root, packageContexts);
 
                 var source = Repository.Factory.GetCoreV3(root);
                 var localResource = new FindLocalPackagesResourceV2(root);
@@ -380,6 +382,7 @@ namespace NuGet.Protocol.Tests
                 var result = (await resource.ResolvePackage(
                     new PackageIdentity("z", NuGetVersion.Parse("1.0.0")),
                     NuGetFramework.Parse("net46"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None));
 
@@ -389,7 +392,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_SinglePackageNotFoundEmptyFolder()
+        public async Task LocalDependencyInfoResource_SinglePackageNotFoundEmptyFolderAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -404,6 +407,7 @@ namespace NuGet.Protocol.Tests
                 var result = (await resource.ResolvePackage(
                     new PackageIdentity("z", NuGetVersion.Parse("1.0.0")),
                     NuGetFramework.Parse("net46"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None));
 
@@ -413,7 +417,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_SinglePackageNearestDependencyGroup()
+        public async Task LocalDependencyInfoResource_SinglePackageNearestDependencyGroupAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -449,7 +453,7 @@ namespace NuGet.Protocol.Tests
                     packageA
                 };
 
-                SimpleTestPackageUtility.CreatePackages(root, packageContexts);
+                await SimpleTestPackageUtility.CreatePackagesAsync(root, packageContexts);
 
                 var source = Repository.Factory.GetCoreV3(root);
                 var localResource = new FindLocalPackagesResourceV2(root);
@@ -459,18 +463,21 @@ namespace NuGet.Protocol.Tests
                 var resultNet462 = (await resource.ResolvePackage(
                     packageA.Identity,
                     NuGetFramework.Parse("net462"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None));
 
                 var resultNet46 = (await resource.ResolvePackage(
                     packageA.Identity,
                     NuGetFramework.Parse("net46"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None));
 
                 var resultWin8 = (await resource.ResolvePackage(
                     packageA.Identity,
                     NuGetFramework.Parse("win8"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None));
 
@@ -487,7 +494,7 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task LocalDependencyInfoResource_ResolvePackagesNearestDependencyGroup()
+        public async Task LocalDependencyInfoResource_ResolvePackagesNearestDependencyGroupAsync()
         {
             using (var root = TestDirectory.Create())
             {
@@ -523,7 +530,7 @@ namespace NuGet.Protocol.Tests
                     packageA
                 };
 
-                SimpleTestPackageUtility.CreatePackages(root, packageContexts);
+                await SimpleTestPackageUtility.CreatePackagesAsync(root, packageContexts);
 
                 var source = Repository.Factory.GetCoreV3(root);
                 var localResource = new FindLocalPackagesResourceV2(root);
@@ -533,18 +540,21 @@ namespace NuGet.Protocol.Tests
                 var resultNet462 = (await resource.ResolvePackages(
                     "a",
                     NuGetFramework.Parse("net462"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None)).Single();
 
                 var resultNet46 = (await resource.ResolvePackages(
                     "a",
                     NuGetFramework.Parse("net46"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None)).Single();
 
                 var resultWin8 = (await resource.ResolvePackages(
                     "a",
                     NuGetFramework.Parse("win8"),
+                    NullSourceCacheContext.Instance,
                     testLogger,
                     CancellationToken.None)).Single();
 

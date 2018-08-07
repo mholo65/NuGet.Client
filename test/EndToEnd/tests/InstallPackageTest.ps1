@@ -63,15 +63,14 @@ function Test-InstallPackageWithInvalidHttpSourceVerbose {
     $source = "http://example.com"
     $escapedSource = [regex]::Escape($source)
     $escapedUrl = [regex]::Escape($source+"/FindPackagesById()?id='$package'&semVerLevel=2.0.0")
-    $message = "\ \ GET\ $escapedUrl\ \ \ NotFound\ $escapedUrl\ [\w]+\ An\ error\ occurred\ while\ retrieving\ package\ metadata\ for\ '$package'\ from\ source\ '$escapedSource'\.\r\n\ \ The\ V2\ feed\ at\ '$escapedUrl'\ returned\ an\ unexpected\ status\ code\ '404\ Not\ Found'\.\ Unable\ to\ find\ package\ '$package'\ at\ source\ '$escapedSource'\."
-
+    $message = "\ \ GET\ $escapedUrl\ \ \ NotFound\ $escapedUrl\ [\w]+\ An\ error\ occurred\ while\ retrieving\ package\ metadata\ for\ '$package'\ from\ source\ '$escapedSource'\."
     # Act
     $result = Install-Package $package -ProjectName $project.Name -source $source -Verbose *>&1
     $resultString = [string]::Join(" ", $result)
     $compare = $resultString -Match $message
-
+    $messageToPrint = "Result string is `n$resultString but expected message was `n$message"
     # Assert
-    Assert-True $compare
+    Assert-True $compare $messageToPrint
 }
 
 function Test-InstallPackageWithIncompleteHttpSource {
@@ -713,9 +712,18 @@ function Test-InstallPackageWithNonExistentFrameworkReferences {
 
     # Arrange
     $p = New-ClassLibrary
+    $expectedExceptionMessage = "Failed to add reference. The package 'PackageWithNonExistentGacReferences' tried to add a framework reference to 'System.Awesome' which was not found in the GAC. This is possibly a bug in the package. Please contact the package owners for assistance."
+    $actualExceptionMessage = [string]::Empty
 
     # Arrange
-    Assert-Throws { $p | Install-Package PackageWithNonExistentGacReferences -Source $context.RepositoryRoot } "Failed to add reference. The package 'PackageWithNonExistentGacReferences' tried to add a framework reference to 'System.Awesome' which was not found in the GAC. This is possibly a bug in the package. Please contact the package owners for assistance.`r`n  Reference unavailable."
+    try {
+        $p | Install-Package PackageWithNonExistentGacReferences -Source $context.RepositoryRoot
+    }
+    catch {
+        $actualExceptionMessage = $_.Exception.Message
+    }
+
+    Assert-Contains $expectedExceptionMessage $actualExceptionMessage
 }
 
 function Test-InstallPackageWithFrameworkFacadeReference {
@@ -2474,22 +2482,6 @@ function Test-InstallPackageWithXdtTransformTransformsTheFile
     Assert-NotNull $content.configuration["system.web"].customErrors
 }
 
-function Test-InstallPackageAddImportStatement
-{
-    param ($context)
-
-    # Arrange
-    $p = New-ConsoleApplication
-
-    # Act
-    $p | Install-Package PackageWithImport -Source $context.RepositoryPath
-
-    # Assert
-    Assert-Package $p PackageWithImport 2.0.0
-    Assert-ProjectImport $p "..\packages\PackageWithImport.2.0.0\build\PackageWithImport.targets"
-    Assert-ProjectImport $p "..\packages\PackageWithImport.2.0.0\build\PackageWithImport.props"
-}
-
 # Solution-level package used
 function Test-ReinstallSolutionLevelPackageWorks
 {
@@ -2771,34 +2763,6 @@ function Test-PackageWithConfigTransformInstallToWinJsProject
     Assert-NotNull (Get-ProjectItem $p 'b.config')
 }
 
-function Test-InstallPackageIntoLightSwitchApplication
-{
-    param($context)
-
-    # this test is only applicable to VS 2013 because it has the latest LightSwitch template
-    if ((Get-VSVersion) -ne "12.0")
-    {
-        return
-    }
-
-    # Arrange
-
-    New-LightSwitchApplication LsApp
-
-    # Sleep for 10 seconds for the two sub-projects to be created
-    [System.Threading.Thread]::Sleep(10000)
-
-    $clientProject = Get-Project LsApp.HTMLClient
-    $serverProject = Get-Project LsApp.Server
-
-    # Act
-    Install-Package PackageWithPPVBSourceFiles -Source $context.RepositoryRoot -ProjectName $clientProject.Name
-    Install-Package NonStrongNameA -Source $context.RepositoryRoot -ProjectName $serverProject.Name
-
-    # Assert
-    Assert-Package $clientProject PackageWithPPVBSourceFiles
-    Assert-Package $serverProject NonStrongNameA
-}
 
 function Test-InstallPackageAddPackagesConfigFileToProject
 {
@@ -3216,4 +3180,22 @@ function Test-InstallPackageWithEscapedSymbolInPath()
 
     # Assert
     Assert-Package $p Xam.Plugin.Connectivity
+}
+
+function Test-InstallPackageWithRootNamespaceInPPFile {
+    param(
+        $context
+    )
+
+    # Arrange
+    $p = New-ClassLibrary "testProject"
+
+    # Act
+    Install-Package PackageWithRootNamespaceFileTransform -Source $context.RepositoryRoot
+
+    # Assert
+    Assert-NotNull (Get-ProjectItem $p foo.cs)
+    $path = (Get-ProjectItemPath $p foo.cs)
+    $content = [System.IO.File]::ReadAllText($path)
+    Assert-True ($content.Contains("namespace testProject"))
 }

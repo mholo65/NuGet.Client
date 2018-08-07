@@ -1,14 +1,16 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.Protocol.Core.Types;
 using Xunit;
 
@@ -80,7 +82,7 @@ namespace NuGet.Protocol.Tests
         public void Constructor_Stream_ThrowsForNullStream()
         {
             var exception = Assert.Throws<ArgumentNullException>(
-                () => new DownloadResourceResult(stream: null));
+                () => new DownloadResourceResult(stream: null, source: null));
 
             Assert.Equal("stream", exception.ParamName);
         }
@@ -88,7 +90,7 @@ namespace NuGet.Protocol.Tests
         [Fact]
         public void Constructor_Stream_InitializesProperties()
         {
-            using (var result = new DownloadResourceResult(Stream.Null))
+            using (var result = new DownloadResourceResult(Stream.Null, source: null))
             {
                 Assert.Null(result.PackageReader);
                 Assert.Null(result.PackageSource);
@@ -133,7 +135,7 @@ namespace NuGet.Protocol.Tests
             using (var packageReader = new TestPackageReader())
             {
                 var exception = Assert.Throws<ArgumentNullException>(
-                    () => new DownloadResourceResult(stream: null, packageReader: packageReader));
+                    () => new DownloadResourceResult(stream: null, packageReader: packageReader, source: null));
 
                 Assert.Equal("stream", exception.ParamName);
             }
@@ -142,7 +144,7 @@ namespace NuGet.Protocol.Tests
         [Fact]
         public void Constructor_StreamPackageReaderBase_AllowsNullPackageReader()
         {
-            using (var result = new DownloadResourceResult(Stream.Null, packageReader: null))
+            using (var result = new DownloadResourceResult(Stream.Null, packageReader: null, source: null))
             {
                 Assert.Null(result.PackageReader);
             }
@@ -152,7 +154,7 @@ namespace NuGet.Protocol.Tests
         public void Constructor_StreamPackageReaderBase_InitializesProperties()
         {
             using (var packageReader = new TestPackageReader())
-            using (var result = new DownloadResourceResult(Stream.Null, packageReader))
+            using (var result = new DownloadResourceResult(Stream.Null, packageReader, source: null))
             {
                 Assert.Same(packageReader, result.PackageReader);
                 Assert.Null(result.PackageSource);
@@ -200,7 +202,7 @@ namespace NuGet.Protocol.Tests
         public void Dispose_IsIdempotent()
         {
             using (var stream = new TestStream())
-            using (var result = new DownloadResourceResult(stream))
+            using (var result = new DownloadResourceResult(stream, source: null))
             {
                 result.Dispose();
                 result.Dispose();
@@ -226,6 +228,11 @@ namespace NuGet.Protocol.Tests
                 throw new NotImplementedException();
             }
 
+            public override Task<byte[]> GetArchiveHashAsync(HashAlgorithmName hashAlgorithm, CancellationToken token)
+            {
+                throw new NotImplementedException();
+            }
+
             public override IEnumerable<string> GetFiles()
             {
                 throw new NotImplementedException();
@@ -236,7 +243,22 @@ namespace NuGet.Protocol.Tests
                 throw new NotImplementedException();
             }
 
+            public override Task<PrimarySignature> GetPrimarySignatureAsync(CancellationToken token)
+            {
+                return Task.FromResult<PrimarySignature>(null);
+            }
+
             public override Stream GetStream(string path)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override Task<bool> IsSignedAsync(CancellationToken token)
+            {
+                return Task.FromResult(false);
+            }
+
+            public override Task ValidateIntegrityAsync(SignatureContent signatureContent, CancellationToken token)
             {
                 throw new NotImplementedException();
             }

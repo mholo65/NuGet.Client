@@ -151,7 +151,7 @@ namespace NuGet.ProjectManagement.Projects
             return packages;
         }
 
-        protected virtual Task<string> GetBaseIntermediatePathAsync()
+        protected virtual Task<string> GetMSBuildProjectExtensionsPathAsync()
         {
             // Extending class will implement the functionality.
             return Task.FromResult((string) null);
@@ -172,7 +172,7 @@ namespace NuGet.ProjectManagement.Projects
                 packageSpec.RestoreMetadata = metadata;
 
                 metadata.ProjectStyle = ProjectStyle.ProjectJson;
-                metadata.OutputPath = await GetBaseIntermediatePathAsync();
+                metadata.OutputPath = await GetMSBuildProjectExtensionsPathAsync();
                 metadata.ProjectPath = MSBuildProjectPath;
                 metadata.ProjectJsonPath = packageSpec.FilePath;
                 metadata.ProjectName = packageSpec.Name;
@@ -182,14 +182,28 @@ namespace NuGet.ProjectManagement.Projects
                 // Reload the target framework from csproj and update the target framework in packageSpec for restore
                 await UpdateInternalTargetFrameworkAsync();
 
-                if (TryGetInternalFramework(out var internalTargetFramework))
+                if (TryGetInternalFramework(out var targetFramework))
                 {
-                    // Ensure the project json has only one target framework
-                    if (packageSpec.TargetFrameworks != null && packageSpec.TargetFrameworks.Count == 1)
+                    var nuGetFramework = targetFramework as NuGetFramework;
+                    if (IsUAPFramework(nuGetFramework))
                     {
-                        var replaceTargetFramework = new TargetFrameworkInformation();
-                        replaceTargetFramework.FrameworkName = internalTargetFramework as NuGetFramework;
-                        packageSpec.TargetFrameworks[0] = replaceTargetFramework;
+                        // Ensure the project json has only one target framework
+                        if (packageSpec.TargetFrameworks != null && packageSpec.TargetFrameworks.Count == 1)
+                        {
+                            var tfi = packageSpec.TargetFrameworks.First();
+                            if (tfi.Imports.Count > 0)
+                            {
+                                if (tfi.AssetTargetFallback)
+                                {
+                                    nuGetFramework = new AssetTargetFallbackFramework(nuGetFramework, tfi.Imports.AsList());
+                                }
+                                else
+                                {
+                                    nuGetFramework = new FallbackFramework(nuGetFramework, tfi.Imports.AsList());
+                                }
+                            }
+                            tfi.FrameworkName = nuGetFramework;
+                        }
                     }
                 }
 
@@ -322,7 +336,7 @@ namespace NuGet.ProjectManagement.Projects
         {
             await FileUtility.ReplaceAsync(async (outputPath) =>
             {
-                using (var writer = File.CreateText(outputPath))
+                using (var writer = new StreamWriter(outputPath, false, Encoding.UTF8))
                 {
                     await writer.WriteAsync(json.ToString());
                 }
@@ -335,7 +349,7 @@ namespace NuGet.ProjectManagement.Projects
             // Update the internal target framework with TPMinV from csproj
             await UpdateInternalTargetFrameworkAsync();
 
-            if (TryGetInternalFramework(out object newTargetFrameworkObject))
+            if (TryGetInternalFramework(out var newTargetFrameworkObject))
             {
                 var frameworks = JsonConfigUtility.GetFrameworks(json);
                 var newTargetFramework = newTargetFrameworkObject as NuGetFramework;

@@ -14,7 +14,7 @@
     <ArtifactsDirectory>$(RepositoryRootDirectory)artifacts\</ArtifactsDirectory>
     <DotnetExePath>$(RepositoryRootDirectory)cli\dotnet.exe</DotnetExePath>
     <DotnetExePath Condition=" '$(IsXPlat)' == 'true' ">$(RepositoryRootDirectory)cli\dotnet</DotnetExePath>
-    <DotnetSharedSDKDirectory>$(RepositoryRootDirectory)cli\shared\Microsoft.NETCore.App\1.0.4\</DotnetSharedSDKDirectory>
+    <DotnetSharedSDKDirectory>$(RepositoryRootDirectory)cli1.0.4\shared\Microsoft.NETCore.App\1.0.4\</DotnetSharedSDKDirectory>
     <NuGetExePath>$(RepositoryRootDirectory).nuget\nuget.exe</NuGetExePath>
     <SharedDirectory>$(BuildCommonDirectory)Shared</SharedDirectory>
     <NuGetCoreSrcDirectory>$(RepositoryRootDirectory)src\NuGet.Core\</NuGetCoreSrcDirectory>
@@ -22,8 +22,9 @@
     <NupkgOutputDirectory Condition=" '$(BuildRTM)' != 'true' ">$(ArtifactsDirectory)nupkgs\</NupkgOutputDirectory>
     <NupkgOutputDirectory Condition=" '$(BuildRTM)' == 'true' ">$(ArtifactsDirectory)ReleaseNupkgs\</NupkgOutputDirectory>
     <SolutionPackagesFolder>$(RepositoryRootDirectory)packages\</SolutionPackagesFolder>
-    <XunitConsoleExePath>$(SolutionPackagesFolder)xunit.runner.console.2.2.0\tools\xunit.console.x86.exe</XunitConsoleExePath>
+    <XunitConsoleExePath>$(SolutionPackagesFolder)xunit.runner.console.2.3.1\tools\net452\xunit.console.x86.exe</XunitConsoleExePath>
     <ILMergeExePath>$(SolutionPackagesFolder)ILMerge.2.14.1208\tools\ILMerge.exe</ILMergeExePath>
+    <XunitXmlLoggerDirectory>$(SolutionPackagesFolder)XunitXml.TestLogger.2.0.0\build\_common</XunitXmlLoggerDirectory>
     <EnlistmentRoot>$(RepositoryRootDirectory)</EnlistmentRoot>
     <EnlistmentRootSrc>$(RepositoryRootDirectory)src</EnlistmentRootSrc>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">$(RepositoryRootDirectory)</SolutionDir>
@@ -32,11 +33,15 @@
     <NuGetBuildLocalizationRepository>$(RepositoryRootDirectory)submodules\NuGet.Build.Localization\</NuGetBuildLocalizationRepository>
     <LocalizationRootDirectory>$(NuGetBuildLocalizationRepository)localize</LocalizationRootDirectory>
     <LocalizationFilesDirectory>$(ArtifactsDirectory)LocalizedFiles</LocalizationFilesDirectory>
+    <MicroBuildDirectory>$(SolutionPackagesFolder)MicroBuild.Core.0.2.0\build\</MicroBuildDirectory>
+    <IsBuildOnlyXPLATProjects>$(DotNetBuildFromSource)</IsBuildOnlyXPLATProjects>
+    <BlobPublishTargetsPath>$(SolutionPackagesFolder)Microsoft.DotNet.Build.Tasks.Feed.2.1.0-prerelease-02419-02\build\Microsoft.DotNet.Build.Tasks.Feed.targets</BlobPublishTargetsPath>
   </PropertyGroup>
 
   <!-- Defaults -->
   <PropertyGroup>
     <TreatWarningsAsErrors Condition=" '$(TreatWarningsAsErrors)' == '' ">true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);NU1605</NoWarn>
   </PropertyGroup>
 
   <!-- Default project configuration -->
@@ -59,10 +64,11 @@
     <NoWarn>$(NoWarn);1762</NoWarn>
     <!-- Code Analysis is OFF by default -->
     <RunCodeAnalysis Condition=" '$(RunCodeAnalysis)' == ''">false</RunCodeAnalysis>
-    <!--This property ensures that if you build the exact sources twice, 
+    <!--This property ensures that if you build the exact sources twice,
     you get exactly the same output, so the .pdb from the second build will match the .dll
      from the first build!-->
     <Deterministic>true</Deterministic>
+    <Features>strict</Features>
   </PropertyGroup>
 
   <!-- DEBUG specific configuration settings -->
@@ -91,7 +97,7 @@
   <PropertyGroup Condition="'$(VisualStudioVersion)' == '15.0'">
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
     <DefineConstants>$(DefineConstants);VS15</DefineConstants>
-    <VSSDKRoot>$(RepositoryRootDirectory)packages\Microsoft.VSSDK.BuildTools.15.0.26201</VSSDKRoot>
+    <VSSDKRoot>$(RepositoryRootDirectory)packages\Microsoft.VSSDK.BuildTools.15.1.192</VSSDKRoot>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(VSSDKRoot)\tools</VSToolsPath>
     <VsixOutputDirName>VS15</VsixOutputDirName>
     <CodeAnalysisRuleSet Condition="'$(CodeAnalysisRuleSet)' == ''">$(BuildCommonDirectory)NuGet.ruleset</CodeAnalysisRuleSet>
@@ -99,7 +105,6 @@
 
   <PropertyGroup>
     <VsixPublishDestination>$(ArtifactRoot)$(VsixOutputDirName)\</VsixPublishDestination>
-    <VsixPublishDestination Condition="'$(IsInsertable)' == 'true'">$(ArtifactRoot)$(VsixOutputDirName)\Insertable\</VsixPublishDestination>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(BuildRTM)' == 'true' ">
@@ -120,11 +125,11 @@
     <!-- If we aren't excluding the build number, use the release label and the build number. -->
     <When Condition="'$(BuildRTM)' != 'true' AND '$(PreReleaseVersion)' != '' AND '$(PreReleaseVersion)' != '0' ">
       <PropertyGroup>
-        <PreReleaseInformationVersion>-$(ReleaseLabel)-$(PreReleaseVersion)</PreReleaseInformationVersion>
+        <PreReleaseInformationVersion>-$(ReleaseLabel).$(PreReleaseVersion)</PreReleaseInformationVersion>
       </PropertyGroup>
     </When>
     <!-- If we are excluding the build number, show the release label unless we are RTM. -->
-    <When Condition="'$(ReleaseLabel)' != 'rtm'">
+    <When Condition="'$(ReleaseLabel)' != 'rtm' AND '$(ReleaseLabel)' != 'svc' ">
       <PropertyGroup>
         <PreReleaseInformationVersion>-$(ReleaseLabel)</PreReleaseInformationVersion>
       </PropertyGroup>
@@ -133,6 +138,7 @@
 
   <PropertyGroup Condition=" '$(Version)' == '' ">
     <Version>$(SemanticVersion)$(PreReleaseInformationVersion)</Version>
+    <Version Condition="'$(BUILD_SOURCEVERSION)' != ''">$(SemanticVersion)$(PreReleaseInformationVersion)+$(BUILD_SOURCEVERSION)</Version>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -141,9 +147,9 @@
   </PropertyGroup>
   <!-- Set the output location for all non-test projects -->
   <!-- Test projects currently fail when the output dir is moved -->
-  <PropertyGroup Condition=" '$(TestProject)' != 'true' ">
+  <PropertyGroup Condition=" '$(TestProject)' != 'true' OR '$(Shipping)' == 'true'">
     <!-- Create different folders for 14.0, 15.0, 15.0-RTM -->
-    
+
     <!-- output paths -->
     <BaseIntermediateOutputPath>$(ArtifactsDirectory)$(MSBuildProjectName)\$(BuildVariationFolder)\obj\</BaseIntermediateOutputPath>
     <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
@@ -172,7 +178,8 @@
       <_Parameter1>$(SemanticVersion).$(PreReleaseVersion)</_Parameter1>
     </AssemblyAttributes>
     <AssemblyAttributes Include="AssemblyInformationalVersion">
-      <_Parameter1>$(SemanticVersion)$(PreReleaseInformationVersion)</_Parameter1>
+      <_Parameter1 Condition="'$(BUILD_SOURCEVERSION)' == ''">$(SemanticVersion)$(PreReleaseInformationVersion)</_Parameter1>
+      <_Parameter1 Condition="'$(BUILD_SOURCEVERSION)' != ''">$(SemanticVersion)$(PreReleaseInformationVersion)+$(BUILD_SOURCEVERSION)</_Parameter1>
     </AssemblyAttributes>
     <AssemblyAttributes Include="AssemblyCompany">
       <_Parameter1>Microsoft Corporation</_Parameter1>
@@ -192,7 +199,8 @@
     <!-- Assembly attributes for net core projects -->
     <AssemblyVersion>$(SemanticVersion).$(NetCoreAssemblyBuildNumber)</AssemblyVersion>
     <FileVersion>$(SemanticVersion).$(PreReleaseVersion)</FileVersion>
-    <InformationalVersion>$(SemanticVersion)$(PreReleaseInformationVersion)</InformationalVersion>
+    <InformationalVersion Condition="'$(BUILD_SOURCEVERSION)' == ''">$(SemanticVersion)$(PreReleaseInformationVersion)</InformationalVersion>
+    <InformationalVersion Condition="'$(BUILD_SOURCEVERSION)' != ''">$(SemanticVersion)$(PreReleaseInformationVersion)+$(BUILD_SOURCEVERSION)</InformationalVersion>
     <Company>Microsoft Corporation</Company>
     <Product>NuGet</Product>
     <Copyright>Microsoft Corporation. All rights reserved.</Copyright>
@@ -246,7 +254,8 @@
   <!-- All projects in the repository -->
   <ItemGroup Condition=" '$(IsXPlat)' != 'true' ">
     <SolutionProjects Include="$(RepositoryRootDirectory)test\*\*\*.csproj"
-                      Exclude="$(RepositoryRootDirectory)test\EndToEnd\*\*.csproj"
+                      Exclude="$(RepositoryRootDirectory)test\EndToEnd\*\*.csproj;
+                               $(RepositoryRootDirectory)test\NuGet.Tests.Apex\*\NuGet.Tests.Apex.csproj"
                       Condition=" '$(ExcludeTestProjects)' != 'true' " />
 
     <SolutionProjects Include="$(RepositoryRootDirectory)src\*\*\*.csproj" />
@@ -258,6 +267,14 @@
   <ItemGroup Condition=" '$(IsXPlat)' == 'true' ">
     <SolutionProjects Include="@(CoreUnitTestProjects)" />
     <SolutionProjects Include="@(CoreFuncTestProjects)" />
+  </ItemGroup>
+
+  <ItemGroup>
+      <AllSolutionProjects Include="$(RepositoryRootDirectory)src\*\*\*.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+   <ApexProjects Include="$(RepositoryRootDirectory)test\NuGet.Tests.Apex\*\*.csproj" />
   </ItemGroup>
 
 </Project>

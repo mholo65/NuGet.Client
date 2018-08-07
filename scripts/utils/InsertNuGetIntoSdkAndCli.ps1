@@ -1,9 +1,11 @@
 ﻿<#
 .SYNOPSIS
-Script to insert NuGet into CLI and SDK
+Script to insert NuGet into CLI and SDK. 
 
 .DESCRIPTION
 Uses the Personal Access Token of NuGetLurker to automate the insertion process into CLI and SDK
+Note - This script can only be used from a VSTS Release Definition because of the env variables it
+depends on.
 
 .PARAMETER PersonalAccessToken
 PersonalAccessToken of the NuGetLurker account
@@ -32,10 +34,15 @@ param
     [Parameter(Mandatory=$True)]
     [string]$BranchName,
     [Parameter(Mandatory=$True)]
+    [string]$FilePath,
+    [Parameter(Mandatory=$True)]
     [string]$NuGetTag,
     [Parameter(Mandatory=$True)]
     [string]$BuildOutputPath
 )
+
+# Set security protocol to tls1.2 for Invoke-RestMethod powershell cmdlet
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $repoOwner = "dotnet"
 $Base64Token = [System.Convert]::ToBase64String([char[]]$PersonalAccessToken)
@@ -46,10 +53,18 @@ $Headers= @{
 
 $Build = ${env:BUILD_BUILDNUMBER}
 $Branch = ${env:BUILD_SOURCEBRANCHNAME}
+$AttemptNum = ${env:RELEASE_ATTEMPTNUMBER}
+$Release = ${env:RELEASE_RELEASENAME}
 $NuGetExePath = [System.IO.Path]::Combine($BuildOutputPath, $Branch, $Build, 'artifacts', 'VS15', "NuGet.exe")
 
 $ProductVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($NuGetExePath).ProductVersion
-$CreatedBranchName = "nuget-insertbuild$Build"
+$index = $ProductVersion.LastIndexOf('+')
+if($index -ne '-1')
+{
+    $ProductVersion = $ProductVersion.Substring(0,$index).Trim()
+}
+
+$CreatedBranchName = "$Release-$AttemptNum"
 
 Function UpdateNuGetVersionInXmlFile {
     param(
@@ -58,7 +73,7 @@ Function UpdateNuGetVersionInXmlFile {
         [string]$NuGetTag
     )
 
-$xmlString = $XmlContents.Split([environment]::NewLine) | where { $_ -cmatch $NuGetTag }
+$xmlString = $XmlContents.Split([environment]::NewLine) | where { $_ -cmatch "<$NuGetTag>" }
 Write-Host $xmlString
 $newXmlString = "<$NuGetTag>$NuGetVersion</$NuGetTag>"
 Write-Host $newXmlString
@@ -196,12 +211,12 @@ $PullRequestUrl | Set-Content $mdFile
 Write-Host "##vso[task.addattachment type=Distributedtask.Core.Summary;name=$RepositoryName Pull Request Url;]$mdFile"  
 }
 
-$xml = GetDependencyVersionPropsFile -RepositoryName $RepositoryName -BranchName $BranchName -FilePath build/DependencyVersions.props
+$xml = GetDependencyVersionPropsFile -RepositoryName $RepositoryName -BranchName $BranchName -FilePath $FilePath
 Write-Host $xml
 
 $updatedXml = UpdateNuGetVersionInXmlFile -XmlContents $xml -NuGetVersion $ProductVersion -NuGetTag $NuGetTag
 
 CreateBranchForPullRequest -RepositoryName $RepositoryName -Headers $Headers -BranchName $BranchName
-UpdateFileContent -RepositoryName $RepositoryName -Headers $Headers -FilePath build/DependencyVersions.props -FileContent $updatedXml
+UpdateFileContent -RepositoryName $RepositoryName -Headers $Headers -FilePath $FilePath -FileContent $updatedXml
 $PullRequestUrl = CreatePullRequest -RepositoryName $RepositoryName -Headers $Headers -CreatedBranchName $CreatedBranchName -BaseBranch $BranchName
 PrintPullRequestUrlToVsts -RepositoryName $RepositoryName -PullRequestUrl $PullRequestUrl

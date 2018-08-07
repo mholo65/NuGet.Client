@@ -49,9 +49,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public void Constructor_InitializesProperty()
+        public async Task Constructor_InitializesPropertyAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 Assert.Same(test.SourceRepository, test.Resource.SourceRepository);
             }
@@ -60,9 +60,9 @@ namespace NuGet.Protocol.Tests
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public async Task GetAllVersionsAsync_ThrowsForNullOrEmptyId(string id)
+        public async Task GetAllVersionsAsync_ThrowsForNullOrEmptyIdAsync(string id)
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentException>(
                     () => test.Resource.GetAllVersionsAsync(
@@ -76,9 +76,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetAllVersionsAsync_ThrowsForNullSourceCacheContext()
+        public async Task GetAllVersionsAsync_ThrowsForNullSourceCacheContextAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.GetAllVersionsAsync(
@@ -92,9 +92,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetAllVersionsAsync_ThrowsForNullLogger()
+        public async Task GetAllVersionsAsync_ThrowsForNullLoggerAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.GetAllVersionsAsync(
@@ -108,9 +108,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetAllVersionsAsync_ThrowIfCancelled()
+        public async Task GetAllVersionsAsync_ThrowIfCancelledAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 await Assert.ThrowsAsync<OperationCanceledException>(
                     () => test.Resource.GetAllVersionsAsync(
@@ -122,9 +122,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetAllVersionsAsync_ReturnsEmptyEnumerableIfPackageIdNotFound()
+        public async Task GetAllVersionsAsync_ReturnsEmptyEnumerableIfPackageIdNotFoundAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var versions = await test.Resource.GetAllVersionsAsync(
                     id: "a",
@@ -137,9 +137,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetAllVersionsAsync_ReturnsAllVersions()
+        public async Task GetAllVersionsAsync_ReturnsAllVersionsAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var versions = await test.Resource.GetAllVersionsAsync(
                     test.PackageIdentity.Id,
@@ -151,41 +151,12 @@ namespace NuGet.Protocol.Tests
             }
         }
 
-        [Fact]
-        public async Task GetAllVersionsAsync_NoErrorsOnNoContent()
-        {
-            // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
-
-            var responses = new Dictionary<string, string>();
-            responses.Add(serviceAddress + "FindPackagesById()?id='a'", "204");
-
-            var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
-            var logger = new TestLogger();
-
-            using (var cacheContext = new SourceCacheContext())
-            {
-                var resource = await repo.GetResourceAsync<FindPackageByIdResource>();
-
-                // Act
-                var versions = await resource.GetAllVersionsAsync(
-                    "a",
-                    cacheContext,
-                    logger,
-                    CancellationToken.None);
-
-                // Assert
-                // Verify no items returned, and no exceptions were thrown above
-                Assert.Equal(0, versions.Count());
-            }
-        }
-
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public async Task GetDependencyInfoAsync_ThrowsForNullOrEmptyId(string id)
+        public async Task GetDependencyInfoAsync_ThrowsForNullOrEmptyIdAsync(string id)
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentException>(
                     () => test.Resource.GetDependencyInfoAsync(
@@ -200,9 +171,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetDependencyInfoAsync_ThrowsForNullVersion()
+        public async Task GetDependencyInfoAsync_ThrowsForNullVersionAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.GetDependencyInfoAsync(
@@ -217,9 +188,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetDependencyInfoAsync_ThrowsForNullSourceCacheContext()
+        public async Task GetDependencyInfoAsync_ThrowsForNullSourceCacheContextAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.GetDependencyInfoAsync(
@@ -234,9 +205,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetDependencyInfoAsync_ThrowsForNullLogger()
+        public async Task GetDependencyInfoAsync_ThrowsForNullLoggerAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.GetDependencyInfoAsync(
@@ -251,9 +222,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetDependencyInfoAsync_ThrowIfCancelled()
+        public async Task GetDependencyInfoAsync_ThrowIfCancelledAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 await Assert.ThrowsAsync<OperationCanceledException>(
                     () => test.Resource.GetDependencyInfoAsync(
@@ -266,9 +237,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetDependencyInfoAsync_ReturnsNullIfPackageNotFound()
+        public async Task GetDependencyInfoAsync_ReturnsNullIfPackageNotFoundAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var dependencyInfo = await test.Resource.GetDependencyInfoAsync(
                     id: "a",
@@ -282,14 +253,14 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetDependencyInfoAsync_GetOriginalIdentity_IdInResponse()
+        public async Task GetDependencyInfoAsync_GetOriginalIdentity_IdInResponseAsync()
         {
             // Arrange
             using (var cacheContext = new SourceCacheContext())
             using (var workingDir = TestDirectory.Create())
             {
                 var source = "http://testsource.com/v3/index.json";
-                var package = SimpleTestPackageUtility.CreateFullPackage(workingDir, "DeepEqual", "1.4.0.1-rc");
+                var package = await SimpleTestPackageUtility.CreateFullPackageAsync(workingDir, "DeepEqual", "1.4.0.1-rc");
                 var packageBytes = File.ReadAllBytes(package.FullName);
 
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
@@ -340,9 +311,9 @@ namespace NuGet.Protocol.Tests
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public async Task CopyNupkgToStreamAsync_ThrowsForNullId(string id)
+        public async Task CopyNupkgToStreamAsync_ThrowsForNullIdAsync(string id)
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentException>(
                     () => test.Resource.CopyNupkgToStreamAsync(
@@ -358,9 +329,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgToStreamAsync_ThrowsForNullVersion()
+        public async Task CopyNupkgToStreamAsync_ThrowsForNullVersionAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.CopyNupkgToStreamAsync(
@@ -376,9 +347,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgToStreamAsync_ThrowsForNullDestination()
+        public async Task CopyNupkgToStreamAsync_ThrowsForNullDestinationAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.CopyNupkgToStreamAsync(
@@ -394,9 +365,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgToStreamAsync_ThrowsForNullSourceCacheContext()
+        public async Task CopyNupkgToStreamAsync_ThrowsForNullSourceCacheContextAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.CopyNupkgToStreamAsync(
@@ -412,9 +383,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgToStreamAsync_ThrowsForNullLogger()
+        public async Task CopyNupkgToStreamAsync_ThrowsForNullLoggerAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.CopyNupkgToStreamAsync(
@@ -430,9 +401,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgToStreamAsync_ThrowsIfCancelled()
+        public async Task CopyNupkgToStreamAsync_ThrowsIfCancelledAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 await Assert.ThrowsAsync<OperationCanceledException>(
                     () => test.Resource.CopyNupkgToStreamAsync(
@@ -446,9 +417,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgToStreamAsync_ReturnsFalseIfNotCopied()
+        public async Task CopyNupkgToStreamAsync_ReturnsFalseIfNotCopiedAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             using (var stream = new MemoryStream())
             {
                 var wasCopied = await test.Resource.CopyNupkgToStreamAsync(
@@ -465,9 +436,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgToStreamAsync_ReturnsTrueIfCopied()
+        public async Task CopyNupkgToStreamAsync_ReturnsTrueIfCopiedAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             using (var stream = new MemoryStream())
             {
                 var wasCopied = await test.Resource.CopyNupkgToStreamAsync(
@@ -484,9 +455,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageDownloaderAsync_ThrowsForNullPackageIdentity()
+        public async Task GetPackageDownloaderAsync_ThrowsForNullPackageIdentityAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.GetPackageDownloaderAsync(
@@ -500,9 +471,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageDownloaderAsync_ThrowsForNullSourceCacheContext()
+        public async Task GetPackageDownloaderAsync_ThrowsForNullSourceCacheContextAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.GetPackageDownloaderAsync(
@@ -516,9 +487,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageDownloaderAsync_ThrowsForNullLogger()
+        public async Task GetPackageDownloaderAsync_ThrowsForNullLoggerAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentNullException>(
                     () => test.Resource.GetPackageDownloaderAsync(
@@ -532,9 +503,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageDownloaderAsync_ThrowsIfCancelled()
+        public async Task GetPackageDownloaderAsync_ThrowsIfCancelledAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 await Assert.ThrowsAsync<OperationCanceledException>(
                     () => test.Resource.GetPackageDownloaderAsync(
@@ -546,9 +517,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageDownloaderAsync_ReturnsNullIfPackageNotFound()
+        public async Task GetPackageDownloaderAsync_ReturnsNullIfPackageNotFoundAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var downloader = await test.Resource.GetPackageDownloaderAsync(
                     new PackageIdentity(id: "a", version: NuGetVersion.Parse("1.0.0")),
@@ -561,9 +532,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageDownloaderAsync_ReturnsPackageDownloaderIfPackageFound()
+        public async Task GetPackageDownloaderAsync_ReturnsPackageDownloaderIfPackageFoundAsync()
         {
-            using (var test = RemoteV3FindPackageByIdResourceTest.Create())
+            using (var test = await RemoteV3FindPackageByIdResourceTest.CreateAsync())
             {
                 var downloader = await test.Resource.GetPackageDownloaderAsync(
                     test.PackageIdentity,
@@ -578,8 +549,7 @@ namespace NuGet.Protocol.Tests
         private static HttpSource CreateDummyHttpSource()
         {
             var packageSource = new PackageSource("https://unit.test");
-            Func<Task<HttpHandlerResource>> messageHandlerFactory =
-                () => Task.FromResult<HttpHandlerResource>(null);
+            Task<HttpHandlerResource> messageHandlerFactory() => Task.FromResult<HttpHandlerResource>(null);
 
             return new HttpSource(packageSource, messageHandlerFactory, Mock.Of<IThrottle>());
         }
@@ -622,9 +592,9 @@ namespace NuGet.Protocol.Tests
                 GC.SuppressFinalize(this);
             }
 
-            internal static RemoteV3FindPackageByIdResourceTest Create()
+            internal static async Task<RemoteV3FindPackageByIdResourceTest> CreateAsync()
             {
-                var serviceAddress = TestUtility.CreateServiceAddress();
+                var serviceAddress = ProtocolUtility.CreateServiceAddress();
                 var packageIdentity = new PackageIdentity(
                     id: "xunit",
                     version: NuGetVersion.Parse("2.2.0-beta1-build3239"));
@@ -641,6 +611,7 @@ namespace NuGet.Protocol.Tests
 
                 dependencyInfoResource.Setup(x => x.ResolvePackages(
                         It.Is<string>(id => id == packageIdentity.Id),
+                        It.IsAny<SourceCacheContext>(),
                         It.IsNotNull<ILogger>(),
                         It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new[] { remoteSourceDependencyInfo });
@@ -660,7 +631,7 @@ namespace NuGet.Protocol.Tests
                 var sourceRepository = new SourceRepository(
                     packageSource,
                     new[] { dependencyInfoResourceProvider.Object });
-                var package = SimpleTestPackageUtility.CreateFullPackage(
+                var package = await SimpleTestPackageUtility.CreateFullPackageAsync(
                     testDirectory.Path,
                     packageIdentity.Id,
                     packageIdentity.Version.ToNormalizedString());
@@ -676,35 +647,11 @@ namespace NuGet.Protocol.Tests
                         })
                     },
                     {
-                        serviceAddress + $"FindPackagesById()?id='{packageIdentity.Id}'",
-                        request => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                        {
-                            Content = new TestContent(
-                                TestUtility.GetResource(
-                                    "NuGet.Protocol.Tests.compiler.resources.XunitFindPackagesById.xml",
-                                    typeof(RemoteV3FindPackageByIdResourceTest)))
-                        })
-                    },
-                    {
-                        serviceAddress + $"FindPackagesById()?id='{packageIdentity.Id.ToUpper()}'",
-                        request => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                        {
-                            Content = new TestContent(
-                                TestUtility.GetResource(
-                                    "NuGet.Protocol.Tests.compiler.resources.XunitFindPackagesById.xml",
-                                    typeof(RemoteV3FindPackageByIdResourceTest)))
-                        })
-                    },
-                    {
                         serviceAddress + "api/v2/package/xunit/2.2.0-beta1-build3239",
                         request => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                         {
                             Content = new ByteArrayContent(packageBytes)
                         })
-                    },
-                    {
-                        serviceAddress + $"FindPackagesById()?id='a'",
-                        request => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent))
                     }
                 };
 

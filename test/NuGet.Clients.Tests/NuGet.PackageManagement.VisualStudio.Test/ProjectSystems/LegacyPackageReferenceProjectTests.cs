@@ -43,17 +43,17 @@ namespace NuGet.PackageManagement.VisualStudio.Test
         }
 
         [Fact]
-        public async Task GetAssetsFilePathAsync_WithValidBaseIntermediateOutputPath_Succeeds()
+        public async Task GetAssetsFilePathAsync_WithValidMSBuildProjectExtensionsPath_Succeeds()
         {
             // Arrange
             using (var testDirectory = TestDirectory.Create())
             {
-                var testBaseIntermediateOutputPath = Path.Combine(testDirectory, "obj");
-                TestDirectory.Create(testBaseIntermediateOutputPath);
+                var testMSBuildProjectExtensionsPath = Path.Combine(testDirectory, "obj");
+                Directory.CreateDirectory(testMSBuildProjectExtensionsPath);
                 var projectAdapter = Mock.Of<IVsProjectAdapter>();
                 Mock.Get(projectAdapter)
-                    .SetupGet(x => x.BaseIntermediateOutputPath)
-                    .Returns(testBaseIntermediateOutputPath);
+                    .SetupGet(x => x.MSBuildProjectExtensionsPath)
+                    .Returns(testMSBuildProjectExtensionsPath);
 
                 var testProject = new LegacyPackageReferenceProject(
                     projectAdapter,
@@ -67,16 +67,16 @@ namespace NuGet.PackageManagement.VisualStudio.Test
                 var assetsPath = await testProject.GetAssetsFilePathAsync();
 
                 // Assert
-                Assert.Equal(Path.Combine(testBaseIntermediateOutputPath, "project.assets.json"), assetsPath);
+                Assert.Equal(Path.Combine(testMSBuildProjectExtensionsPath, "project.assets.json"), assetsPath);
 
                 // Verify
                 Mock.Get(projectAdapter)
-                    .VerifyGet(x => x.BaseIntermediateOutputPath, Times.AtLeastOnce);
+                    .VerifyGet(x => x.MSBuildProjectExtensionsPath, Times.AtLeastOnce);
             }
         }
 
         [Fact]
-        public async Task GetAssetsFilePathAsync_WithNoBaseIntermediateOutputPath_Throws()
+        public async Task GetAssetsFilePathAsync_WithNoMSBuildProjectExtensionsPath_Throws()
         {
             // Arrange
             using (TestDirectory.Create())
@@ -96,18 +96,18 @@ namespace NuGet.PackageManagement.VisualStudio.Test
         }
 
         [Fact]
-        public async Task GetCacheFilePathAsync_WithValidBaseIntermediateOutputPath_Succeeds()
+        public async Task GetCacheFilePathAsync_WithValidMSBuildProjectExtensionsPath_Succeeds()
         {
             // Arrange
             using (var testDirectory = TestDirectory.Create())
             {
                 var testProj = "project.csproj";
-                var testBaseIntermediateOutputPath = Path.Combine(testDirectory, "obj");
-                TestDirectory.Create(testBaseIntermediateOutputPath);
+                var testMSBuildProjectExtensionsPath = Path.Combine(testDirectory, "obj");
+                Directory.CreateDirectory(testMSBuildProjectExtensionsPath);
                 var projectAdapter = Mock.Of<IVsProjectAdapter>();
                 Mock.Get(projectAdapter)
-                    .SetupGet(x => x.BaseIntermediateOutputPath)
-                    .Returns(testBaseIntermediateOutputPath);
+                    .SetupGet(x => x.MSBuildProjectExtensionsPath)
+                    .Returns(testMSBuildProjectExtensionsPath);
 
                 Mock.Get(projectAdapter)
                     .SetupGet(x => x.FullProjectPath)
@@ -125,16 +125,16 @@ namespace NuGet.PackageManagement.VisualStudio.Test
                 var cachePath = await testProject.GetCacheFilePathAsync();
 
                 // Assert
-                Assert.Equal(Path.Combine(testBaseIntermediateOutputPath, $"{testProj}.nuget.cache"), cachePath);
+                Assert.Equal(Path.Combine(testMSBuildProjectExtensionsPath, $"{testProj}.nuget.cache"), cachePath);
 
                 // Verify
                 Mock.Get(projectAdapter)
-                    .VerifyGet(x => x.BaseIntermediateOutputPath, Times.AtLeastOnce);
+                    .VerifyGet(x => x.MSBuildProjectExtensionsPath, Times.AtLeastOnce);
             }
         }
 
         [Fact]
-        public async Task GetCacheFilePathAsync_WithNoBaseIntermediateOutputPath_Throws()
+        public async Task GetCacheFilePathAsync_WithNoMSBuildProjectExtensionsPath_Throws()
         {
             // Arrange
             using (TestDirectory.Create())
@@ -160,12 +160,12 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             using (var testDirectory = TestDirectory.Create())
             {
                 var testProj = "project.csproj";
-                var testBaseIntermediateOutputPath = Path.Combine(testDirectory, "obj");
-                TestDirectory.Create(testBaseIntermediateOutputPath);
+                var testMSBuildProjectExtensionsPath = Path.Combine(testDirectory, "obj");
+                Directory.CreateDirectory(testMSBuildProjectExtensionsPath);
                 var projectAdapter = Mock.Of<IVsProjectAdapter>();
                 Mock.Get(projectAdapter)
-                    .SetupGet(x => x.BaseIntermediateOutputPath)
-                    .Returns(testBaseIntermediateOutputPath);
+                    .SetupGet(x => x.MSBuildProjectExtensionsPath)
+                    .Returns(testMSBuildProjectExtensionsPath);
 
                 Mock.Get(projectAdapter)
                     .SetupGet(x => x.FullProjectPath)
@@ -181,11 +181,11 @@ namespace NuGet.PackageManagement.VisualStudio.Test
                 var assetsPath = await testProject.GetCacheFilePathAsync();
 
                 // Assert
-                Assert.Equal(Path.Combine(testBaseIntermediateOutputPath, $"{testProj}.nuget.cache"), assetsPath);
+                Assert.Equal(Path.Combine(testMSBuildProjectExtensionsPath, $"{testProj}.nuget.cache"), assetsPath);
 
                 // Verify
                 Mock.Get(projectAdapter)
-                    .VerifyGet(x => x.BaseIntermediateOutputPath, Times.AtLeastOnce);
+                    .VerifyGet(x => x.MSBuildProjectExtensionsPath, Times.AtLeastOnce);
             }
         }
 
@@ -503,8 +503,10 @@ namespace NuGet.PackageManagement.VisualStudio.Test
 
                 var actualRestoreSpec = packageSpecs.Single();
                 SpecValidationUtility.ValidateProjectSpec(actualRestoreSpec);
+                //No top level dependencies
+                Assert.Equal(0, actualRestoreSpec.Dependencies.Count);
 
-                var actualDependency = actualRestoreSpec.Dependencies.Single();
+                var actualDependency = actualRestoreSpec.TargetFrameworks.SingleOrDefault().Dependencies.Single();
                 Assert.NotNull(actualDependency);
                 Assert.Equal("packageA", actualDependency.LibraryRange.Name);
                 Assert.Equal(VersionRange.Parse("1.*"), actualDependency.LibraryRange.VersionRange);
@@ -774,11 +776,11 @@ namespace NuGet.PackageManagement.VisualStudio.Test
                 .Setup(x => x.GetTargetFrameworkAsync())
                 .ReturnsAsync(NuGetFramework.Parse("netstandard13"));
 
-            var testBaseIntermediateOutputPath = Path.Combine(fullPath, "obj");
-            TestDirectory.Create(testBaseIntermediateOutputPath);
+            var testMSBuildProjectExtensionsPath = Path.Combine(fullPath, "obj");
+            Directory.CreateDirectory(testMSBuildProjectExtensionsPath);
             projectAdapter
-                .Setup(x => x.BaseIntermediateOutputPath)
-                .Returns(testBaseIntermediateOutputPath);
+                .Setup(x => x.MSBuildProjectExtensionsPath)
+                .Returns(testMSBuildProjectExtensionsPath);
 
             return projectAdapter.Object;
         }

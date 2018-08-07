@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using NuGet.Common;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.Test.Utility;
 using NuGet.Versioning;
 using Xunit;
@@ -33,22 +34,27 @@ namespace Commands.Test
 
                 var token = CancellationToken.None;
                 var logger = NullLogger.Instance;
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    identity,
-                    packagesDir,
-                    logger,
-                    packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                var packageExtractionContext = new PackageExtractionContext(
+                   packageSaveMode: PackageSaveMode.Defaultv3,
+                   xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                   logger: logger,
+                   signedPackageVerifier: null,
+                   signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
+                        identity,
                         packageDownloader,
-                        versionFolderPathContext,
+                        versionFolderPathResolver,
+                        packageExtractionContext,
                         token);
                 }
 
@@ -78,23 +84,28 @@ namespace Commands.Test
 
                 var token = CancellationToken.None;
                 var logger = NullLogger.Instance;
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    identity,
-                    packagesDir,
-                    logger,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: logger,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        token);
+                         identity,
+                         packageDownloader,
+                         versionFolderPathResolver,
+                         packageExtractionContext,
+                         token);
                 }
 
                 // Assert
@@ -123,12 +134,14 @@ namespace Commands.Test
 
                 var token = CancellationToken.None;
                 var logger = NullLogger.Instance;
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    identity,
-                    packagesDir,
-                    logger,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: logger,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 var packageDir = pathResolver.GetInstallPath(package.Id, identity.Version);
 
@@ -143,14 +156,17 @@ namespace Commands.Test
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        token);
+                          identity,
+                          packageDownloader,
+                          versionFolderPathResolver,
+                          packageExtractionContext,
+                          token);
                 }
 
                 // Assert
@@ -179,12 +195,14 @@ namespace Commands.Test
 
                 var token = CancellationToken.None;
                 var logger = NullLogger.Instance;
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    identity,
-                    packagesDir,
-                    logger,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: logger,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 var packageDir = pathResolver.GetInstallPath(package.Id, identity.Version);
 
@@ -201,14 +219,17 @@ namespace Commands.Test
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        token);
+                         identity,
+                         packageDownloader,
+                         versionFolderPathResolver,
+                         packageExtractionContext,
+                         token);
                 }
 
                 // Assert
@@ -239,27 +260,32 @@ namespace Commands.Test
 
                 var token = CancellationToken.None;
                 var logger = NullLogger.Instance;
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    identity,
-                    packagesDir,
-                    logger,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: logger,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 var packageDir = pathResolver.GetInstallPath(package.Id, identity.Version);
                 Assert.False(Directory.Exists(packageDir), packageDir + " exist");
 
                 // Act
                 using (var packageDownloader = new ThrowingPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
                 {
                     await Assert.ThrowsAnyAsync<CorruptionException>(async () =>
-                        await PackageExtractor.InstallFromSourceAsync(
-                           packageDownloader,
-                           versionFolderPathContext,
-                           token));
+                       await PackageExtractor.InstallFromSourceAsync(
+                         identity,
+                         packageDownloader,
+                         versionFolderPathResolver,
+                         packageExtractionContext,
+                         token));
                 }
 
                 AssertDirectoryExists(packageDir, packageDir + " does not exist");
@@ -267,14 +293,17 @@ namespace Commands.Test
                 Assert.NotEmpty(Directory.EnumerateFiles(packageDir));
 
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    packagesDir,
                     package.File.FullName,
                     identity,
                     logger))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        token);
+                          identity,
+                          packageDownloader,
+                          versionFolderPathResolver,
+                          packageExtractionContext,
+                          token);
                 }
 
                 // Assert
@@ -300,12 +329,14 @@ namespace Commands.Test
 
                 var token = CancellationToken.None;
                 var logger = NullLogger.Instance;
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    identity,
-                    packagesDir,
-                    logger,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: logger,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 var packageDir = pathResolver.GetInstallPath(package.Id, identity.Version);
                 Assert.False(Directory.Exists(packageDir), packageDir + " exist");
@@ -314,6 +345,7 @@ namespace Commands.Test
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
@@ -324,9 +356,11 @@ namespace Commands.Test
                     {
                         Assert.ThrowsAnyAsync<IOException>(async () =>
                             await PackageExtractor.InstallFromSourceAsync(
+                                identity,
                                 packageDownloader,
-                                versionFolderPathContext,
-                           token));
+                                versionFolderPathResolver,
+                                packageExtractionContext,
+                                token));
 
                         return Task.FromResult(true);
                     };
@@ -339,14 +373,17 @@ namespace Commands.Test
                 Assert.NotEmpty(Directory.EnumerateFiles(packageDir));
 
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        token);
+                         identity,
+                         packageDownloader,
+                         versionFolderPathResolver,
+                         packageExtractionContext,
+                         token);
                 }
 
                 // Assert
@@ -373,23 +410,28 @@ namespace Commands.Test
             using (var packagesDirectory = TestDirectory.Create())
             {
                 var pathResolver = new VersionFolderPathResolver(packagesDirectory);
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    packageIdentity,
-                    packagesDirectory,
-                    NullLogger.Instance,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: NullLogger.Instance,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo,
                     packageIdentity,
                     NullLogger.Instance))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        CancellationToken.None);
+                         packageIdentity,
+                         packageDownloader,
+                         versionFolderPathResolver,
+                         packageExtractionContext,
+                         CancellationToken.None);
                 }
 
                 // Assert
@@ -414,23 +456,28 @@ namespace Commands.Test
             using (var packagesDirectory = TestDirectory.Create())
             {
                 var pathResolver = new VersionFolderPathResolver(packagesDirectory);
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    packageIdentity,
-                    packagesDirectory,
-                    NullLogger.Instance,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Nuspec | PackageSaveMode.Nupkg,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: NullLogger.Instance,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo,
                     packageIdentity,
                     NullLogger.Instance))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        CancellationToken.None);
+                          packageIdentity,
+                          packageDownloader,
+                          versionFolderPathResolver,
+                          packageExtractionContext,
+                          CancellationToken.None);
                 }
 
                 // Assert
@@ -459,23 +506,27 @@ namespace Commands.Test
                     packageIdentity.Id,
                     packageIdentity.Version.ToNormalizedString());
 
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    packageIdentity,
-                    packagesDirectory,
-                    NullLogger.Instance,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: NullLogger.Instance,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
 
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo.FullName,
                     packageIdentity,
                     NullLogger.Instance))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        CancellationToken.None);
+                         packageIdentity,
+                         packageDownloader,
+                         versionFolderPathResolver,
+                         packageExtractionContext,
+                         CancellationToken.None);
                 }
 
                 // Assert
@@ -516,23 +567,28 @@ namespace Commands.Test
                     packageIdentity.Id,
                     packageIdentity.Version.ToNormalizedString());
 
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    packageIdentity,
-                    packagesDirectory,
-                    NullLogger.Instance,
+                var packageExtractionContext = new PackageExtractionContext(
                     packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                    logger: NullLogger.Instance,
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo.FullName,
                     packageIdentity,
                     NullLogger.Instance))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        CancellationToken.None);
+                          packageIdentity,
+                          packageDownloader,
+                          versionFolderPathResolver,
+                          packageExtractionContext,
+                          CancellationToken.None);
                 }
 
                 // Assert
@@ -571,23 +627,28 @@ namespace Commands.Test
                     entryModifiedTime,
                     "lib/net45/A.dll");
 
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    packageIdentity,
-                    packagesDirectory,
-                    NullLogger.Instance,
-                    packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                var packageExtractionContext = new PackageExtractionContext(
+                     packageSaveMode: PackageSaveMode.Defaultv3,
+                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                     logger: NullLogger.Instance,
+                     signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo.FullName,
                     packageIdentity,
                     NullLogger.Instance))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        CancellationToken.None);
+                         packageIdentity,
+                         packageDownloader,
+                         versionFolderPathResolver,
+                         packageExtractionContext,
+                         CancellationToken.None);
                 }
 
                 // Assert
@@ -611,23 +672,28 @@ namespace Commands.Test
             using (var packagesDirectory = TestDirectory.Create())
             {
                 var pathResolver = new VersionFolderPathResolver(packagesDirectory);
-                var versionFolderPathContext = new VersionFolderPathContext(
-                    packageIdentity,
-                    packagesDirectory,
-                    NullLogger.Instance,
-                    packageSaveMode: PackageSaveMode.Nupkg | PackageSaveMode.Nuspec,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None);
+                var packageExtractionContext = new PackageExtractionContext(
+                     packageSaveMode: PackageSaveMode.Nuspec | PackageSaveMode.Nupkg,
+                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
+                     logger: NullLogger.Instance,
+                     signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
+                var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo,
                     packageIdentity,
                     NullLogger.Instance))
                 {
                     await PackageExtractor.InstallFromSourceAsync(
-                        packageDownloader,
-                        versionFolderPathContext,
-                        CancellationToken.None);
+                          packageIdentity,
+                          packageDownloader,
+                          versionFolderPathResolver,
+                          packageExtractionContext,
+                          CancellationToken.None);
                 }
 
                 // Assert
@@ -748,7 +814,12 @@ namespace Commands.Test
             public IAsyncPackageContentReader ContentReader => _packageReader.Value;
             public IAsyncPackageCoreReader CoreReader => _packageReader.Value;
 
+            public ISignedPackageReader SignedPackageReader => _packageReader.Value;
+
+            public string Source { get; }
+
             internal ThrowingPackageArchiveDownloader(
+                string source,
                 string packageFilePath,
                 PackageIdentity packageIdentity,
                 ILogger logger)
@@ -758,6 +829,7 @@ namespace Commands.Test
                 _logger = logger;
                 _packageReader = new Lazy<PackageArchiveReader>(GetPackageReader);
                 _sourceStream = new Lazy<FileStream>(GetSourceStream);
+                Source = source;
             }
 
             public void Dispose()

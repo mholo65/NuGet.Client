@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -58,16 +58,6 @@ namespace NuGet.Protocol.Core.Types
         /// Initializes a new <see cref="DownloadResourceResult" /> class.
         /// </summary>
         /// <param name="stream">A package stream.</param>
-        /// <exception cref="ArgumentNullException">Thrown if <paramref name="stream" /> is <c>null</c>.</exception>
-        public DownloadResourceResult(Stream stream)
-            : this(stream, source: null)
-        {
-        }
-
-        /// <summary>
-        /// Initializes a new <see cref="DownloadResourceResult" /> class.
-        /// </summary>
-        /// <param name="stream">A package stream.</param>
         /// <param name="packageReader">A package reader.</param>
         /// <param name="source">A package source.</param>
         /// <exception cref="ArgumentNullException">Thrown if <paramref name="stream" /> is <c>null</c>.</exception>
@@ -75,17 +65,6 @@ namespace NuGet.Protocol.Core.Types
             : this(stream, source)
         {
             _packageReader = packageReader;
-        }
-
-        /// <summary>
-        /// Initializes a new <see cref="DownloadResourceResult" /> class.
-        /// </summary>
-        /// <param name="stream">A package stream.</param>
-        /// <param name="packageReader">A package reader.</param>
-        /// <exception cref="ArgumentNullException">Thrown if <paramref name="stream" /> is <c>null</c>.</exception>
-        public DownloadResourceResult(Stream stream, PackageReaderBase packageReader)
-            : this(stream, packageReader, source: null)
-        {
         }
 
         /// <summary>
@@ -107,6 +86,8 @@ namespace NuGet.Protocol.Core.Types
         }
 
         public DownloadResourceResultStatus Status { get; }
+
+        public bool SignatureVerified { get; set; }
 
         /// <summary>
         /// Gets the package <see cref="PackageStream"/>.

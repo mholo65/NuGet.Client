@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using Microsoft.Build.Framework;
@@ -15,6 +15,8 @@ namespace NuGet.Build.Tasks.Pack
     /// </typeparam>
     public interface IPackTaskRequest<TItem>
     {
+        string[] AllowedOutputExtensionsInPackageBuildOutputFolder { get; }
+        string[] AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder { get; }
         string AssemblyName { get; }
         string[] Authors { get; }
         TItem[] BuildOutputInPackage { get; }
@@ -34,6 +36,7 @@ namespace NuGet.Build.Tasks.Pack
         ILogger Logger { get; }
         string MinClientVersion { get; }
         bool NoPackageAnalysis { get; }
+        string NoWarn { get; }
         string NuspecBasePath { get; }
         string NuspecFile { get; }
         string[] NuspecProperties { get; }
@@ -45,10 +48,13 @@ namespace NuGet.Build.Tasks.Pack
         string[] PackageTypes { get; }
         string PackageVersion { get; }
         TItem PackItem { get; }
+        TItem[] ProjectReferencesWithVersions { get; }
         string ProjectUrl { get; }
         string ReleaseNotes { get; }
         string RepositoryType { get; }
         string RepositoryUrl { get; }
+        string RepositoryBranch { get; }
+        string RepositoryCommit { get; }
         bool RequireLicenseAcceptance { get; }
         string RestoreOutputPath { get; }
         bool Serviceable { get; }
@@ -57,5 +63,7 @@ namespace NuGet.Build.Tasks.Pack
         string[] TargetFrameworks { get; }
         TItem[] TargetPathsToSymbols { get; }
         string Title { get; }
+        string TreatWarningsAsErrors { get; }
+        string WarningsAsErrors { get; }
     }
 }

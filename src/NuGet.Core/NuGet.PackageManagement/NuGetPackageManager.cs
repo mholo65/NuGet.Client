@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -213,20 +213,20 @@ namespace NuGet.PackageManagement
             IEnumerable<SourceRepository> secondarySources,
             CancellationToken token)
         {
-            using (var sourceCacheContext = new SourceCacheContext())
+            var downloadContext = new PackageDownloadContext(resolutionContext.SourceCacheContext)
             {
-                var downloadContext = new PackageDownloadContext(sourceCacheContext);
+                ParentId = nuGetProjectContext.OperationId
+            };
 
-                return InstallPackageAsync(
-                    nuGetProject,
-                    packageId,
-                    resolutionContext,
-                    nuGetProjectContext,
-                    downloadContext,
-                    new List<SourceRepository> { primarySourceRepository },
-                    secondarySources,
-                    token);
-            }
+            return InstallPackageAsync(
+                nuGetProject,
+                packageId,
+                resolutionContext,
+                nuGetProjectContext,
+                downloadContext,
+                new List<SourceRepository> { primarySourceRepository },
+                secondarySources,
+                token);
         }
 
         /// <summary>
@@ -264,19 +264,19 @@ namespace NuGet.PackageManagement
             INuGetProjectContext nuGetProjectContext, IEnumerable<SourceRepository> primarySources,
             IEnumerable<SourceRepository> secondarySources, CancellationToken token)
         {
-            using (var sourceCacheContext = new SourceCacheContext())
+            var downloadContext = new PackageDownloadContext(resolutionContext.SourceCacheContext)
             {
-                var downloadContext = new PackageDownloadContext(sourceCacheContext);
+                ParentId = nuGetProjectContext.OperationId
+            };
 
-                await InstallPackageAsync(
-                    nuGetProject,
-                    packageId,
-                    resolutionContext,
-                    nuGetProjectContext,
-                    downloadContext,
-                    primarySources,
-                    secondarySources, token);
-            }
+            await InstallPackageAsync(
+                nuGetProject,
+                packageId,
+                resolutionContext,
+                nuGetProjectContext,
+                downloadContext,
+                primarySources,
+                secondarySources, token);
         }
 
         /// <summary>
@@ -335,20 +335,20 @@ namespace NuGet.PackageManagement
             IEnumerable<SourceRepository> secondarySources,
             CancellationToken token)
         {
-            using (var sourceCacheContext = new SourceCacheContext())
+            var downloadContext = new PackageDownloadContext(resolutionContext.SourceCacheContext)
             {
-                var downloadContext = new PackageDownloadContext(sourceCacheContext);
+                ParentId = nuGetProjectContext.OperationId
+            };
 
-                return InstallPackageAsync(
-                    nuGetProject,
-                    packageIdentity,
-                    resolutionContext,
-                    nuGetProjectContext,
-                    downloadContext,
-                    new List<SourceRepository> { primarySourceRepository },
-                    secondarySources,
-                    token);
-            }
+            return InstallPackageAsync(
+                nuGetProject,
+                packageIdentity,
+                resolutionContext,
+                nuGetProjectContext,
+                downloadContext,
+                new List<SourceRepository> { primarySourceRepository },
+                secondarySources,
+                token);
         }
 
         /// <summary>
@@ -389,20 +389,20 @@ namespace NuGet.PackageManagement
             IEnumerable<SourceRepository> secondarySources,
             CancellationToken token)
         {
-            using (var sourceCacheContext = new SourceCacheContext())
+            var downloadContext = new PackageDownloadContext(resolutionContext.SourceCacheContext)
             {
-                var downloadContext = new PackageDownloadContext(sourceCacheContext);
+                ParentId = nuGetProjectContext.OperationId
+            };
 
-                await InstallPackageAsync(
-                    nuGetProject,
-                    packageIdentity,
-                    resolutionContext,
-                    nuGetProjectContext,
-                    downloadContext,
-                    primarySources,
-                    secondarySources,
-                    token);
-            }
+            await InstallPackageAsync(
+                nuGetProject,
+                packageIdentity,
+                resolutionContext,
+                nuGetProjectContext,
+                downloadContext,
+                primarySources,
+                secondarySources,
+                token);
         }
 
         /// <summary>
@@ -447,7 +447,7 @@ namespace NuGet.PackageManagement
             var nuGetProjectActions = await PreviewUninstallPackageAsync(nuGetProject, packageId, uninstallationContext, nuGetProjectContext, token);
 
             // Step-2 : Execute all the nuGetProjectActions
-            await ExecuteNuGetProjectActionsAsync(nuGetProject, nuGetProjectActions, nuGetProjectContext, token);
+            await ExecuteNuGetProjectActionsAsync(nuGetProject, nuGetProjectActions, nuGetProjectContext, NullSourceCacheContext.Instance, token);
         }
 
         /// <summary>
@@ -651,9 +651,46 @@ namespace NuGet.PackageManagement
             var buildIntegratedProjects = nuGetProjects.OfType<BuildIntegratedNuGetProject>().ToList();
             var nonBuildIntegratedProjects = nuGetProjects.Except(buildIntegratedProjects).ToList();
 
+            var shouldFilterProjectsForUpdate = false;
+            if (packageIdentities.Count > 0)
+            {
+                shouldFilterProjectsForUpdate = true;
+            }
+
+            // Update http source cache context MaxAge so that it can always go online to fetch
+            // latest version of packages.
+            resolutionContext.SourceCacheContext.MaxAge = DateTimeOffset.UtcNow;
+
             // add tasks for all build integrated projects
             foreach (var project in buildIntegratedProjects)
             {
+                var packagesToUpdateInProject = packageIdentities;
+                var updatedResolutionContext = resolutionContext;
+
+                if (shouldFilterProjectsForUpdate)
+                {
+                    packagesToUpdateInProject = await GetPackagesToUpdateInProject(project, packageIdentities, token);
+                    if (packagesToUpdateInProject.Count > 0)
+                    {
+                        var includePrerelease = packagesToUpdateInProject.Any(
+                        package => package.Version.IsPrerelease);
+
+                        updatedResolutionContext = new ResolutionContext(
+                            dependencyBehavior: resolutionContext.DependencyBehavior,
+                            includePrelease: includePrerelease,
+                            includeUnlisted: resolutionContext.IncludeUnlisted,
+                            versionConstraints: resolutionContext.VersionConstraints,
+                            gatherCache: resolutionContext.GatherCache,
+                            sourceCacheContext: resolutionContext.SourceCacheContext);
+                    }
+                    else
+                    {
+                        // skip running update preview for this project, since it doesn't have any package installed
+                        // which is being updated.
+                        continue;
+                    }
+                }
+
                 // if tasks count reachs max then wait until an existing task is completed
                 if (tasks.Count >= maxTasks)
                 {
@@ -665,9 +702,9 @@ namespace NuGet.PackageManagement
                 tasks.Add(Task.Run(async ()
                     => await PreviewUpdatePackagesForBuildIntegratedAsync(
                         packageId,
-                        packageIdentities,
+                        packagesToUpdateInProject,
                         project,
-                        resolutionContext,
+                        updatedResolutionContext,
                         nuGetProjectContext,
                         primarySources,
                         secondarySources,
@@ -680,19 +717,65 @@ namespace NuGet.PackageManagement
 
             foreach (var project in nonBuildIntegratedProjects)
             {
+                var packagesToUpdateInProject = packageIdentities;
+                var updatedResolutionContext = resolutionContext;
+
+                if (shouldFilterProjectsForUpdate)
+                {
+                    packagesToUpdateInProject = await GetPackagesToUpdateInProject(project, packageIdentities, token);
+                    if (packagesToUpdateInProject.Count > 0)
+                    {
+                        var includePrerelease = packagesToUpdateInProject.Any(
+                        package => package.HasVersion && package.Version.IsPrerelease);
+
+                        updatedResolutionContext = new ResolutionContext(
+                            dependencyBehavior: resolutionContext.DependencyBehavior,
+                            includePrelease: includePrerelease,
+                            includeUnlisted: resolutionContext.IncludeUnlisted,
+                            versionConstraints: resolutionContext.VersionConstraints,
+                            gatherCache: resolutionContext.GatherCache,
+                            sourceCacheContext: resolutionContext.SourceCacheContext);
+                    }
+                    else
+                    {
+                        // skip running update preview for this project, since it doesn't have any package installed
+                        // which is being updated.
+                        continue;
+                    }
+                }
+
                 // packages.config based projects are handled here
                 nugetActions.AddRange(await PreviewUpdatePackagesForClassicAsync(
-                    packageId,
-                    packageIdentities,
-                    project,
-                    resolutionContext,
-                    nuGetProjectContext,
-                    primarySources,
-                    secondarySources,
-                    token));
+                packageId,
+                packagesToUpdateInProject,
+                project,
+                updatedResolutionContext,
+                nuGetProjectContext,
+                primarySources,
+                secondarySources,
+                token));
             }
 
             return nugetActions;
+        }
+
+        private async Task<List<PackageIdentity>> GetPackagesToUpdateInProject(
+            NuGetProject project,
+            List<PackageIdentity> packages,
+            CancellationToken token)
+        {
+            var installedPackages = await project.GetInstalledPackagesAsync(token);
+
+            var packageIds = new HashSet<string>(
+                installedPackages.Select(p => p.PackageIdentity.Id), StringComparer.OrdinalIgnoreCase);
+
+            // We need to filter out packages from packagesToUpdate that are not installed
+            // in the current project. Otherwise, we'll incorrectly install a
+            // package that is not installed before.
+            var packagesToUpdateInProject = packages.Where(
+                package => packageIds.Contains(package.Id)).ToList();
+
+            return packagesToUpdateInProject;
         }
 
         private async Task<IEnumerable<NuGetProjectAction>> CompleteTaskAsync(
@@ -733,8 +816,7 @@ namespace NuGet.PackageManagement
                 foreach (var installedPackage in projectInstalledPackageReferences)
                 {
                     // Skip auto referenced packages during update all.
-                    var buildPackageReference = installedPackage as BuildIntegratedPackageReference;
-                    var autoReferenced = buildPackageReference?.Dependency?.AutoReferenced == true;
+                    var autoReferenced = IsPackageReferenceAutoReferenced(installedPackage);
 
                     if (!autoReferenced)
                     {
@@ -788,8 +870,10 @@ namespace NuGet.PackageManagement
                 {
                     var installedPackageReference = projectInstalledPackageReferences
                         .FirstOrDefault(pr => StringComparer.OrdinalIgnoreCase.Equals(pr.PackageIdentity.Id, packageId));
+                    // Skip autoreferenced update when we have only a package ID.
+                    var autoReferenced = IsPackageReferenceAutoReferenced(installedPackageReference);
 
-                    if (installedPackageReference != null)
+                    if (installedPackageReference != null && !autoReferenced)
                     {
                         var resolvedPackage = await GetLatestVersionAsync(
                             packageId,
@@ -827,10 +911,10 @@ namespace NuGet.PackageManagement
                     var installed = projectInstalledPackageReferences
                         .Where(pr => StringComparer.OrdinalIgnoreCase.Equals(pr.PackageIdentity.Id, packageIdentity.Id))
                         .FirstOrDefault();
+                    var autoReferenced = IsPackageReferenceAutoReferenced(installed);
 
-                    //  if the package is not currently installed ignore it
-
-                    if (installed != null)
+                    //  if the package is not currently installed, or the installed one is auto referenced ignore it
+                    if (installed != null && !autoReferenced)
                     {
                         lowLevelActions.Add(NuGetProjectAction.CreateUninstallProjectAction(installed.PackageIdentity, nuGetProject));
                         lowLevelActions.Add(NuGetProjectAction.CreateInstallProjectAction(packageIdentity,
@@ -870,6 +954,12 @@ namespace NuGet.PackageManagement
             return actions;
         }
 
+        private static bool IsPackageReferenceAutoReferenced(PackageReference package)
+        {
+            var buildPackageReference = package as BuildIntegratedPackageReference;
+            return buildPackageReference?.Dependency?.AutoReferenced == true;
+        }
+
         /// <summary>
         /// Update Package logic specific to classic style NuGet projects
         /// </summary>
@@ -888,8 +978,7 @@ namespace NuGet.PackageManagement
             var projectId = string.Empty;
             nuGetProject.TryGetMetadata<string>(NuGetProjectMetadataKeys.ProjectId, out projectId);
 
-            var telemetryHelper = nuGetProjectContext.TelemetryService;
-            TelemetryServiceUtility.StartTimer(telemetryHelper);
+            var stopWatch = Stopwatch.StartNew();
 
             var projectInstalledPackageReferences = await nuGetProject.GetInstalledPackagesAsync(token);
             var oldListOfInstalledPackages = projectInstalledPackageReferences.Select(p => p.PackageIdentity);
@@ -986,7 +1075,8 @@ namespace NuGet.PackageManagement
                     includePrereleaseInGather,
                     resolutionContext.IncludeUnlisted,
                     VersionConstraints.None,
-                    resolutionContext.GatherCache);
+                    resolutionContext.GatherCache,
+                    resolutionContext.SourceCacheContext);
 
                 // Step-1 : Get metadata resources using gatherer
                 var targetFramework = nuGetProject.GetMetadata<NuGetFramework>(NuGetProjectMetadataKeys.TargetFramework);
@@ -1038,8 +1128,13 @@ namespace NuGet.PackageManagement
                 var availablePackageDependencyInfoWithSourceSet = await ResolverGather.GatherAsync(gatherContext, token);
 
                 // emit gather dependency telemetry event and restart timer
-                TelemetryServiceUtility.EmitEventAndRestartTimer(telemetryHelper,
-                    string.Format(TelemetryConstants.GatherDependencyStepName, projectId));
+                stopWatch.Stop();
+
+                var gatherTelemetryEvent = new ActionTelemetryStepEvent(nuGetProjectContext.OperationId.ToString(),
+                    string.Format(TelemetryConstants.GatherDependencyStepName, projectId), stopWatch.Elapsed.TotalSeconds);
+
+                TelemetryActivity.EmitTelemetryEvent(gatherTelemetryEvent);
+                stopWatch.Restart();
 
                 if (!availablePackageDependencyInfoWithSourceSet.Any())
                 {
@@ -1056,7 +1151,7 @@ namespace NuGet.PackageManagement
                     var packages = new List<SourcePackageDependencyInfo>();
                     foreach (var installedPackage in projectInstalledPackageReferences)
                     {
-                        var packageInfo = await packagesFolderResource.ResolvePackage(installedPackage.PackageIdentity, targetFramework, log, token);
+                        var packageInfo = await packagesFolderResource.ResolvePackage(installedPackage.PackageIdentity, targetFramework, resolutionContext.SourceCacheContext, log, token);
                         if (packageInfo != null)
                         {
                             availablePackageDependencyInfoWithSourceSet.Add(packageInfo);
@@ -1118,8 +1213,13 @@ namespace NuGet.PackageManagement
                 var newListOfInstalledPackages = packageResolver.Resolve(packageResolverContext, token);
 
                 // emit resolve dependency telemetry event and restart timer
-                TelemetryServiceUtility.EmitEventAndRestartTimer(telemetryHelper,
-                    string.Format(TelemetryConstants.ResolveDependencyStepName, projectId));
+                stopWatch.Stop();
+
+                var resolveTelemetryEvent = new ActionTelemetryStepEvent(nuGetProjectContext.OperationId.ToString(),
+                    string.Format(TelemetryConstants.ResolveDependencyStepName, projectId), stopWatch.Elapsed.TotalSeconds);
+
+                TelemetryActivity.EmitTelemetryEvent(resolveTelemetryEvent);
+                stopWatch.Restart();
 
                 if (newListOfInstalledPackages == null)
                 {
@@ -1150,8 +1250,12 @@ namespace NuGet.PackageManagement
                     isDependencyBehaviorIgnore);
 
                 // emit resolve actions telemetry event
-                TelemetryServiceUtility.EmitEvent(telemetryHelper,
-                    string.Format(TelemetryConstants.ResolvedActionsStepName, projectId));
+                stopWatch.Stop();
+
+                var actionTelemetryEvent = new ActionTelemetryStepEvent(nuGetProjectContext.OperationId.ToString(),
+                    string.Format(TelemetryConstants.ResolvedActionsStepName, projectId), stopWatch.Elapsed.TotalSeconds);
+
+                TelemetryActivity.EmitTelemetryEvent(actionTelemetryEvent);
 
                 if (nuGetProjectActions.Count == 0)
                 {
@@ -1182,6 +1286,13 @@ namespace NuGet.PackageManagement
             }
 
             return nuGetProjectActions;
+        }
+
+        public async Task<IEnumerable<PackageDependencyInfo>> GetInstalledPackagesDependencyInfo(NuGetProject nuGetProject, CancellationToken token, bool includeUnresolved = false)
+        {
+            var targetFramework = nuGetProject.GetMetadata<NuGetFramework>(NuGetProjectMetadataKeys.TargetFramework);
+            var installedPackageIdentities = (await nuGetProject.GetInstalledPackagesAsync(token)).Select(pr => pr.PackageIdentity);
+            return await GetDependencyInfoFromPackagesFolder(installedPackageIdentities, targetFramework, includeUnresolved);
         }
 
         /// <summary>
@@ -1446,7 +1557,7 @@ namespace NuGet.PackageManagement
                 if (primarySources.Count() > 1)
                 {
                     var logger = new ProjectContextLogger(nuGetProjectContext);
-                    sourceRepository = await GetSourceRepository(packageIdentity, primarySources, logger);
+                    sourceRepository = await GetSourceRepository(packageIdentity, primarySources, resolutionContext.SourceCacheContext, logger);
                 }
                 else
                 {
@@ -1471,8 +1582,8 @@ namespace NuGet.PackageManagement
             var projectName = NuGetProject.GetUniqueNameOrName(nuGetProject);
             var projectId = string.Empty;
             nuGetProject.TryGetMetadata<string>(NuGetProjectMetadataKeys.ProjectId, out projectId);
-            var telemetryHelper = nuGetProjectContext.TelemetryService;
-            TelemetryServiceUtility.StartTimer(telemetryHelper);
+ 
+            var stopWatch = Stopwatch.StartNew();
 
             var projectInstalledPackageReferences = await nuGetProject.GetInstalledPackagesAsync(token);
             var oldListOfInstalledPackages = projectInstalledPackageReferences.Select(p => p.PackageIdentity);
@@ -1512,6 +1623,8 @@ namespace NuGet.PackageManagement
 
                     var primaryPackages = new List<PackageIdentity> { packageIdentity };
 
+                    HashSet<SourcePackageDependencyInfo> availablePackageDependencyInfoWithSourceSet = null;
+
                     var gatherContext = new GatherContext()
                     {
                         InstalledPackages = oldListOfInstalledPackages.ToList(),
@@ -1525,11 +1638,16 @@ namespace NuGet.PackageManagement
                         ProjectContext = nuGetProjectContext
                     };
 
-                    var availablePackageDependencyInfoWithSourceSet = await ResolverGather.GatherAsync(gatherContext, token);
+                    availablePackageDependencyInfoWithSourceSet = await ResolverGather.GatherAsync(gatherContext, token);
 
                     // emit gather dependency telemetry event and restart timer
-                    TelemetryServiceUtility.EmitEventAndRestartTimer(telemetryHelper,
-                        string.Format(TelemetryConstants.GatherDependencyStepName, projectId));
+                    stopWatch.Stop();
+                    var gatherTelemetryEvent = new ActionTelemetryStepEvent(nuGetProjectContext.OperationId.ToString(),
+                        string.Format(TelemetryConstants.GatherDependencyStepName, projectId), stopWatch.Elapsed.TotalSeconds);
+
+                    TelemetryActivity.EmitTelemetryEvent(gatherTelemetryEvent);
+
+                    stopWatch.Restart();
 
                     if (!availablePackageDependencyInfoWithSourceSet.Any())
                     {
@@ -1587,8 +1705,14 @@ namespace NuGet.PackageManagement
                     var newListOfInstalledPackages = packageResolver.Resolve(packageResolverContext, token);
 
                     // emit resolve dependency telemetry event and restart timer
-                    TelemetryServiceUtility.EmitEventAndRestartTimer(telemetryHelper,
-                        string.Format(TelemetryConstants.ResolveDependencyStepName, projectId));
+                    stopWatch.Stop();
+
+                    var resolveTelemetryEvent = new ActionTelemetryStepEvent(nuGetProjectContext.OperationId.ToString(),
+                        string.Format(TelemetryConstants.ResolveDependencyStepName, projectId), stopWatch.Elapsed.TotalSeconds);
+
+                    TelemetryActivity.EmitTelemetryEvent(resolveTelemetryEvent);
+
+                    stopWatch.Restart();
 
                     if (newListOfInstalledPackages == null)
                     {
@@ -1668,13 +1792,17 @@ namespace NuGet.PackageManagement
             else
             {
                 var logger = new ProjectContextLogger(nuGetProjectContext);
-                var sourceRepository = await GetSourceRepository(packageIdentity, effectiveSources, logger);
+                var sourceRepository = await GetSourceRepository(packageIdentity, effectiveSources, resolutionContext.SourceCacheContext, logger);
                 nuGetProjectActions.Add(NuGetProjectAction.CreateInstallProjectAction(packageIdentity, sourceRepository, nuGetProject));
             }
 
             // emit resolve actions telemetry event
-            TelemetryServiceUtility.EmitEvent(telemetryHelper,
-                string.Format(TelemetryConstants.ResolvedActionsStepName, projectId));
+            stopWatch.Stop();
+
+            var actionTelemetryEvent = new ActionTelemetryStepEvent(nuGetProjectContext.OperationId.ToString(),
+                string.Format(TelemetryConstants.ResolvedActionsStepName, projectId), stopWatch.Elapsed.TotalSeconds);
+
+            TelemetryActivity.EmitTelemetryEvent(actionTelemetryEvent);
 
             nuGetProjectContext.Log(ProjectManagement.MessageLevel.Info, Strings.ResolvedActionsToInstallPackage, packageIdentity);
             return nuGetProjectActions;
@@ -1688,6 +1816,7 @@ namespace NuGet.PackageManagement
         /// </summary>
         private static async Task<SourceRepository> GetSourceRepository(PackageIdentity packageIdentity,
             IEnumerable<SourceRepository> sourceRepositories,
+            SourceCacheContext sourceCacheContext,
             Common.ILogger logger)
         {
             SourceRepository source = null;
@@ -1705,7 +1834,7 @@ namespace NuGet.PackageManagement
                 var metadataResource = await sourceRepository.GetResourceAsync<MetadataResource>();
                 if (metadataResource != null)
                 {
-                    var task = Task.Run(() => metadataResource.Exists(packageIdentity, logger, tokenSource.Token), tokenSource.Token);
+                    var task = Task.Run(() => metadataResource.Exists(packageIdentity, sourceCacheContext, logger, tokenSource.Token), tokenSource.Token);
                     results.Enqueue(new KeyValuePair<SourceRepository, Task<bool>>(sourceRepository, task));
                 }
             }
@@ -1884,7 +2013,8 @@ namespace NuGet.PackageManagement
         }
 
         private async Task<IEnumerable<PackageDependencyInfo>> GetDependencyInfoFromPackagesFolder(IEnumerable<PackageIdentity> packageIdentities,
-            NuGetFramework nuGetFramework)
+            NuGetFramework nuGetFramework,
+            bool includeUnresolved = false)
         {
             try
             {
@@ -1894,10 +2024,15 @@ namespace NuGet.PackageManagement
 
                 foreach (var package in packageIdentities)
                 {
-                    var packageDependencyInfo = await dependencyInfoResource.ResolvePackage(package, nuGetFramework, Common.NullLogger.Instance, CancellationToken.None);
+                    var packageDependencyInfo = await dependencyInfoResource.ResolvePackage(package, nuGetFramework, NullSourceCacheContext.Instance,
+                        Common.NullLogger.Instance, CancellationToken.None);
                     if (packageDependencyInfo != null)
                     {
                         results.Add(packageDependencyInfo);
+                    }
+                    else if (includeUnresolved)
+                    {
+                        results.Add(new PackageDependencyInfo(package, null));
                     }
                 }
 
@@ -1919,6 +2054,7 @@ namespace NuGet.PackageManagement
         public async Task ExecuteNuGetProjectActionsAsync(IEnumerable<NuGetProject> nuGetProjects,
             IEnumerable<NuGetProjectAction> nuGetProjectActions,
             INuGetProjectContext nuGetProjectContext,
+            SourceCacheContext sourceCacheContext,
             CancellationToken token)
         {
             var projects = nuGetProjects.ToList();
@@ -1941,7 +2077,7 @@ namespace NuGet.PackageManagement
                 // get all build integrated projects of the solution which will be used to map project references
                 // of the target projects
                 var allBuildIntegratedProjects =
-                    SolutionManager.GetNuGetProjects().OfType<BuildIntegratedNuGetProject>().ToList();
+                    (await SolutionManager.GetNuGetProjectsAsync()).OfType<BuildIntegratedNuGetProject>().ToList();
 
                 var dgFile = await DependencyGraphRestoreUtility.GetSolutionRestoreSpec(SolutionManager, referenceContext);
                 _buildIntegratedProjectsCache = dgFile;
@@ -1967,7 +2103,7 @@ namespace NuGet.PackageManagement
             foreach (var project in sortedProjectsToUpdate)
             {
                 var nugetActions = nuGetProjectActions.Where(action => action.Project.Equals(project));
-                await ExecuteNuGetProjectActionsAsync(project, nugetActions, nuGetProjectContext, token);
+                await ExecuteNuGetProjectActionsAsync(project, nugetActions, nuGetProjectContext, sourceCacheContext, token);
             }
 
             // clear cache which could temper with other updates
@@ -1986,18 +2122,19 @@ namespace NuGet.PackageManagement
         public async Task ExecuteNuGetProjectActionsAsync(NuGetProject nuGetProject,
             IEnumerable<NuGetProjectAction> nuGetProjectActions,
             INuGetProjectContext nuGetProjectContext,
+            SourceCacheContext sourceCacheContext,
             CancellationToken token)
         {
-            using (var sourceCacheContext = new SourceCacheContext())
+            var downloadContext = new PackageDownloadContext(sourceCacheContext)
             {
-                var downloadContext = new PackageDownloadContext(sourceCacheContext);
+                ParentId = nuGetProjectContext.OperationId
+            };
 
-                await ExecuteNuGetProjectActionsAsync(nuGetProject,
-                    nuGetProjectActions,
-                    nuGetProjectContext,
-                    downloadContext,
-                    token);
-            }
+            await ExecuteNuGetProjectActionsAsync(nuGetProject,
+                nuGetProjectActions,
+                nuGetProjectContext,
+                downloadContext,
+                token);
         }
 
         /// <summary>
@@ -2100,34 +2237,65 @@ namespace NuGet.PackageManagement
                             logger);
                     }
 
+                    // raise Nuget batch start event
+                    var batchId = Guid.NewGuid().ToString();
+                    string name;
+                    nuGetProject.TryGetMetadata(NuGetProjectMetadataKeys.Name, out name);
+                    packageProjectEventArgs = new PackageProjectEventArgs(batchId, name);
+                    BatchStart?.Invoke(this, packageProjectEventArgs);
+                    PackageProjectEventsProvider.Instance.NotifyBatchStart(packageProjectEventArgs);
+
                     try
                     {
                         if (msbuildProject != null)
                         {
                             //start batch processing for msbuild
                             await msbuildProject.ProjectSystem.BeginProcessingAsync();
-
-                            // raise Nuget batch start event
-                            var batchId = Guid.NewGuid().ToString();
-                            string name;
-                            nuGetProject.TryGetMetadata(NuGetProjectMetadataKeys.Name, out name);
-                            packageProjectEventArgs = new PackageProjectEventArgs(batchId, name);
-                            BatchStart?.Invoke(this, packageProjectEventArgs);
-                            PackageProjectEventsProvider.Instance.NotifyBatchStart(packageProjectEventArgs);
                         }
 
                         foreach (var nuGetProjectAction in actionsList)
                         {
-                            executedNuGetProjectActions.Push(nuGetProjectAction);
                             if (nuGetProjectAction.NuGetProjectActionType == NuGetProjectActionType.Uninstall)
                             {
+                                executedNuGetProjectActions.Push(nuGetProjectAction);
+
                                 await ExecuteUninstallAsync(nuGetProject,
                                     nuGetProjectAction.PackageIdentity,
                                     packageWithDirectoriesToBeDeleted,
                                     nuGetProjectContext, token);
+
+                                nuGetProjectContext.Log(
+                                    ProjectManagement.MessageLevel.Info,
+                                    Strings.SuccessfullyUninstalled,
+                                    nuGetProjectAction.PackageIdentity,
+                                    nuGetProject.GetMetadata<string>(NuGetProjectMetadataKeys.Name));
                             }
-                            else
+                        }
+                    }
+                    finally
+                    {
+                        if (msbuildProject != null)
+                        {
+                            // end batch for msbuild and let it save everything.
+                            // always calls it before PostProcessAsync or binding redirects
+                            await msbuildProject.ProjectSystem.EndProcessingAsync();
+                        }
+                    }
+
+                    try
+                    {
+                        if (msbuildProject != null)
+                        {
+                            //start batch processing for msbuild
+                            await msbuildProject.ProjectSystem.BeginProcessingAsync();
+                        }
+
+                        foreach (var nuGetProjectAction in actionsList)
+                        {
+                            if (nuGetProjectAction.NuGetProjectActionType == NuGetProjectActionType.Install)
                             {
+                                executedNuGetProjectActions.Push(nuGetProjectAction);
+
                                 // Retrieve the downloaded package
                                 // This will wait on the package if it is still downloading
                                 var preFetchResult = downloadTasks[nuGetProjectAction.PackageIdentity];
@@ -2144,27 +2312,17 @@ namespace NuGet.PackageManagement
                                         nuGetProjectContext,
                                         token);
                                 }
-                            }
 
-                            if (nuGetProjectAction.NuGetProjectActionType == NuGetProjectActionType.Install)
-                            {
                                 var identityString = string.Format(CultureInfo.InvariantCulture, "{0} {1}",
                                     nuGetProjectAction.PackageIdentity.Id,
                                     nuGetProjectAction.PackageIdentity.Version.ToNormalizedString());
+
+                                preFetchResult.EmitTelemetryEvent(nuGetProjectContext.OperationId);
 
                                 nuGetProjectContext.Log(
                                     ProjectManagement.MessageLevel.Info,
                                     Strings.SuccessfullyInstalled,
                                     identityString,
-                                    nuGetProject.GetMetadata<string>(NuGetProjectMetadataKeys.Name));
-                            }
-                            else
-                            {
-                                // uninstall
-                                nuGetProjectContext.Log(
-                                    ProjectManagement.MessageLevel.Info,
-                                    Strings.SuccessfullyUninstalled,
-                                    nuGetProjectAction.PackageIdentity,
                                     nuGetProject.GetMetadata<string>(NuGetProjectMetadataKeys.Name));
                             }
                         }
@@ -2268,9 +2426,10 @@ namespace NuGet.PackageManagement
                 DatetimeUtility.ToReadableTimeFormat(stopWatch.Elapsed));
 
             // emit resolve actions telemetry event
-            TelemetryServiceUtility.EmitEvent(nuGetProjectContext.TelemetryService,
-                string.Format(TelemetryConstants.ExecuteActionStepName, projectId),
-                stopWatch.Elapsed.TotalSeconds);
+            var actionTelemetryEvent = new ActionTelemetryStepEvent(nuGetProjectContext.OperationId.ToString(),
+                string.Format(TelemetryConstants.ExecuteActionStepName, projectId), stopWatch.Elapsed.TotalSeconds);
+
+            TelemetryActivity.EmitTelemetryEvent(actionTelemetryEvent);
 
             if (exceptionInfo != null)
             {
@@ -2366,6 +2525,7 @@ namespace NuGet.PackageManagement
                     providerCache,
                     cacheModifier,
                     sources,
+                    nuGetProjectContext.OperationId,
                     logger,
                     token);
 
@@ -2381,7 +2541,14 @@ namespace NuGet.PackageManagement
                 }
                 else if (action.NuGetProjectActionType == NuGetProjectActionType.Install)
                 {
-                    PackageSpecOperations.AddOrUpdateDependency(updatedPackageSpec, action.PackageIdentity);
+                    if (updatedPackageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.PackageReference)
+                    {
+                        PackageSpecOperations.AddOrUpdateDependency(updatedPackageSpec, action.PackageIdentity, updatedPackageSpec.TargetFrameworks.Select(e => e.FrameworkName));
+                    }
+                    else
+                    {
+                        PackageSpecOperations.AddOrUpdateDependency(updatedPackageSpec, action.PackageIdentity);
+                    }
                 }
             }
 
@@ -2394,6 +2561,7 @@ namespace NuGet.PackageManagement
                 providerCache,
                 cacheModifier,
                 sources,
+                nuGetProjectContext.OperationId,
                 logger,
                 token);
 
@@ -2444,6 +2612,7 @@ namespace NuGet.PackageManagement
                     providerCache,
                     cacheModifier,
                     sources,
+                    nuGetProjectContext.OperationId,
                     logger,
                     token);
             }
@@ -2484,9 +2653,11 @@ namespace NuGet.PackageManagement
             }
 
             stopWatch.Stop();
-            TelemetryServiceUtility.EmitEvent(nuGetProjectContext.TelemetryService,
-                string.Format(TelemetryConstants.PreviewBuildIntegratedStepName, projectId),
-                stopWatch.Elapsed.TotalSeconds);
+
+            var actionTelemetryEvent = new ActionTelemetryStepEvent(nuGetProjectContext.OperationId.ToString(),
+                string.Format(TelemetryConstants.PreviewBuildIntegratedStepName, projectId), stopWatch.Elapsed.TotalSeconds);
+
+            TelemetryActivity.EmitTelemetryEvent(actionTelemetryEvent);
 
             return new BuildIntegratedProjectAction(
                 buildIntegratedProject,
@@ -2601,6 +2772,7 @@ namespace NuGet.PackageManagement
                             GetRestoreProviderCache(),
                             cacheContextModifier,
                             projectAction.Sources,
+                            nuGetProjectContext.OperationId,
                             logger,
                             token);
                 }
@@ -2648,7 +2820,7 @@ namespace NuGet.PackageManagement
                     token);
 
                 // find list of buildintegrated projects
-                var projects = SolutionManager.GetNuGetProjects().OfType<BuildIntegratedNuGetProject>().ToList();
+                var projects = (await SolutionManager.GetNuGetProjectsAsync()).OfType<BuildIntegratedNuGetProject>().ToList();
 
                 // build reference cache if not done already
                 if (_buildIntegratedProjectsCache == null)
@@ -2691,6 +2863,7 @@ namespace NuGet.PackageManagement
                         GetRestoreProviderCache(),
                         cacheContextModifier,
                         projectAction.Sources,
+                        nuGetProjectContext.OperationId,
                         false, // No need to force restore as the inputs would've changed here anyways
                         logger,
                         token);
@@ -2699,11 +2872,20 @@ namespace NuGet.PackageManagement
             else
             {
                 // Fail and display a rollback message to let the user know they have returned to the original state
-                throw new InvalidOperationException(
-                    string.Format(
+                var message = string.Format(
                         CultureInfo.InvariantCulture,
                         Strings.RestoreFailedRollingBack,
-                        buildIntegratedProject.ProjectName));
+                        buildIntegratedProject.ProjectName);
+
+                // Read additional errors from the lock file if one exists
+                var logMessages = restoreResult.LockFile?
+                    .LogMessages
+                    .Where(e => e.Level == LogLevel.Error)
+                    .Select(e => e.AsRestoreLogMessage())
+                  ?? Enumerable.Empty<ILogMessage>();
+
+                // Throw an exception containing all errors, these will be displayed in the error list
+                throw new PackageReferenceRollbackException(message, logMessages);
             }
 
             await OpenReadmeFile(buildIntegratedProject, nuGetProjectContext, token);
@@ -2877,7 +3059,7 @@ namespace NuGet.PackageManagement
 
             // Step-2: Check if the package directory could be deleted
             if (!(nuGetProject is INuGetIntegratedProject)
-                && !await PackageExistsInAnotherNuGetProject(nuGetProject, packageIdentity, SolutionManager, token))
+                && !await PackageExistsInAnotherNuGetProject(nuGetProject, packageIdentity, SolutionManager, token, excludeIntegrated: true))
             {
                 packageWithDirectoriesToBeDeleted.Add(packageIdentity);
             }
@@ -2894,7 +3076,7 @@ namespace NuGet.PackageManagement
         /// project <paramref name="nuGetProject" /> is also installed in any
         /// other projects in the solution.
         /// </summary>
-        public static async Task<bool> PackageExistsInAnotherNuGetProject(NuGetProject nuGetProject, PackageIdentity packageIdentity, ISolutionManager solutionManager, CancellationToken token)
+        public static async Task<bool> PackageExistsInAnotherNuGetProject(NuGetProject nuGetProject, PackageIdentity packageIdentity, ISolutionManager solutionManager, CancellationToken token, bool excludeIntegrated= false)
         {
             if (nuGetProject == null)
             {
@@ -2914,16 +3096,21 @@ namespace NuGet.PackageManagement
             }
 
             var nuGetProjectName = NuGetProject.GetUniqueNameOrName(nuGetProject);
-            foreach (var otherNuGetProject in solutionManager.GetNuGetProjects())
+            foreach (var otherNuGetProject in (await solutionManager.GetNuGetProjectsAsync()))
             {
-                var otherNuGetProjectName = NuGetProject.GetUniqueNameOrName(otherNuGetProject);
-                if (!otherNuGetProjectName.Equals(nuGetProjectName, StringComparison.OrdinalIgnoreCase))
+                if (excludeIntegrated && otherNuGetProject is INuGetIntegratedProject)
                 {
-                    var packageExistsInAnotherNuGetProject = (await otherNuGetProject.GetInstalledPackagesAsync(token)).Any(pr => pr.PackageIdentity.Equals(packageIdentity));
-                    if (packageExistsInAnotherNuGetProject)
-                    {
-                        return true;
-                    }
+                    continue;
+                }
+                var otherNuGetProjectName = NuGetProject.GetUniqueNameOrName(otherNuGetProject);
+                if (otherNuGetProjectName.Equals(nuGetProjectName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                var packageExistsInAnotherNuGetProject = (await otherNuGetProject.GetInstalledPackagesAsync(token)).Any(pr => pr.PackageIdentity.Equals(packageIdentity));
+                if (packageExistsInAnotherNuGetProject)
+                {
+                    return true;
                 }
             }
 
@@ -3053,7 +3240,7 @@ namespace NuGet.PackageManagement
             // Resolve the package for the project framework and cache the results in the
             // resolution context for the gather to use during the next step.
             // Using the metadata resource will result in multiple calls to the same url during an install.
-            var packages = (await dependencyInfoResource.ResolvePackages(packageId, framework, log, token)).ToList();
+            var packages = (await dependencyInfoResource.ResolvePackages(packageId, framework, resolutionContext.SourceCacheContext, log, token)).ToList();
 
             Debug.Assert(resolutionContext.GatherCache != null);
 

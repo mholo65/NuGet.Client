@@ -104,20 +104,10 @@ namespace NuGet.ProjectModel
         {
             try
             {
-                using (var jsonReader = new JsonTextReader(reader))
-                {
-                    while (jsonReader.TokenType != JsonToken.StartObject)
-                    {
-                        if (!jsonReader.Read())
-                        {
-                            throw new InvalidDataException();
-                        }
-                    }
-                    var token = JToken.Load(jsonReader);
-                    var lockFile = ReadLockFile(token as JObject);
-                    lockFile.Path = path;
-                    return lockFile;
-                }
+                var json = JsonUtility.LoadJson(reader);
+                var lockFile = ReadLockFile(json);
+                lockFile.Path = path;
+                return lockFile;
             }
             catch (Exception ex)
             {
@@ -488,6 +478,7 @@ namespace NuGet.ProjectModel
             library.BuildMultiTargeting = ReadObject(json[BuildMultiTargetingProperty] as JObject, ReadFileItem);
             library.ContentFiles = ReadObject(json[ContentFilesProperty] as JObject, ReadContentFile);
             library.RuntimeTargets = ReadObject(json[RuntimeTargetsProperty] as JObject, ReadRuntimeTarget);
+            library.ToolsAssemblies = ReadObject(json[ToolsProperty] as JObject, ReadFileItem);
 
             return library;
         }
@@ -574,6 +565,13 @@ namespace NuGet.ProjectModel
                 var ordered = library.RuntimeTargets.OrderBy(assembly => assembly.Path, StringComparer.Ordinal);
 
                 json[RuntimeTargetsProperty] = WriteObject(ordered, WriteFileItem);
+            }
+
+            if (library.ToolsAssemblies.Count > 0)
+            {
+                var ordered = library.ToolsAssemblies.OrderBy(assembly => assembly.Path, StringComparer.Ordinal);
+
+                json[ToolsProperty] = WriteObject(ordered, WriteFileItem);
             }
 
             return new JProperty(library.Name + "/" + library.Version.ToNormalizedString(), json);

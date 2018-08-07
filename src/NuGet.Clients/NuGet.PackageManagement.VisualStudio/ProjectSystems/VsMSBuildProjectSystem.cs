@@ -16,6 +16,7 @@ using Microsoft.CSharp.RuntimeBinder;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Threading;
+using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.ProjectManagement;
 using NuGet.VisualStudio;
@@ -31,11 +32,11 @@ namespace NuGet.PackageManagement.VisualStudio
         private const string BinDir = "bin";
         private const string NuGetImportStamp = "NuGetPackageImportStamp";
 
-        private readonly AsyncLazy<NuGetFramework> _targetFramework;
+        private NuGetFramework _targetFramework;
 
         private IVsProjectBuildSystem _buildSystem;
 
-        protected IVsProjectAdapter VsProjectAdapter { get; }
+        public IVsProjectAdapter VsProjectAdapter { get; }
 
         public INuGetProjectContext NuGetProjectContext { get; set; }
 
@@ -138,7 +139,18 @@ namespace NuGet.PackageManagement.VisualStudio
             }
         }
 
-        public NuGetFramework TargetFramework => NuGetUIThreadHelper.JoinableTaskFactory.Run(_targetFramework.GetValueAsync);
+        public NuGetFramework TargetFramework
+        {
+            get
+            {
+                if (_targetFramework == null)
+                {
+                    _targetFramework = NuGetUIThreadHelper.JoinableTaskFactory.Run(VsProjectAdapter.GetTargetFrameworkAsync);
+                }
+
+                return _targetFramework;
+            }
+        }
 
         public VsMSBuildProjectSystem(
             IVsProjectAdapter vsProjectAdapter,
@@ -149,10 +161,11 @@ namespace NuGet.PackageManagement.VisualStudio
 
             VsProjectAdapter = vsProjectAdapter;
             NuGetProjectContext = nuGetProjectContext;
+        }
 
-            _targetFramework = new AsyncLazy<NuGetFramework>(
-                VsProjectAdapter.GetTargetFrameworkAsync,
-                NuGetUIThreadHelper.JoinableTaskFactory);
+        public async Task InitializeProperties()
+        {
+            _targetFramework = await VsProjectAdapter.GetTargetFrameworkAsync();
         }
 
         public virtual void AddFile(string path, Stream stream)
@@ -572,13 +585,13 @@ namespace NuGet.PackageManagement.VisualStudio
             }
         }
 
-        private readonly bool BindingRedirectsRelatedInitialized = false;
+        private readonly bool _bindingRedirectsRelatedInitialized = false;
         private VSSolutionManager VSSolutionManager { get; set; }
         private IVsFrameworkMultiTargeting VSFrameworkMultiTargeting { get; set; }
 
         private void InitForBindingRedirects()
         {
-            if (!BindingRedirectsRelatedInitialized)
+            if (!_bindingRedirectsRelatedInitialized)
             {
                 var solutionManager = ServiceLocator.GetInstanceSafe<ISolutionManager>();
                 VSSolutionManager = (solutionManager != null) ? (solutionManager as VSSolutionManager) : null;
@@ -715,6 +728,19 @@ namespace NuGet.PackageManagement.VisualStudio
             }
         }
 
+        public VSLangProj157.References3 References3
+        {
+            get
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+
+                dynamic projectObj = VsProjectAdapter.Project.Object;
+                var references = (VSLangProj157.References3)projectObj.References;
+                projectObj = null;
+                return references;
+            }
+        }
+
         public async Task AddFrameworkReferenceAsync(string name, string packageId)
         {
             await NuGetUIThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -782,7 +808,28 @@ namespace NuGet.PackageManagement.VisualStudio
                     assemblyFullPath = Path.Combine(projectFullPath, referencePath);
 
                     // Add a reference to the project
-                    dynamic reference = References.Add(assemblyFullPath);
+                    dynamic reference;
+                    try
+                    {
+                        // First try the References3.AddFiles API, as that will incur fewer
+                        // design-time builds.
+                        References3.AddFiles(new[] { assemblyFullPath }, out var referencesArray);
+                        var references = (VSLangProj.Reference[])referencesArray;
+                        reference = references[0];
+                    }
+                    catch (Exception e)
+                    {
+                        if (e is InvalidCastException)
+                        {
+                            // We've encountered a project system that doesn't implement References3, or
+                            // there's some sort of setup issue such that we can't find the library with
+                            // the References3 type. Send a report about this.
+                            TelemetryActivity.EmitTelemetryEvent(new TelemetryEvent("References3InvalidCastException"));
+                        }
+
+                        // If that didn't work, fall back to References.Add.
+                        reference = References.Add(assemblyFullPath);
+                    }
 
                     if (reference != null)
                     {
@@ -970,6 +1017,7 @@ namespace NuGet.PackageManagement.VisualStudio
             }
             catch (Exception ex)
             {
+                NuGetProjectContext.Log(ProjectManagement.MessageLevel.Debug, ex.Message);
                 ExceptionHelper.WriteErrorToActivityLog(ex);
             }
         }

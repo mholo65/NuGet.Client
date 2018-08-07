@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -110,7 +110,11 @@ namespace NuGet.Commands
                 switch (projectStyle)
                 {
                     case ProjectStyle.PackageReference:
-                        ValidateProjectSpecNetCore(spec, files);
+                        ValidateProjectSpecPackageReference(spec, files);
+                        break;
+
+                    case ProjectStyle.DotnetToolReference:
+                        ValidateProjectSpecPackageReference(spec, files);
                         break;
 
                     case ProjectStyle.ProjectJson:
@@ -157,7 +161,7 @@ namespace NuGet.Commands
             }
         }
 
-        private static void ValidateProjectSpecNetCore(PackageSpec spec, IEnumerable<string> files)
+        private static void ValidateProjectSpecPackageReference(PackageSpec spec, IEnumerable<string> files)
         {
             // Verify frameworks
             ValidateFrameworks(spec, files);
@@ -326,6 +330,20 @@ namespace NuGet.Commands
                     CultureInfo.CurrentCulture,
                     Strings.MissingRequiredProperty,
                     nameof(spec.RestoreMetadata.ProjectName));
+
+                throw RestoreSpecException.Create(message, files);
+            }
+
+            // spec.name and spec.RestoreMetadata.ProjectName should be the same
+            if (!string.Equals(spec.Name, spec.RestoreMetadata.ProjectName, StringComparison.Ordinal))
+            {
+                var message = string.Format(
+                    CultureInfo.CurrentCulture,
+                    Strings.NonMatchingProperties,
+                    nameof(spec.Name),
+                    spec.Name,
+                    nameof(spec.RestoreMetadata.ProjectName),
+                    spec.RestoreMetadata.ProjectName);
 
                 throw RestoreSpecException.Create(message, files);
             }

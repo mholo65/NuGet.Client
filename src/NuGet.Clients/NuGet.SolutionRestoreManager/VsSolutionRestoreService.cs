@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft;
 using NuGet.Commands;
+using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Frameworks;
 using NuGet.LibraryModel;
@@ -246,18 +247,23 @@ namespace NuGet.SolutionRestoreManager
                 // cross-targeting is always ON even in case of a single tfm in the list.
                 crossTargeting = true;
             }
+
+        
             var outputPath = Path.GetFullPath(
-                        Path.Combine(
-                            projectDirectory,
-                            projectRestoreInfo.BaseIntermediatePath));
+                                Path.Combine(
+                                    projectDirectory,
+                                    projectRestoreInfo.BaseIntermediatePath));
+
+            var projectName = GetPackageId(projectNames, projectRestoreInfo.TargetFrameworks);
+
             var packageSpec = new PackageSpec(tfis)
             {
-                Name = GetPackageId(projectNames, projectRestoreInfo.TargetFrameworks),
+                Name = projectName,
                 Version = GetPackageVersion(projectRestoreInfo.TargetFrameworks),
                 FilePath = projectFullPath,
                 RestoreMetadata = new ProjectRestoreMetadata
                 {
-                    ProjectName = projectNames.ShortName,
+                    ProjectName = projectName,
                     ProjectUniqueName = projectFullPath,
                     ProjectPath = projectFullPath,
                     OutputPath = outputPath,
@@ -276,7 +282,7 @@ namespace NuGet.SolutionRestoreManager
                     Sources = GetRestoreSources(projectRestoreInfo.TargetFrameworks)
                                     .Select(e => new PackageSource(e))
                                     .ToList(),
-                    ProjectWideWarningProperties = MSBuildRestoreUtility.GetWarningProperties(
+                    ProjectWideWarningProperties = WarningProperties.GetWarningProperties(
                         treatWarningsAsErrors: GetNonEvaluatedPropertyOrNull(projectRestoreInfo.TargetFrameworks, TreatWarningsAsErrors, e => e),
                         warningsAsErrors: GetNonEvaluatedPropertyOrNull(projectRestoreInfo.TargetFrameworks, WarningsAsErrors, e => e),
                         noWarn: GetNonEvaluatedPropertyOrNull(projectRestoreInfo.TargetFrameworks, NoWarn, e => e)),
@@ -477,7 +483,7 @@ namespace NuGet.SolutionRestoreManager
             };
 
             // Add warning suppressions
-            foreach (var code in MSBuildRestoreUtility.GetNuGetLogCodes(GetPropertyValueOrNull(item, NoWarn)))
+            foreach (var code in MSBuildStringUtility.GetNuGetLogCodes(GetPropertyValueOrNull(item, NoWarn)))
             {
                 dependency.NoWarn.Add(code);
             }

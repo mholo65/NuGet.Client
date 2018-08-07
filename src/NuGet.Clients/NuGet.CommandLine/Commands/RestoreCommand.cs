@@ -13,6 +13,8 @@ using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.PackageManagement;
 using NuGet.Packaging;
+using NuGet.Packaging.PackageExtraction;
+using NuGet.Packaging.Signing;
 using NuGet.ProjectManagement;
 using NuGet.ProjectModel;
 using NuGet.Protocol;
@@ -178,9 +180,10 @@ namespace NuGet.CommandLine
 
         private string GetSolutionDirectory(PackageRestoreInputs packageRestoreInputs)
         {
-            return packageRestoreInputs.RestoringWithSolutionFile ?
+            var solutionDirectory = packageRestoreInputs.RestoringWithSolutionFile ?
                     packageRestoreInputs.DirectoryOfSolutionFile :
                     SolutionDirectory;
+            return solutionDirectory != null ? PathUtility.EnsureTrailingSlash(solutionDirectory) : null;
         }
 
         private void ReadSettings(PackageRestoreInputs packageRestoreInputs)
@@ -300,9 +303,17 @@ namespace NuGet.CommandLine
             CheckRequireConsent();
 
             var collectorLogger = new RestoreCollectorLogger(Console);
+
+            var signedPackageVerifier = new PackageSignatureVerifier(SignatureVerificationProviderFactory.GetSignatureVerificationProviders());
+
             var projectContext = new ConsoleProjectContext(collectorLogger)
             {
-                PackageExtractionContext = new PackageExtractionContext(collectorLogger)
+                PackageExtractionContext = new PackageExtractionContext(
+                        Packaging.PackageSaveMode.Defaultv2,
+                        PackageExtractionBehavior.XmlDocFileSaveMode,
+                        collectorLogger,
+                        signedPackageVerifier,
+                        SignedPackageVerifierSettings.GetDefault())
             };
 
             if (EffectivePackageSaveMode != Packaging.PackageSaveMode.None)
@@ -333,7 +344,7 @@ namespace NuGet.CommandLine
                     Settings.Priority.Select(x => Path.Combine(x.Root, x.FileName)),
                     packageSources.Select(x => x.Source),
                     installCount,
-                    collectorLogger.Errors.Concat(failedEvents.Select(e => new RestoreLogMessage(LogLevel.Error, e.Exception.Message))));
+                    collectorLogger.Errors.Concat(failedEvents.Select(e => new RestoreLogMessage(LogLevel.Error, NuGetLogCode.Undefined, e.Exception.Message))));
             }
         }
 
@@ -350,7 +361,7 @@ namespace NuGet.CommandLine
                         LocalizedResourceManager.GetString("RestoreCommandPackageRestoreOptOutMessage"),
                         NuGetResources.PackageRestoreConsentCheckBoxText.Replace("&", ""));
 
-                    Console.LogMinimal(message);
+                    Console.LogInformation(message);
                 }
                 else
                 {
@@ -430,6 +441,7 @@ namespace NuGet.CommandLine
                 {
                     dgFileOutput = await GetDependencyGraphSpecAsync(projectsWithPotentialP2PReferences,
                         GetSolutionDirectory(packageRestoreInputs),
+                        packageRestoreInputs.NameOfSolutionFile,
                         ConfigFile);
                 }
                 catch (Exception ex)
@@ -538,7 +550,7 @@ namespace NuGet.CommandLine
         /// <summary>
         ///  Create a dg v2 file using msbuild.
         /// </summary>
-        private async Task<DependencyGraphSpec> GetDependencyGraphSpecAsync(string[] projectsWithPotentialP2PReferences, string solutionDirectory, string configFile)
+        private async Task<DependencyGraphSpec> GetDependencyGraphSpecAsync(string[] projectsWithPotentialP2PReferences, string solutionDirectory, string solutionName, string configFile)
         {
             // Create requests based on the solution directory if a solution was used read settings for the solution.
             // If the solution directory is null, then use config file if present
@@ -567,6 +579,7 @@ namespace NuGet.CommandLine
                 Console,
                 Recursive,
                 solutionDirectory,
+                solutionName,
                 configFile,
                 Source.ToArray(),
                 PackagesDirectory
@@ -759,6 +772,7 @@ namespace NuGet.CommandLine
         private void ProcessSolutionFile(string solutionFileFullPath, PackageRestoreInputs restoreInputs)
         {
             restoreInputs.DirectoryOfSolutionFile = Path.GetDirectoryName(solutionFileFullPath);
+            restoreInputs.NameOfSolutionFile = Path.GetFileNameWithoutExtension(solutionFileFullPath);
 
             // restore packages for the solution
             var solutionLevelPackagesConfig = Path.Combine(
@@ -801,6 +815,8 @@ namespace NuGet.CommandLine
             public bool RestoringWithSolutionFile => !string.IsNullOrEmpty(DirectoryOfSolutionFile);
 
             public string DirectoryOfSolutionFile { get; set; }
+
+            public string NameOfSolutionFile { get; set; }
 
             public List<string> PackagesConfigFiles { get; } = new List<string>();
 

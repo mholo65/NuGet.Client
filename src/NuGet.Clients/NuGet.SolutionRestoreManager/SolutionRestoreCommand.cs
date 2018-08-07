@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -11,7 +11,6 @@ using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using NuGet.PackageManagement;
-using NuGet.PackageManagement.VisualStudio;
 using NuGet.VisualStudio;
 using Task = System.Threading.Tasks.Task;
 
@@ -148,10 +147,7 @@ namespace NuGet.SolutionRestoreManager
                     _restoreTask.IsCompleted &&
                     !ConsoleStatus.Value.IsBusy &&
                     !SolutionRestoreWorker.Value.IsBusy &&
-                    (
-                        DeferredProjectVSUtility.IsSolutionDPLEnabled() ||
-                        Enumerable.Any(SolutionManager.Value.GetNuGetProjects())
-                    );
+                    await SolutionManager.Value.DoesNuGetSupportsAnyProjectAsync();
             });
         }
 

@@ -466,4 +466,25 @@ The "ms" should be localized to the abbreviation for milliseconds.</comment>
     <comment>{0} is the plugin name
 {1} is the exception ToString() result</comment>
   </data>
+  <data name="Log_LocalSourceNotExist" xml:space="preserve">
+    <value>The local source '{0}' doesn't exist.</value>
+  </data>
+  <data name="Log_FailedToFetchV2FeedHttp" xml:space="preserve">
+    <value>Failed to fetch results from V2 feed at '{0}' with following message : {1}</value>
+    <comment>{0} is the URL that failed.
+{1} is the message returned from HTTP call.</comment>
+  </data>
+  <data name="Log_FailedToReadRepositorySignature" xml:space="preserve">
+    <value>Unable to get repository signature information for source {0}.</value>
+    <comment>{0} is the repository signature information endpoint.</comment>
+  </data>
+  <data name="Log_RetryingRepositorySignature" xml:space="preserve">
+    <value>Retrying repository signature request for source '{0}'.</value>
+    <comment>{0} is the repository signature information endpoint.</comment>
+  </data>
+  <data name="Log_FailedToParseRepoSignInfor" xml:space="preserve">
+    <value>Unable to parse {0} information from {1}. </value>
+    <comment>{0} is the information name that needs to be parsed. 
+{1} is the repository signature information endpoint.</comment>
+  </data>
 </root>

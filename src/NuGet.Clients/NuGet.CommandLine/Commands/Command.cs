@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 extern alias CoreV2;
 
@@ -102,11 +102,19 @@ namespace NuGet.CommandLine
             }
             else
             {
-                if (String.IsNullOrEmpty(ConfigFile))
+                if (string.IsNullOrEmpty(ConfigFile))
                 {
+                    string configFileName = null;
+
+                    PackCommand packCommand = this as PackCommand;
+                    if (packCommand != null && !string.IsNullOrEmpty(packCommand.ConfigFile))
+                    {
+                        configFileName = packCommand.ConfigFile;
+                    }
+
                     Settings = Configuration.Settings.LoadDefaultSettings(
                         CurrentDirectory,
-                        configFileName: null,
+                        configFileName: configFileName,
                         machineWideSettings: MachineWideSettings);
                 }
                 else
@@ -139,11 +147,13 @@ namespace NuGet.CommandLine
             if (ShouldOutputNuGetVersion)
             {
                 var assemblyName = Assembly.GetExecutingAssembly().GetName();
+                var assemblyLocation = Assembly.GetExecutingAssembly().Location;
+                var version = System.Diagnostics.FileVersionInfo.GetVersionInfo(assemblyLocation).FileVersion;
                 var message = string.Format(
                     CultureInfo.CurrentCulture,
                     LocalizedResourceManager.GetString("OutputNuGetVersion"),
                     assemblyName.Name,
-                    assemblyName.Version);
+                    version);
                 Console.WriteLine(message);
             }
         }
@@ -163,7 +173,7 @@ namespace NuGet.CommandLine
 
             CoreV2.NuGet.HttpClient.DefaultCredentialProvider = new CredentialServiceAdapter(CredentialService);
 
-            HttpHandlerResourceV3.CredentialService = CredentialService;
+            HttpHandlerResourceV3.CredentialService = new Lazy<Configuration.ICredentialService>(() => CredentialService);
 
             HttpHandlerResourceV3.CredentialsSuccessfullyUsed = (uri, credentials) =>
             {
@@ -214,13 +224,13 @@ namespace NuGet.CommandLine
             }
 
             // Use the command name minus the suffix if present and default description
-            string name = GetType().Name;
-            int idx = name.LastIndexOf(CommandSuffix, StringComparison.OrdinalIgnoreCase);
+            var name = GetType().Name;
+            var idx = name.LastIndexOf(CommandSuffix, StringComparison.OrdinalIgnoreCase);
             if (idx >= 0)
             {
                 name = name.Substring(0, idx);
             }
-            if (!String.IsNullOrEmpty(name))
+            if (!string.IsNullOrEmpty(name))
             {
                 return new CommandAttribute(name, LocalizedResourceManager.GetString("DefaultCommandDescription"));
             }

@@ -1,8 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Protocol.Core.Types;
@@ -155,17 +156,17 @@ namespace NuGet.ProjectModel
             }
 
             return ProjectStyle == other.ProjectStyle &&
-                   ProjectPath == other.ProjectPath &&
-                   ProjectJsonPath == other.ProjectJsonPath &&
-                   OutputPath == other.OutputPath &&
-                   ProjectName == other.ProjectName &&
-                   ProjectUniqueName == other.ProjectUniqueName &&
-                   EqualityUtility.SequenceEqualWithNullCheck(Sources, other.Sources) &&
-                   PackagesPath == other.PackagesPath &&
-                   EqualityUtility.SequenceEqualWithNullCheck(ConfigFilePaths, other.ConfigFilePaths) &&
-                   EqualityUtility.SequenceEqualWithNullCheck(FallbackFolders, other.FallbackFolders) &&
+                   PathUtility.GetStringComparerBasedOnOS().Equals(ProjectPath, other.ProjectPath) &&
+                   PathUtility.GetStringComparerBasedOnOS().Equals(ProjectJsonPath, other.ProjectJsonPath) &&
+                   PathUtility.GetStringComparerBasedOnOS().Equals(OutputPath, other.OutputPath) &&
+                   PathUtility.GetStringComparerBasedOnOS().Equals(ProjectName, other.ProjectName) &&
+                   PathUtility.GetStringComparerBasedOnOS().Equals(ProjectUniqueName, other.ProjectUniqueName) &&
+                   Sources.OrderedEquals(other.Sources.Distinct(), source => source.Source, PathUtility.GetStringComparerBasedOnOS()) &&
+                   PathUtility.GetStringComparerBasedOnOS().Equals(PackagesPath, other.PackagesPath) &&
+                   ConfigFilePaths.OrderedEquals(other.ConfigFilePaths, filePath => filePath, PathUtility.GetStringComparerBasedOnOS()) &&
+                   FallbackFolders.OrderedEquals(other.FallbackFolders, fallbackFolder => fallbackFolder, PathUtility.GetStringComparerBasedOnOS()) &&
                    EqualityUtility.SequenceEqualWithNullCheck(TargetFrameworks, other.TargetFrameworks) &&
-                   EqualityUtility.SequenceEqualWithNullCheck(OriginalTargetFrameworks, other.OriginalTargetFrameworks) &&
+                   OriginalTargetFrameworks.OrderedEquals(other.OriginalTargetFrameworks, fw => fw, StringComparer.OrdinalIgnoreCase) &&
                    CrossTargeting == other.CrossTargeting &&
                    LegacyPackagesDirectory == other.LegacyPackagesDirectory &&
                    ValidateRuntimeAssets == other.ValidateRuntimeAssets &&
@@ -173,5 +174,30 @@ namespace NuGet.ProjectModel
                    EqualityUtility.SequenceEqualWithNullCheck(Files, other.Files) &&
                    EqualityUtility.EqualsWithNullCheck(ProjectWideWarningProperties, other.ProjectWideWarningProperties);
         }
+
+        public ProjectRestoreMetadata Clone()
+        {
+            var clonedObject = new ProjectRestoreMetadata();
+            clonedObject.ProjectStyle = ProjectStyle;
+            clonedObject.ProjectPath = ProjectPath;
+            clonedObject.ProjectJsonPath = ProjectJsonPath;
+            clonedObject.OutputPath = OutputPath;
+            clonedObject.ProjectName = ProjectName;
+            clonedObject.ProjectUniqueName = ProjectUniqueName;
+            clonedObject.PackagesPath = PackagesPath;
+            clonedObject.CacheFilePath = CacheFilePath;
+            clonedObject.CrossTargeting = CrossTargeting;
+            clonedObject.LegacyPackagesDirectory = LegacyPackagesDirectory;
+            clonedObject.SkipContentFileWrite = SkipContentFileWrite;
+            clonedObject.ValidateRuntimeAssets = ValidateRuntimeAssets;
+            clonedObject.FallbackFolders = FallbackFolders != null ? new List<string>(FallbackFolders) : null;
+            clonedObject.ConfigFilePaths = ConfigFilePaths != null ? new List<string>(ConfigFilePaths) : null;
+            clonedObject.OriginalTargetFrameworks = OriginalTargetFrameworks != null ? new List<string>(OriginalTargetFrameworks) : null;
+            clonedObject.Sources = Sources?.Select(c => c.Clone()).ToList();
+            clonedObject.TargetFrameworks = TargetFrameworks?.Select( c => c.Clone()).ToList();
+            clonedObject.Files = Files?.Select(c => c.Clone()).ToList();
+            clonedObject.ProjectWideWarningProperties = ProjectWideWarningProperties?.Clone();
+            return clonedObject;
     }
+}
 }

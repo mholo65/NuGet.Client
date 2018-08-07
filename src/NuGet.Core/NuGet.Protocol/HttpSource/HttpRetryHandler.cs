@@ -1,10 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -48,7 +47,7 @@ namespace NuGet.Protocol
                 using (var requestMessage = request.RequestFactory())
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    string requestUri = requestMessage.RequestUri.ToString();
+                    var requestUri = requestMessage.RequestUri.ToString();
                     
                     try
                     {
@@ -66,6 +65,13 @@ namespace NuGet.Protocol
                         // success variable being set to false but the response being returned to the caller without
                         // disposing it.
                         response?.Dispose();
+
+                        // Add common headers to the request after it is created by the factory. This includes
+                        // X-NuGet-Session-Id which is added to all nuget requests.
+                        foreach (var header in request.AddHeaders)
+                        {
+                            requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                        }
 
                         log.LogInformation("  " + string.Format(
                             CultureInfo.InvariantCulture,
@@ -94,6 +100,14 @@ namespace NuGet.Protocol
                                 requestUri,
                                 networkStream,
                                 request.DownloadTimeout);
+
+                            // Copy over the content headers since we are replacing the HttpContent instance associated
+                            // with the response message.
+                            foreach (var header in response.Content.Headers)
+                            {
+                                newContent.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                            }
+
                             response.Content = newContent;
                         }
 

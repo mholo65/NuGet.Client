@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -9,11 +9,16 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NuGet.Common;
+using NuGet.PackageManagement.Telemetry;
 using NuGet.PackageManagement.VisualStudio;
 using NuGet.Packaging.Core;
 using NuGet.ProjectManagement;
 using NuGet.Protocol.Core.Types;
 using NuGet.VisualStudio;
+using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
+using Task = System.Threading.Tasks.Task;
 
 namespace NuGet.PackageManagement.UI
 {
@@ -25,6 +30,9 @@ namespace NuGet.PackageManagement.UI
         private readonly ISourceRepositoryProvider _sourceProvider;
         private readonly NuGetPackageManager _packageManager;
         private readonly INuGetLockService _lockService;
+
+        private const __VSCREATEWEBBROWSER CreateWebBrowserFlags = __VSCREATEWEBBROWSER.VSCWB_StartCustom | __VSCREATEWEBBROWSER.VSCWB_ReuseExisting | __VSCREATEWEBBROWSER.VSCWB_AutoShow;
+        private const string CreateWebBrowserOwnerGuidString = "192D4A62-3273-4C4F-9EB4-B53DAAFFCBFB";
 
         /// <summary>
         /// Create a UIActionEngine to perform installs/uninstalls
@@ -71,7 +79,7 @@ namespace NuGet.PackageManagement.UI
 
             await PerformActionImplAsync(
                 uiService,
-                () =>
+                (sourceCacheContext) =>
                 {
                     var projects = uiService.Projects;
 
@@ -86,7 +94,9 @@ namespace NuGet.PackageManagement.UI
                         uiService.DependencyBehavior,
                         includePrelease,
                         includeUnlisted,
-                        VersionConstraints.None);
+                        VersionConstraints.None,
+                        new GatherCache(),
+                        sourceCacheContext);
 
                     return GetActionsAsync(
                         uiService,
@@ -98,12 +108,107 @@ namespace NuGet.PackageManagement.UI
                         projectContext: uiService.ProjectContext,
                         token: token);
                 },
-                (actions) =>
+                (actions, sourceCacheContext) =>
                 {
-                    return ExecuteActionsAsync(actions, uiService.ProjectContext, uiService.CommonOperations, userAction, token);
+                    return ExecuteActionsAsync(actions, uiService.ProjectContext, uiService.CommonOperations, userAction, sourceCacheContext, token);
                 },
                 operationType,
                 token);
+        }
+
+        public async Task UpgradeNuGetProjectAsync(INuGetUI uiService, NuGetProject nuGetProject)
+        {
+            var context = uiService.UIContext;
+            // Restore the project before proceeding
+            var solutionDirectory = context.SolutionManager.SolutionDirectory;
+
+            await context.PackageRestoreManager.RestoreMissingPackagesInSolutionAsync(solutionDirectory, uiService.ProjectContext, CancellationToken.None);
+
+            var packagesDependencyInfo = await context.PackageManager.GetInstalledPackagesDependencyInfo(nuGetProject, CancellationToken.None, includeUnresolved: true);
+            var upgradeInformationWindowModel = new NuGetProjectUpgradeWindowModel(nuGetProject, packagesDependencyInfo.ToList());
+
+            var result = uiService.ShowNuGetUpgradeWindow(upgradeInformationWindowModel);
+            if (!result)
+            {
+                // raise upgrade telemetry event with Cancelled status
+                var packagesCount = upgradeInformationWindowModel.UpgradeDependencyItems.Count;
+
+                var upgradeTelemetryEvent = VSTelemetryServiceUtility.GetUpgradeTelemetryEvent(
+                    uiService.Projects,
+                    NuGetOperationStatus.Cancelled,
+                    packagesCount);
+
+                TelemetryActivity.EmitTelemetryEvent(upgradeTelemetryEvent);
+
+                return;
+            }
+
+            var progressDialogData = new ProgressDialogData(Resources.NuGetUpgrade_WaitMessage);
+            string backupPath;
+
+            var windowTitle = string.Format(
+                CultureInfo.CurrentCulture,
+                Resources.WindowTitle_NuGetMigrator,
+                NuGetProject.GetUniqueNameOrName(nuGetProject));
+
+            using (var progressDialogSession = context.StartModalProgressDialog(windowTitle, progressDialogData, uiService))
+            {
+                backupPath = await PackagesConfigToPackageReferenceMigrator.DoUpgradeAsync(
+                    context,
+                    uiService,
+                    nuGetProject,
+                    upgradeInformationWindowModel.UpgradeDependencyItems,
+                    upgradeInformationWindowModel.NotFoundPackages,
+                    progressDialogSession.Progress,
+                    progressDialogSession.UserCancellationToken);
+            }
+
+            if (!string.IsNullOrEmpty(backupPath))
+            {
+                var htmlLogFile = GenerateUpgradeReport(nuGetProject, backupPath, upgradeInformationWindowModel);
+
+                Process process = null;
+                try
+                {
+                    process = Process.Start(htmlLogFile);
+                }
+                catch { }
+            }
+        }
+
+        private static void OpenUrlInInternalWebBrowser(string url)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var webBrowsingService = Package.GetGlobalService(typeof(SVsWebBrowsingService)) as IVsWebBrowsingService;
+            if (webBrowsingService == null)
+            {
+                return;
+            }
+
+            var createWebBrowserOwnerGuid = new Guid(CreateWebBrowserOwnerGuidString);
+
+            webBrowsingService.CreateWebBrowser((uint)CreateWebBrowserFlags, ref createWebBrowserOwnerGuid, null, url, null, out var browser, out var frame);
+        }
+
+        private static string GenerateUpgradeReport(NuGetProject nuGetProject, string backupPath, NuGetProjectUpgradeWindowModel upgradeInformationWindowModel)
+        {
+            var projectName = NuGetProject.GetUniqueNameOrName(nuGetProject);
+            using (var upgradeLogger = new UpgradeLogger(projectName, backupPath))
+            {
+                var installedAsTopLevel = upgradeInformationWindowModel.UpgradeDependencyItems.Where(t => t.InstallAsTopLevel);
+                var transitiveDependencies = upgradeInformationWindowModel.TransitiveDependencies.Where(t => !t.InstallAsTopLevel);
+                foreach (var package in installedAsTopLevel)
+                {
+                    upgradeLogger.RegisterPackage(projectName, package.Id, package.Version, package.Issues, true);
+                }
+
+                foreach (var package in transitiveDependencies)
+                {
+                    upgradeLogger.RegisterPackage(projectName, package.Id, package.Version, package.Issues, false);
+                }
+
+                return upgradeLogger.GetHtmlFilePath();
+            }
         }
 
         /// <summary>
@@ -117,14 +222,14 @@ namespace NuGet.PackageManagement.UI
         {
             await PerformActionImplAsync(
                 uiService,
-                () =>
+                (sourceCacheContext) =>
                 {
                     return ResolveActionsForUpdateAsync(
                         uiService,
                         packagesToUpdate,
                         token);
                 },
-                async (actions) =>
+                async (actions, sourceCacheContext) =>
                 {
                     // Get all Nuget projects and actions and call ExecuteNugetProjectActions once for all the projects.
                     var nugetProjects = actions.Select(action => action.Project);
@@ -133,6 +238,7 @@ namespace NuGet.PackageManagement.UI
                         nugetProjects,
                         nugetActions,
                         uiService.ProjectContext,
+                        sourceCacheContext,
                         token);
                 },
                 NuGetOperationType.Update,
@@ -159,26 +265,30 @@ namespace NuGet.PackageManagement.UI
             var includePrerelease = packagesToUpdate.Where(
                 package => package.Version.IsPrerelease).Any();
 
-            var resolutionContext = new ResolutionContext(
-                uiService.DependencyBehavior,
-                includePrelease: includePrerelease,
-                includeUnlisted: true,
-                versionConstraints: VersionConstraints.None,
-                gatherCache: gatherCache);
+            using (var sourceCacheContext = new SourceCacheContext())
+            {
+                var resolutionContext = new ResolutionContext(
+                    uiService.DependencyBehavior,
+                    includePrelease: includePrerelease,
+                    includeUnlisted: true,
+                    versionConstraints: VersionConstraints.None,
+                    gatherCache: gatherCache,
+                    sourceCacheContext: sourceCacheContext);
 
-            var secondarySources = _sourceProvider.GetRepositories().Where(e => e.PackageSource.IsEnabled);
+                var secondarySources = _sourceProvider.GetRepositories().Where(e => e.PackageSource.IsEnabled);
 
-            var actions = await _packageManager.PreviewUpdatePackagesAsync(
-                packagesToUpdate,
-                uiService.Projects,
-                resolutionContext,
-                uiService.ProjectContext,
-                uiService.ActiveSources,
-                secondarySources,
-                token);
+                var actions = await _packageManager.PreviewUpdatePackagesAsync(
+                    packagesToUpdate,
+                    uiService.Projects,
+                    resolutionContext,
+                    uiService.ProjectContext,
+                    uiService.ActiveSources,
+                    secondarySources,
+                    token);
 
-            resolvedActions.AddRange(actions.Select(action => new ResolvedAction(action.Project, action))
-                .ToList());
+                resolvedActions.AddRange(actions.Select(action => new ResolvedAction(action.Project, action))
+                    .ToList());
+            }
 
             return resolvedActions;
         }
@@ -192,19 +302,17 @@ namespace NuGet.PackageManagement.UI
         /// the project actions.</param>
         private async Task PerformActionImplAsync(
             INuGetUI uiService,
-            Func<Task<IReadOnlyList<ResolvedAction>>> resolveActionsAsync,
-            Func<IReadOnlyList<ResolvedAction>, Task> executeActionsAsync,
+            Func<SourceCacheContext, Task<IReadOnlyList<ResolvedAction>>> resolveActionsAsync,
+            Func<IReadOnlyList<ResolvedAction>, SourceCacheContext, Task> executeActionsAsync,
             NuGetOperationType operationType,
             CancellationToken token)
         {
             var status = NuGetOperationStatus.Succeeded;
             var startTime = DateTimeOffset.Now;
             var packageCount = 0;
-            var operationId = Guid.NewGuid().ToString();
 
             // Enable granular level telemetry events for nuget ui operation
-            var telemetryService = new TelemetryServiceHelper();
-            uiService.ProjectContext.TelemetryService = telemetryService;
+            uiService.ProjectContext.OperationId = Guid.NewGuid();
 
             await _lockService.ExecuteNuGetOperationAsync(async () =>
             {
@@ -218,78 +326,81 @@ namespace NuGet.PackageManagement.UI
                         return;
                     }
 
-                    TelemetryUtility.StartorResumeTimer();
+                    TelemetryServiceUtility.StartOrResumeTimer();
 
-                    var actions = await resolveActionsAsync();
-                    var results = GetPreviewResults(actions);
-
-                    if (operationType == NuGetOperationType.Uninstall)
+                    using (var sourceCacheContext = new SourceCacheContext())
                     {
-                        packageCount = results.SelectMany(result => result.Deleted).
-                            Select(package => package.Id).Distinct().Count();
-                    }
-                    else
-                    {
-                        var addCount = results.SelectMany(result => result.Added).
-                            Select(package => package.Id).Distinct().Count();
+                        var actions = await resolveActionsAsync(sourceCacheContext);
+                        var results = GetPreviewResults(actions);
 
-                        var updateCount = results.SelectMany(result => result.Updated).
-                            Select(result => result.New.Id).Distinct().Count();
-
-                        // update packages count
-                        packageCount = addCount + updateCount;
-
-                        if (updateCount > 0)
+                        if (operationType == NuGetOperationType.Uninstall)
                         {
-                            // set operation type to update when there are packages being updated
-                            operationType = NuGetOperationType.Update;
+                            packageCount = results.SelectMany(result => result.Deleted).
+                                Select(package => package.Id).Distinct().Count();
                         }
-                    }
-
-                    TelemetryUtility.StopTimer();
-
-                    // Show the preview window.
-                    if (uiService.DisplayPreviewWindow)
-                    {
-                        var shouldContinue = uiService.PromptForPreviewAcceptance(results);
-                        if (!shouldContinue)
+                        else
                         {
-                            return;
+                            var addCount = results.SelectMany(result => result.Added).
+                                Select(package => package.Id).Distinct().Count();
+
+                            var updateCount = results.SelectMany(result => result.Updated).
+                                Select(result => result.New.Id).Distinct().Count();
+
+                            // update packages count
+                            packageCount = addCount + updateCount;
+
+                            if (updateCount > 0)
+                            {
+                                // set operation type to update when there are packages being updated
+                                operationType = NuGetOperationType.Update;
+                            }
                         }
-                    }
 
-                    TelemetryUtility.StartorResumeTimer();
+                        TelemetryServiceUtility.StopTimer();
 
-                    // Show the license acceptance window.
-                    var accepted = await CheckLicenseAcceptanceAsync(uiService, results, token);
+                        // Show the preview window.
+                        if (uiService.DisplayPreviewWindow)
+                        {
+                            var shouldContinue = uiService.PromptForPreviewAcceptance(results);
+                            if (!shouldContinue)
+                            {
+                                return;
+                            }
+                        }
 
-                    TelemetryUtility.StartorResumeTimer();
+                        TelemetryServiceUtility.StartOrResumeTimer();
 
-                    if (!accepted)
-                    {
-                        return;
-                    }
+                        // Show the license acceptance window.
+                        var accepted = await CheckLicenseAcceptanceAsync(uiService, results, token);
 
-                    // Warn about the fact that the "dotnet" TFM is deprecated.
-                    if (uiService.DisplayDeprecatedFrameworkWindow)
-                    {
-                        var shouldContinue = ShouldContinueDueToDotnetDeprecation(uiService, actions, token);
+                        TelemetryServiceUtility.StartOrResumeTimer();
 
-                        TelemetryUtility.StartorResumeTimer();
-
-                        if (!shouldContinue)
+                        if (!accepted)
                         {
                             return;
                         }
-                    }
 
-                    if (!token.IsCancellationRequested)
-                    {
-                        // execute the actions
-                        await executeActionsAsync(actions);
+                        // Warn about the fact that the "dotnet" TFM is deprecated.
+                        if (uiService.DisplayDeprecatedFrameworkWindow)
+                        {
+                            var shouldContinue = ShouldContinueDueToDotnetDeprecation(uiService, actions, token);
 
-                        // fires ActionsExecuted event to update the UI
-                        uiService.OnActionsExecuted(actions);
+                            TelemetryServiceUtility.StartOrResumeTimer();
+
+                            if (!shouldContinue)
+                            {
+                                return;
+                            }
+                        }
+
+                        if (!token.IsCancellationRequested)
+                        {
+                            // execute the actions
+                            await executeActionsAsync(actions, sourceCacheContext);
+
+                            // fires ActionsExecuted event to update the UI
+                            uiService.OnActionsExecuted(actions);
+                        }
                     }
                 }
                 catch (System.Net.Http.HttpRequestException ex)
@@ -311,16 +422,17 @@ namespace NuGet.PackageManagement.UI
                 }
                 finally
                 {
-                    TelemetryUtility.StopTimer();
+                    TelemetryServiceUtility.StopTimer();
 
-                    var duration = TelemetryUtility.GetTimerElapsedTime();
+                    var duration = TelemetryServiceUtility.GetTimerElapsedTime();
 
                     uiService.ProjectContext.Log(MessageLevel.Info,
                         string.Format(CultureInfo.CurrentCulture, Resources.Operation_TotalTime, duration));
 
                     uiService.EndOperation();
 
-                    var actionTelemetryEvent = TelemetryUtility.GetActionTelemetryEvent(
+                    var actionTelemetryEvent = VSTelemetryServiceUtility.GetActionTelemetryEvent(
+                        uiService.ProjectContext.OperationId.ToString(),
                         uiService.Projects,
                         operationType,
                         OperationSource.UI,
@@ -329,7 +441,7 @@ namespace NuGet.PackageManagement.UI
                         packageCount,
                         duration.TotalSeconds);
 
-                    ActionsTelemetryService.Instance.EmitActionEvent(actionTelemetryEvent, telemetryService.TelemetryEvents);
+                    TelemetryActivity.EmitTelemetryEvent(actionTelemetryEvent);
                 }
             }, token);
         }
@@ -419,7 +531,7 @@ namespace NuGet.PackageManagement.UI
             var sources = _sourceProvider.GetRepositories().Where(e => e.PackageSource.IsEnabled);
             var licenseMetadata = await GetPackageMetadataAsync(sources, licenseCheck, token);
 
-            TelemetryUtility.StopTimer();
+            TelemetryServiceUtility.StopTimer();
 
             // show license agreement
             if (licenseMetadata.Any(e => e.RequireLicenseAcceptance))
@@ -444,7 +556,7 @@ namespace NuGet.PackageManagement.UI
         {
             var projects = DotnetDeprecatedPrompt.GetAffectedProjects(actions);
 
-            TelemetryUtility.StopTimer();
+            TelemetryServiceUtility.StopTimer();
 
             if (projects.Any())
             {
@@ -461,7 +573,8 @@ namespace NuGet.PackageManagement.UI
             IEnumerable<ResolvedAction> actions,
             INuGetProjectContext projectContext, 
             ICommonOperations commonOperations,
-            UserAction userAction, 
+            UserAction userAction,
+            SourceCacheContext sourceCacheContext,
             CancellationToken token)
         {
             var processedDirectInstalls = new HashSet<PackageIdentity>(PackageIdentity.Comparer);
@@ -475,7 +588,7 @@ namespace NuGet.PackageManagement.UI
                     NuGetPackageManager.SetDirectInstall(directInstall, projectContext);
                     processedDirectInstalls.Add(directInstall);
                 }
-                await _packageManager.ExecuteNuGetProjectActionsAsync(projectActions.Key, nuGetProjectActions, projectContext, token);
+                await _packageManager.ExecuteNuGetProjectActionsAsync(projectActions.Key, nuGetProjectActions, projectContext, sourceCacheContext, token);
                 NuGetPackageManager.ClearDirectInstall(projectContext);
             }
         }
@@ -651,27 +764,29 @@ namespace NuGet.PackageManagement.UI
 
             var allPackages = packages.ToArray();
 
-            // first check all the packages with local sources.
-            var completed = (await TaskCombinators.ThrottledAsync(
-                allPackages,
-                (p, t) => GetPackageMetadataAsync(localSources, p, t),
-                token)).Where(metadata => metadata != null).ToArray();
-
-            results.AddRange(completed);
-
-            if (completed.Length != allPackages.Length)
+            using (var sourceCacheContext = new SourceCacheContext())
             {
-                // get remaining package's metadata from remote repositories
-                var remainingPackages = allPackages.Where(package => !completed.Any(pack => pack.Identity.Equals(package)));
-
-                var remoteResults = (await TaskCombinators.ThrottledAsync(
-                    remainingPackages,
-                    (p, t) => GetPackageMetadataAsync(sources, p, t),
+                // first check all the packages with local sources.
+                var completed = (await TaskCombinators.ThrottledAsync(
+                    allPackages,
+                    (p, t) => GetPackageMetadataAsync(localSources, sourceCacheContext, p, t),
                     token)).Where(metadata => metadata != null).ToArray();
 
-                results.AddRange(remoteResults);
-            }
+                results.AddRange(completed);
 
+                if (completed.Length != allPackages.Length)
+                {
+                    // get remaining package's metadata from remote repositories
+                    var remainingPackages = allPackages.Where(package => !completed.Any(pack => pack.Identity.Equals(package)));
+
+                    var remoteResults = (await TaskCombinators.ThrottledAsync(
+                        remainingPackages,
+                        (p, t) => GetPackageMetadataAsync(sources, sourceCacheContext, p, t),
+                        token)).Where(metadata => metadata != null).ToArray();
+
+                    results.AddRange(remoteResults);
+                }
+            }
             // check if missing metadata for any package
             if (allPackages.Length != results.Count)
             {
@@ -692,6 +807,7 @@ namespace NuGet.PackageManagement.UI
 
         private static async Task<IPackageSearchMetadata> GetPackageMetadataAsync(
             IEnumerable<SourceRepository> sources,
+            SourceCacheContext sourceCacheContext,
             PackageIdentity package,
             CancellationToken token)
         {
@@ -709,6 +825,7 @@ namespace NuGet.PackageManagement.UI
                 {
                     var packageMetadata = await metadataResource.GetMetadataAsync(
                         package,
+                        sourceCacheContext,
                         log: Common.NullLogger.Instance,
                         token: token);
                     if (packageMetadata != null)

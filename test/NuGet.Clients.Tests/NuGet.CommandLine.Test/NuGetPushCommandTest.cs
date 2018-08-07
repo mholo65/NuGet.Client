@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -128,9 +128,13 @@ namespace NuGet.CommandLine.Test
         {
             string nugetexe = Util.GetNuGetExePath();
 
-            using (TestDirectory packageDirectory = TestDirectory.Create())
-            using (TestDirectory source = TestDirectory.Create())
+            using (var root = TestDirectory.Create())
             {
+                var packageDirectory = Path.Combine(root, "packages");
+                var source = Path.Combine(root, "source");
+                Directory.CreateDirectory(packageDirectory);
+                Directory.CreateDirectory(source);
+
                 // Arrange
                 string packageFileName = Util.CreateTestPackage("testPackage1", "1.1.0", packageDirectory);
                 string config = $@"<?xml version='1.0' encoding='utf-8'?>
@@ -949,15 +953,14 @@ namespace NuGet.CommandLine.Test
         }
 
         // Test push command to a server using Plugin credential provider
-        [Fact]
+        [SkipMono]
         public void PushCommand_PushToServer_GetCredentialFromPlugin()
         {
             var nugetexe = Util.GetNuGetExePath();
 
             var pluginDirectory = Util.GetTestablePluginDirectory();
-
-            List<string> credentialForGetRequest = new List<string>();
-            List<string> credentialForPutRequest = new List<string>();
+            
+            
 
             using (var packageDirectory = TestDirectory.Create())
             {
@@ -967,12 +970,13 @@ namespace NuGet.CommandLine.Test
 
                 using (var server = new MockServer())
                 {
+                    var credentialForPutRequest = new List<string>();
                     server.Listener.AuthenticationSchemes = AuthenticationSchemes.Basic;
                     server.Put.Add("/nuget", r => new Action<HttpListenerResponse>(res =>
                     {
                         var h = r.Headers["Authorization"];
                         var credential = Encoding.Default.GetString(Convert.FromBase64String(h.Substring(6)));
-                        credentialForPutRequest.Add(credential);
+                        credentialForPutRequest.Insert(0, credential);
 
                         if (credential.Equals("testuser:testpassword", StringComparison.OrdinalIgnoreCase))
                         {
@@ -1009,8 +1013,7 @@ namespace NuGet.CommandLine.Test
 
                     // Assert
                     Assert.True(0 == r1.Item1, r1.Item2 + " " + r1.Item3);
-
-                    Assert.Equal(1, credentialForPutRequest.Count);
+                    Assert.NotEqual(0, credentialForPutRequest.Count);
                     Assert.Equal("testuser:testpassword", credentialForPutRequest[0]);
                 }
             }
@@ -1018,14 +1021,12 @@ namespace NuGet.CommandLine.Test
 
         // Test push command to a server, plugin provider does not provide credentials
         // so fallback to console provider
-        [Fact]
+        [SkipMono]
         public void PushCommand_PushToServer_WhenPluginReturnsNoCredentials_FallBackToConsoleProvider()
         {
             var nugetexe = Util.GetNuGetExePath();
             var pluginDirectory = Util.GetTestablePluginDirectory();
-
-            List<string> credentialForGetRequest = new List<string>();
-            List<string> credentialForPutRequest = new List<string>();
+                        
 
             using (var packageDirectory = TestDirectory.Create())
             {
@@ -1035,12 +1036,13 @@ namespace NuGet.CommandLine.Test
 
                 using (var server = new MockServer())
                 {
+                    var credentialForPutRequest = new List<string>();
                     server.Listener.AuthenticationSchemes = AuthenticationSchemes.Basic;
                     server.Put.Add("/nuget", r => new Action<HttpListenerResponse>(res =>
                     {
                         var h = r.Headers["Authorization"];
                         var credential = Encoding.Default.GetString(Convert.FromBase64String(h.Substring(6)));
-                        credentialForPutRequest.Add(credential);
+                        credentialForPutRequest.Insert(0,credential);
                         if (credential.Equals("testuser:testpassword", StringComparison.OrdinalIgnoreCase))
                         {
                             res.StatusCode = (int)HttpStatusCode.OK;
@@ -1078,7 +1080,7 @@ namespace NuGet.CommandLine.Test
 
                     // Assert
                     Assert.True(0 == r1.Item1, r1.Item2 + " " + r1.Item3);
-                    Assert.Equal(1, credentialForPutRequest.Count);
+                    Assert.NotEqual(0, credentialForPutRequest.Count);
                     Assert.Equal("testuser:testpassword", credentialForPutRequest[0]);
                 }
             }
@@ -2069,7 +2071,7 @@ namespace NuGet.CommandLine.Test
 
         }
 
-        public static IEnumerable<string[]> ServerWarningData
+        public static IEnumerable<object[]> ServerWarningData
         {
             get
             {

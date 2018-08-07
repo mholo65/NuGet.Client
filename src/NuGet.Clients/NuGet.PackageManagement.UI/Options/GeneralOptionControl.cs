@@ -59,13 +59,25 @@ namespace NuGet.Options
                     showPackageManagementChooser.Checked = packageManagement.Enabled;
 #endif
                 }
-                catch (InvalidOperationException)
+                // Thrown during creating or saving NuGet.Config.
+                catch (NuGetConfigurationException ex)
                 {
-                    MessageHelper.ShowErrorMessage(Resources.ShowError_ConfigInvalidOperation, Resources.ErrorDialogBoxTitle);
-               } 
+                    MessageHelper.ShowErrorMessage(ex.Message, Resources.ErrorDialogBoxTitle);
+                }
+                // Thrown if no nuget.config found.
+                catch (InvalidOperationException ex)
+                {
+                    MessageHelper.ShowErrorMessage(ex.Message, Resources.ErrorDialogBoxTitle);
+                }
                 catch (UnauthorizedAccessException)
                 {
                     MessageHelper.ShowErrorMessage(Resources.ShowError_ConfigUnauthorizedAccess, Resources.ErrorDialogBoxTitle);
+                }
+                // Unknown exception.
+                catch (Exception ex)
+                {
+                    MessageHelper.ShowErrorMessage(Resources.ShowError_SettingActivatedFailed, Resources.ErrorDialogBoxTitle);
+                    ActivityLog.LogError(NuGetUI.LogEntrySource, ex.ToString());
                 }
             }
 
@@ -90,14 +102,28 @@ namespace NuGet.Options
                 packageManagement.ApplyChanges();
 #endif
             }
-            catch (InvalidOperationException)
+            // Thrown during creating or saving NuGet.Config.
+            catch (NuGetConfigurationException ex)
             {
-                MessageHelper.ShowErrorMessage(Resources.ShowError_ConfigInvalidOperation, Resources.ErrorDialogBoxTitle);
+                MessageHelper.ShowErrorMessage(ex.Message, Resources.ErrorDialogBoxTitle);
+                return false;
+            }
+            // Thrown if no nuget.config found.
+            catch (InvalidOperationException ex)
+            {
+                MessageHelper.ShowErrorMessage(ex.Message, Resources.ErrorDialogBoxTitle);
                 return false;
             }
             catch (UnauthorizedAccessException)
             {
                 MessageHelper.ShowErrorMessage(Resources.ShowError_ConfigUnauthorizedAccess, Resources.ErrorDialogBoxTitle);
+                return false;
+            }
+            // Unknown exception.
+            catch (Exception ex)
+            {
+                MessageHelper.ShowErrorMessage(Resources.ShowError_ApplySettingFailed, Resources.ErrorDialogBoxTitle);
+                ActivityLog.LogError(NuGetUI.LogEntrySource, ex.ToString());
                 return false;
             }
 

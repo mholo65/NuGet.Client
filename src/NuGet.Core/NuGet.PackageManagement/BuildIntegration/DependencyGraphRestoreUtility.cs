@@ -10,15 +10,11 @@ using System.Threading.Tasks;
 using NuGet.Commands;
 using NuGet.Common;
 using NuGet.Configuration;
-using NuGet.LibraryModel;
-using NuGet.Packaging;
-using NuGet.Packaging.Core;
 using NuGet.ProjectManagement;
 using NuGet.ProjectManagement.Projects;
 using NuGet.ProjectModel;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
-using NuGet.Shared;
 
 namespace NuGet.PackageManagement
 {
@@ -38,6 +34,7 @@ namespace NuGet.PackageManagement
             RestoreCommandProvidersCache providerCache,
             Action<SourceCacheContext> cacheContextModifier,
             IEnumerable<SourceRepository> sources,
+            Guid parentId,
             bool forceRestore,
             DependencyGraphSpec dgSpec,
             ILogger log,
@@ -57,11 +54,14 @@ namespace NuGet.PackageManagement
                         sourceCacheContext,
                         sources,
                         dgSpec,
+                        parentId,
                         forceRestore);
 
                     var restoreSummaries = await RestoreRunner.RunAsync(restoreContext, token);
 
                     RestoreSummary.Log(log, restoreSummaries);
+
+                    await PersistDGSpec(dgSpec);
 
                     return restoreSummaries;
                 }
@@ -79,6 +79,7 @@ namespace NuGet.PackageManagement
             RestoreCommandProvidersCache providerCache,
             Action<SourceCacheContext> cacheContextModifier,
             IEnumerable<SourceRepository> sources,
+            Guid parentId,
             bool forceRestore,
             ILogger log,
             CancellationToken token)
@@ -97,6 +98,7 @@ namespace NuGet.PackageManagement
                         sourceCacheContext,
                         sources,
                         dgSpec,
+                        parentId,
                         forceRestore: forceRestore);
 
                     var restoreSummaries = await RestoreRunner.RunAsync(restoreContext, token);
@@ -110,6 +112,28 @@ namespace NuGet.PackageManagement
             return new List<RestoreSummary>();
         }
 
+        private static async Task PersistDGSpec(DependencyGraphSpec dgSpec)
+        {
+            try
+            {
+                var filePath = Path.Combine(
+                        NuGetEnvironment.GetFolderPath(NuGetFolderPath.Temp),
+                        "nuget-dg",
+                        "nugetSpec.dg");
+
+                // create nuget temp folder if not exists
+                DirectoryUtility.CreateSharedDirectory(Path.GetDirectoryName(filePath));
+
+                // delete existing dg spec file (if exists) then replace it with new file.
+                await FileUtility.ReplaceWithLock(
+                    (tempFile) => dgSpec.Save(tempFile), filePath);
+            }
+            catch (Exception)
+            {
+                //ignore any failure if it fails to write or replace dg spec file.
+            }
+        }
+
         /// <summary>
         /// Restore without writing the lock file
         /// </summary>
@@ -121,6 +145,7 @@ namespace NuGet.PackageManagement
             RestoreCommandProvidersCache providerCache,
             Action<SourceCacheContext> cacheContextModifier,
             IEnumerable<SourceRepository> sources,
+            Guid parentId,
             ILogger log,
             CancellationToken token)
         {
@@ -141,7 +166,7 @@ namespace NuGet.PackageManagement
                 cacheContextModifier(sourceCacheContext);
 
                 // Settings passed here will be used to populate the restore requests.
-                var restoreContext = GetRestoreContext(context, providerCache, sourceCacheContext, sources, dgFile, forceRestore : true);
+                var restoreContext = GetRestoreContext(context, providerCache, sourceCacheContext, sources, dgFile, parentId, forceRestore: true);
 
                 var requests = await RestoreRunner.GetRequests(restoreContext);
                 var results = await RestoreRunner.RunWithoutCommit(requests, restoreContext);
@@ -150,7 +175,7 @@ namespace NuGet.PackageManagement
         }
 
         /// <summary>
-        /// Restore a build integrated project and update the lock file
+        /// Restore a build integrated project(PackageReference and Project.Json only) and update the lock file
         /// </summary>
         public static async Task<RestoreResult> RestoreProjectAsync(
             ISolutionManager solutionManager,
@@ -159,13 +184,14 @@ namespace NuGet.PackageManagement
             RestoreCommandProvidersCache providerCache,
             Action<SourceCacheContext> cacheContextModifier,
             IEnumerable<SourceRepository> sources,
+            Guid parentId,
             ILogger log,
             CancellationToken token)
         {
             // Restore
             var specs = await project.GetPackageSpecsAsync(context);
             var spec = specs.Single(e => e.RestoreMetadata.ProjectStyle == ProjectStyle.PackageReference
-                || e.RestoreMetadata.ProjectStyle == ProjectStyle.ProjectJson);
+                || e.RestoreMetadata.ProjectStyle == ProjectStyle.ProjectJson); // Do not restore global tools Project Style in VS. 
 
             var result = await PreviewRestoreAsync(
                 solutionManager,
@@ -175,6 +201,7 @@ namespace NuGet.PackageManagement
                 providerCache,
                 cacheContextModifier,
                 sources,
+                parentId,
                 log,
                 token);
 
@@ -218,20 +245,7 @@ namespace NuGet.PackageManagement
         {
             var dgSpec = new DependencyGraphSpec();
 
-            foreach (var packageSpec in context.DeferredPackageSpecs)
-            {
-                dgSpec.AddProject(packageSpec);
-
-                if (packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.PackageReference ||
-                    packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.ProjectJson ||
-                    packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.DotnetCliTool ||
-                    packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.Standalone)
-                {
-                    dgSpec.AddRestore(packageSpec.RestoreMetadata.ProjectUniqueName);
-                }
-            }
-
-            var projects = solutionManager.GetNuGetProjects().OfType<IDependencyGraphProject>();
+            var projects = (await solutionManager.GetNuGetProjectsAsync()).OfType<IDependencyGraphProject>();
 
             foreach (var project in projects)
             {
@@ -244,7 +258,7 @@ namespace NuGet.PackageManagement
                     if (packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.PackageReference ||
                         packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.ProjectJson ||
                         packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.DotnetCliTool ||
-                        packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.Standalone)
+                        packageSpec.RestoreMetadata.ProjectStyle == ProjectStyle.Standalone) // Don't add global tools to restore specs for solutions
                     {
                         dgSpec.AddRestore(packageSpec.RestoreMetadata.ProjectUniqueName);
                     }
@@ -263,6 +277,7 @@ namespace NuGet.PackageManagement
             SourceCacheContext sourceCacheContext,
             IEnumerable<SourceRepository> sources,
             DependencyGraphSpec dgFile,
+            Guid parentId,
             bool forceRestore)
         {
             var caching = new CachingSourceProvider(new PackageSourceProvider(context.Settings));
@@ -279,7 +294,8 @@ namespace NuGet.PackageManagement
                 PreLoadedRequestProviders = new List<IPreLoadedRestoreRequestProvider>() { dgProvider },
                 Log = context.Logger,
                 AllowNoOp = !forceRestore,
-                CachingSourceProvider = caching
+                CachingSourceProvider = caching,
+                ParentId = parentId
             };
 
             return restoreContext;

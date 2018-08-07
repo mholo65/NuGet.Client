@@ -1,7 +1,8 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Diagnostics;
 using Microsoft.Build.Framework;
 using NuGet.Commands;
 using NuGet.Common;
@@ -20,6 +21,7 @@ namespace NuGet.Build.Tasks.Pack
         public string[] TargetFrameworks { get; set; }
         public string[] PackageTypes { get; set; }
         public ITaskItem[] BuildOutputInPackage { get; set; }
+        public ITaskItem[] ProjectReferencesWithVersions { get; set; }
         public string PackageId { get; set; }
         public string PackageVersion { get; set; }
         public string Title { get; set; }
@@ -42,6 +44,8 @@ namespace NuGet.Build.Tasks.Pack
         public bool IncludeSource { get; set; }
         public string RepositoryUrl { get; set; }
         public string RepositoryType { get; set; }
+        public string RepositoryBranch { get; set; }
+        public string RepositoryCommit { get; set; }
         public ITaskItem[] SourceFiles { get; set; }
         public bool NoPackageAnalysis { get; set; }
         public string NuspecFile { get; set; }
@@ -55,7 +59,11 @@ namespace NuGet.Build.Tasks.Pack
         public string[] ContentTargetFolders { get; set; }
         public string[] NuspecProperties { get; set; }
         public string NuspecBasePath { get; set; }
-
+        public string[] AllowedOutputExtensionsInPackageBuildOutputFolder { get; set; }
+        public string[] AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder { get; set; }
+        public string NoWarn { get; set; }
+        public string TreatWarningsAsErrors { get; set; }
+        public string WarningsAsErrors { get; set; }
         public ILogger Logger => new MSBuildLogger(Log);
 
         private IPackTaskLogic _packTaskLogic;
@@ -85,6 +93,25 @@ namespace NuGet.Build.Tasks.Pack
         {
             try
             {
+#if DEBUG
+                var debugPackTask = Environment.GetEnvironmentVariable("DEBUG_PACK_TASK");
+                if (!string.IsNullOrEmpty(debugPackTask) && debugPackTask.Equals(bool.TrueString, StringComparison.OrdinalIgnoreCase))
+                {
+#if IS_CORECLR
+                    Console.WriteLine("Waiting for debugger to attach.");
+                    Console.WriteLine($"Process ID: {Process.GetCurrentProcess().Id}");
+
+                    while (!Debugger.IsAttached)
+                    {
+                        System.Threading.Thread.Sleep(100);
+                    }
+                    Debugger.Break();
+#else
+            Debugger.Launch();
+#endif
+                }
+#endif
+
                 var request = GetRequest();
                 var logic = PackTaskLogic;
                 PackageBuilder packageBuilder = null;
@@ -107,7 +134,7 @@ namespace NuGet.Build.Tasks.Pack
                 ExceptionUtilities.LogException(ex, Logger);
                 return false;
             }
-            
+
         }
 
         /// <summary>
@@ -119,6 +146,8 @@ namespace NuGet.Build.Tasks.Pack
         {
             return new PackTaskRequest
             {
+                AllowedOutputExtensionsInPackageBuildOutputFolder = MSBuildStringUtility.TrimAndExcludeNullOrEmpty(AllowedOutputExtensionsInPackageBuildOutputFolder),
+                AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder = MSBuildStringUtility.TrimAndExcludeNullOrEmpty(AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder),
                 AssemblyName = MSBuildStringUtility.TrimAndGetNullForEmpty(AssemblyName),
                 Authors = MSBuildStringUtility.TrimAndExcludeNullOrEmpty(Authors),
                 BuildOutputInPackage = MSBuildUtility.WrapMSBuildItem(BuildOutputInPackage),
@@ -149,10 +178,13 @@ namespace NuGet.Build.Tasks.Pack
                 PackageTypes = MSBuildStringUtility.TrimAndExcludeNullOrEmpty(PackageTypes),
                 PackageVersion = MSBuildStringUtility.TrimAndGetNullForEmpty(PackageVersion),
                 PackItem = MSBuildUtility.WrapMSBuildItem(PackItem),
+                ProjectReferencesWithVersions = MSBuildUtility.WrapMSBuildItem(ProjectReferencesWithVersions),
                 ProjectUrl = MSBuildStringUtility.TrimAndGetNullForEmpty(ProjectUrl),
                 ReleaseNotes = MSBuildStringUtility.TrimAndGetNullForEmpty(ReleaseNotes),
                 RepositoryType = MSBuildStringUtility.TrimAndGetNullForEmpty(RepositoryType),
                 RepositoryUrl = MSBuildStringUtility.TrimAndGetNullForEmpty(RepositoryUrl),
+                RepositoryBranch = MSBuildStringUtility.TrimAndGetNullForEmpty(RepositoryBranch),
+                RepositoryCommit = MSBuildStringUtility.TrimAndGetNullForEmpty(RepositoryCommit),
                 RequireLicenseAcceptance = RequireLicenseAcceptance,
                 RestoreOutputPath = MSBuildStringUtility.TrimAndGetNullForEmpty(RestoreOutputPath),
                 Serviceable = Serviceable,
@@ -160,7 +192,10 @@ namespace NuGet.Build.Tasks.Pack
                 Tags = MSBuildStringUtility.TrimAndExcludeNullOrEmpty(Tags),
                 TargetFrameworks = MSBuildStringUtility.TrimAndExcludeNullOrEmpty(TargetFrameworks),
                 TargetPathsToSymbols = MSBuildUtility.WrapMSBuildItem(TargetPathsToSymbols),
-                Title = MSBuildStringUtility.TrimAndGetNullForEmpty(Title)
+                Title = MSBuildStringUtility.TrimAndGetNullForEmpty(Title),
+                TreatWarningsAsErrors = MSBuildStringUtility.TrimAndGetNullForEmpty(TreatWarningsAsErrors),
+                NoWarn = MSBuildStringUtility.TrimAndGetNullForEmpty(NoWarn),
+                WarningsAsErrors = MSBuildStringUtility.TrimAndGetNullForEmpty(WarningsAsErrors)
             };
         }
     }

@@ -1,23 +1,26 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'README.md'))\build\common.props" />
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.3;net45</TargetFrameworks>
+    <TargetFrameworks>netstandard1.6;net46</TargetFrameworks>
+    <TargetFrameworks Condition="'$(IsBuildOnlyXPLATProjects)' == 'true'">netstandard1.6</TargetFrameworks>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AssemblyName>NuGet.Build.Tasks.Pack</AssemblyName>
     <RootNamespace>$(AssemblyName)</RootNamespace>
-    <NetStandardImplicitPackageVersion Condition=" '$(TargetFramework)' == 'netstandard1.3' ">$(NetStandardPackageVersion)</NetStandardImplicitPackageVersion>
     <Shipping>true</Shipping>
     <PackProject>true</PackProject>
     <NoBuild>true</NoBuild>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+    <PreserveCompilationContext>true</PreserveCompilationContext>
+    <XPLATProject>true</XPLATProject>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="..\NuGet.Build.Tasks\Common\MSBuildLogger.cs" />
-    <Content Include="Pack.targets">
-       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <Compile Include="..\NuGet.Build.Tasks\GetProjectTargetFrameworksTask.cs" />
+    <Content Include="NuGet.Build.Tasks.Pack.targets">		
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>		
     </Content>
   </ItemGroup>
 
@@ -25,17 +28,17 @@
     <ProjectReference Include="..\NuGet.Commands\NuGet.Commands.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net45' ">
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net46' ">
     <Reference Include="Microsoft.Build.Utilities.v4.0" />
     <Reference Include="Microsoft.Build.Framework" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.3' ">
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.6' ">
     <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildPackageVersion)" />
     <PackageReference Include="Microsoft.Build.Tasks.Core" Version="$(MicrosoftBuildPackageVersion)" />
     <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildPackageVersion)" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <Compile Update="Strings.Designer.cs">
       <DesignTime>True</DesignTime>
@@ -51,23 +54,46 @@
     </EmbeddedResource>
   </ItemGroup>
 
-  <Target Name="PublishAndMergePackNupkg" AfterTargets="AfterBuild" Condition="'$(TargetFramework)' != '' AND '$(IsXPlat)' == 'false' AND '$(BuildingInsideVisualStudio)' != 'true'">
-    <MSBuild
-      Projects="$(MSBuildProjectFullPath)"
-      Targets="Publish;ILMergeNuGetPack"/>
+  <Target Name="PublishAndMergePackNupkg" AfterTargets="AfterBuild" Condition="'$(TargetFramework)' != '' AND '$(IsXPlat)' != 'true' AND '$(IsBuildOnlyXPLATProjects)' != 'true' AND '$(BuildingInsideVisualStudio)' != 'true'">
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Publish;ILMergeNuGetPack" />
   </Target>
 
-  <Target Name="ILMergeNuGetPack"  Condition="'$(TargetFramework)' != ''">
+  <Target Name="ILMergeNuGetPackResourcesPerCulture" DependsOnTargets="Publish">
+    <ItemGroup>
+      <_PackResourceDlls Include="$(OutputPath)**\$(AssemblyName).resources.dll" />
+    </ItemGroup>
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="ILMergeNuGetPackResources" Properties="CurrentCulture=%(_PackResourceDlls.RecursiveDir);&#xD;&#xA;                  BuildProjectReferences=false">
+    </MSBuild>
+  </Target>
+
+  <Target Name="ILMergeNuGetPack" Condition="'$(TargetFramework)' != '' AND '$(IsBuildOnlyXPLATProjects)' != 'true' ">
     <PropertyGroup>
       <ILMergeResultDir>$(OutputPath)ilmerge</ILMergeResultDir>
     </PropertyGroup>
-    <MakeDir Directories="$(ILMergeResultDir)"/>
+    <MakeDir Directories="$(ILMergeResultDir)" />
     <ItemGroup>
       <BuildArtifacts Include="$(OutputPath)*.dll" Exclude="$(OutputPath)*Pack.dll" />
     </ItemGroup>
     <PropertyGroup>
       <PathToMergedNuGetPack>$(ILMergeResultDir)\NuGet.Build.Tasks.Pack.dll</PathToMergedNuGetPack>
-      <IlmergeCommand>$(ILMergeExePath) $(OutputPath)NuGet.Build.Tasks.Pack.dll @(BuildArtifacts, ' ') /out:$(PathToMergedNuGetPack) /lib:$(DotnetSharedSDKDirectory) /lib:$(OutputPath)$(RuntimeIdentifier)\publish /internalize /xmldocs /log:$(ILMergeResultDir)\IlMergeLog.txt</IlmergeCommand>
+      <DotnetSharedDirectoryArg Condition="'$(IsCore)' == 'true'">/lib:$(DotnetSharedSDKDirectory)</DotnetSharedDirectoryArg>
+      <IlmergeCommand>$(ILMergeExePath) $(OutputPath)NuGet.Build.Tasks.Pack.dll @(BuildArtifacts, ' ') /out:$(PathToMergedNuGetPack) $(DotnetSharedDirectoryArg) /lib:$(OutputPath)$(RuntimeIdentifier)\publish /internalize /xmldocs /log:$(ILMergeResultDir)\IlMergeLog.txt</IlmergeCommand>
+      <IlmergeCommand Condition="Exists($(MS_PFX_PATH))">$(IlmergeCommand) /delaysign /keyfile:$(MS_PFX_PATH)</IlmergeCommand>
+    </PropertyGroup>
+    <Exec Command="$(IlmergeCommand)" ContinueOnError="false" />
+  </Target>
+
+  <Target Name="ILMergeNuGetPackResources" Condition="'$(TargetFramework)' != '' AND '$(CurrentCulture)' != ''">
+    <PropertyGroup>
+      <ILMergeResultDir>$(OutputPath)ilmerge\$(CurrentCulture)</ILMergeResultDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(ILMergeResultDir)" />
+    <ItemGroup>
+      <ResourceArtifacts Include="$(OutputPath)$(CurrentCulture)NuGet*.resources.dll" Exclude="$(OutputPath)$(CurrentCulture)*Pack.resources.dll" />
+    </ItemGroup>
+    <PropertyGroup>
+      <PathToMergedNuGetPackResource>$(ILMergeResultDir)NuGet.Build.Tasks.Pack.resources.dll</PathToMergedNuGetPackResource>
+      <IlmergeCommand>$(ILMergeExePath) $(OutputPath)$(CurrentCulture)NuGet.Build.Tasks.Pack.resources.dll @(ResourceArtifacts, ' ') /out:$(PathToMergedNuGetPackResource) /lib:$(OutputPath)$(RuntimeIdentifier)\publish /internalize /xmldocs /log:$(ILMergeResultDir)IlMergeLog.txt</IlmergeCommand>
       <IlmergeCommand Condition="Exists($(MS_PFX_PATH))">$(IlmergeCommand) /delaysign /keyfile:$(MS_PFX_PATH)</IlmergeCommand>
     </PropertyGroup>
     <Exec Command="$(IlmergeCommand)" ContinueOnError="false" />
@@ -76,12 +102,12 @@
   <Import Project="$(BuildCommonDirectory)common.targets" />
   
   <PropertyGroup>
-    <SignTargetsForRealSigning>GetIlmergeBuildOutput</SignTargetsForRealSigning>
-    <SymbolTargetsToGetPdbs>GetIlmergeSymbolOutput</SymbolTargetsToGetPdbs>
+    <SignTargetsForRealSigning Condition="'$(IsSymbolsBuild)' != 'true'">GetIlmergeBuildOutput</SignTargetsForRealSigning>
+    <SymbolTargetsToGetPdbs>GetIlmergeSymbolOutput;GetFinalBuildOutput</SymbolTargetsToGetPdbs>
   </PropertyGroup>
   
   <!--These targets help get all the DLLs that are packed in the nuspec to be sent for signing.-->
-  <Target Name="GetIlmergeBuildOutput" DependsOnTargets="_GetDllsInOutputDirectory" Returns="@(DllsToSign)">
+  <Target Name="GetIlmergeBuildOutput" DependsOnTargets="ILMergeNuGetPackResourcesPerCulture;_GetDllsInOutputDirectory" Returns="@(DllsToSign)">
     <ItemGroup>
       <DllsToSign Include="@(DllsInOutputDir)" KeepDuplicates="false" />
     </ItemGroup>
@@ -102,9 +128,16 @@
       <SymbolsToIndex Include="$(OutputPath)ilmerge\*.pdb" KeepDuplicates="false" />
     </ItemGroup>
   </Target>
-  
+
+  <Target Name="GetFinalBuildOutput" Returns="@(DllsToIndex)">
+    <ItemGroup>
+      <DllsToIndex Include="$(OutputPath)ilmerge\NuGet.Build.Tasks.Pack.dll"/>
+    </ItemGroup>
+  </Target>
+
   <PropertyGroup>
-    <NuspecFile>NuGet.Build.Tasks.Pack.nuspec</NuspecFile>
+    <NuspecFile Condition="'$(IsBuildOnlyXPLATProjects)' == 'true'">NuGet.Build.Tasks.Pack.XPlat.nuspec</NuspecFile>
+    <NuspecFile Condition="'$(IsBuildOnlyXPLATProjects)' != 'true'">NuGet.Build.Tasks.Pack.nuspec</NuspecFile>
     <NuspecProperties>version=$(Version);configuration=$(Configuration)</NuspecProperties>
     <NuspecBasePath>$(OutputPath)</NuspecBasePath>
   </PropertyGroup>

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -80,7 +80,7 @@ namespace NuGet.Frameworks
 
         public override bool Equals(object obj)
         {
-            return Equals(obj as FallbackFramework);
+            return Equals(obj as AssetTargetFallbackFramework);
         }
 
         public override int GetHashCode()
@@ -92,11 +92,11 @@ namespace NuGet.Frameworks
                 // Ensure that this is different from a FallbackFramework;
                 combiner.AddStringIgnoreCase("assettargetfallback");
 
-                combiner.AddInt32(NuGetFramework.Comparer.GetHashCode(this));
+                combiner.AddObject(Comparer.GetHashCode(this));
 
                 foreach (var each in Fallback)
                 {
-                    combiner.AddInt32(NuGetFramework.Comparer.GetHashCode(each));
+                    combiner.AddObject(Comparer.GetHashCode(each));
                 }
 
                 _hashCode = combiner.CombinedHash;

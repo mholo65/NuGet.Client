@@ -22,9 +22,9 @@ namespace NuGet.VisualStudio
         string AssetTargetFallback { get; }
 
         /// <summary>
-        /// BaseIntermediateOutputPath project property (e.g. c:\projFoo\obj)
+        /// MSBuildProjectExtensionsPath project property (e.g. c:\projFoo\obj)
         /// </summary>
-        string BaseIntermediateOutputPath { get; }
+        string MSBuildProjectExtensionsPath { get; }
 
         IProjectBuildProperties BuildProperties { get; }
 
@@ -63,8 +63,6 @@ namespace NuGet.VisualStudio
         string ProjectName { get; }
 
         ProjectNames ProjectNames { get; }
-
-        string[] ProjectTypeGuids { get; }
 
         /// <summary>
         /// Additional fallback folders DTE property
@@ -109,6 +107,8 @@ namespace NuGet.VisualStudio
         /// Comma or Semicolon separated list of NU* diagnostic codes e.g. NU1000,NU1001
         /// </summary>
         string WarningsAsErrors { get; }
+
+        Task<string[]> GetProjectTypeGuidsAsync();
 
         Task<FrameworkName> GetDotNetFrameworkNameAsync();
 

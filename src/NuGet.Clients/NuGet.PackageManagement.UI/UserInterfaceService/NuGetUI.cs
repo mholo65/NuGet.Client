@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -14,6 +14,7 @@ using NuGet.Frameworks;
 using NuGet.PackageManagement.VisualStudio;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.ProjectManagement;
 using NuGet.Protocol.Core.Types;
 using NuGet.Resolver;
@@ -54,6 +55,20 @@ namespace NuGet.PackageManagement.UI
             var result = false;
 
             UIDispatcher.Invoke(() => { result = WarnAboutDotnetDeprecationImpl(projects); });
+
+            return result;
+        }
+
+        public bool ShowNuGetUpgradeWindow(NuGetProjectUpgradeWindowModel nuGetProjectUpgradeWindowModel)
+        {
+            var result = false;
+
+            UIDispatcher.Invoke(() =>
+            {
+                var upgradeInformationWindow = new NuGetProjectUpgradeWindow(nuGetProjectUpgradeWindowModel);
+
+                result = upgradeInformationWindow.ShowModal() == true;
+            });
 
             return result;
         }
@@ -234,7 +249,7 @@ namespace NuGet.PackageManagement.UI
 
         public void OnActionsExecuted(IEnumerable<ResolvedAction> actions)
         {
-            this.UIContext.SolutionManager.OnActionsExecuted(actions);
+            UIContext.SolutionManager.OnActionsExecuted(actions);
         }
 
         public IEnumerable<SourceRepository> ActiveSources
@@ -300,28 +315,65 @@ namespace NuGet.PackageManagement.UI
 
         public void ShowError(Exception ex)
         {
-            if (ex is NuGetResolverConstraintException ||
-                ex is PackageAlreadyInstalledException ||
-                ex is MinClientVersionException ||
-                ex is FrameworkException ||
-                ex is NuGetProtocolException ||
-                ex is PackagingException ||
-                ex is InvalidOperationException)
-            {
-                // for exceptions that are known to be normal error cases, just
-                // display the message.
-                ProjectContext.Log(MessageLevel.Info, ExceptionUtilities.DisplayMessage(ex, indent: true));
+            var signException = ex as SignatureException;
 
-                // write to activity log
-                var activityLogMessage = string.Format(CultureInfo.CurrentCulture, ex.ToString());
-                ActivityLog.LogError(LogEntrySource, activityLogMessage);
+            if (signException != null)
+            {
+                foreach (var result in signException.Results)
+                {
+                    ProcessSignatureIssues(result, signException.PackageIdentity);
+                }
             }
             else
             {
-                ProjectContext.Log(MessageLevel.Error, ex.ToString());
-            }
+                if (ex is NuGetResolverConstraintException ||
+                    ex is PackageAlreadyInstalledException ||
+                    ex is MinClientVersionException ||
+                    ex is FrameworkException ||
+                    ex is NuGetProtocolException ||
+                    ex is PackagingException ||
+                    ex is InvalidOperationException ||
+                    ex is PackageReferenceRollbackException)
+                {
+                    // for exceptions that are known to be normal error cases, just
+                    // display the message.
+                    ProjectContext.Log(MessageLevel.Info, ExceptionUtilities.DisplayMessage(ex, indent: true));
 
-            UILogger.ReportError(ExceptionUtilities.DisplayMessage(ex, indent: false));
+                    // write to activity log
+                    var activityLogMessage = string.Format(CultureInfo.CurrentCulture, ex.ToString());
+                    ActivityLog.LogError(LogEntrySource, activityLogMessage);
+
+                    // Log additional messages to the error list to provide context on why the rollback failed
+                    var rollbackException = ex as PackageReferenceRollbackException;
+                    if (rollbackException != null)
+                    {
+                        foreach (var message in rollbackException.LogMessages)
+                        {
+                            if (message.Level == LogLevel.Error)
+                            {
+                                UILogger.ReportError(message.Message);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    ProjectContext.Log(MessageLevel.Error, ex.ToString());
+                }
+
+                UILogger.ReportError(ExceptionUtilities.DisplayMessage(ex, indent: false));
+            }
+        }
+
+        private void ProcessSignatureIssues(PackageVerificationResult result, PackageIdentity packageIdentity)
+        {
+            var errorList = result.GetErrorIssues().ToList();
+            var warningList = result.GetWarningIssues().ToList();
+
+            errorList.ForEach(p => UILogger.ReportError(p.Message));
+
+            errorList.ForEach(p => ProjectContext.Log(MessageLevel.Error, p.FormatWithCode()));
+            warningList.ForEach(p => ProjectContext.Log(MessageLevel.Warning,p.FormatWithCode()));
         }
     }
 }

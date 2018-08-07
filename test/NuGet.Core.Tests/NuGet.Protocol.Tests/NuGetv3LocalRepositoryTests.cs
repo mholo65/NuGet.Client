@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections.Concurrent;
@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using FluentAssertions;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Test.Utility;
@@ -52,7 +53,7 @@ namespace NuGet.Repositories.Test
                             Assert.Null(result);
 
                                 // Create package
-                                await SimpleTestPackageUtility.CreateFolderFeedV3(workingDir,
+                                await SimpleTestPackageUtility.CreateFolderFeedV3Async(workingDir,
                                         PackageSaveMode.Defaultv3,
                                         identity);
 
@@ -93,7 +94,7 @@ namespace NuGet.Repositories.Test
                     packages.Add(new PackageIdentity(id, NuGetVersion.Parse($"{i + 1}.0.0")));
                 }
 
-                await SimpleTestPackageUtility.CreateFolderFeedV3(workingDir, packages.ToArray());
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(workingDir, packages.ToArray());
 
                 var tasks = new List<Task>();
                 var sem = new ManualResetEventSlim(false);
@@ -146,6 +147,39 @@ namespace NuGet.Repositories.Test
             }
         }
 
+        [Theory]
+        [InlineData("foo")]
+        [InlineData("Foo")]
+        public async Task NuGetv3LocalRepository_Exists_WorksForAllCases(string id)
+        {
+            using (var workingDir = TestDirectory.Create())
+            {
+                var target = new NuGetv3LocalRepository(workingDir);
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
+                    workingDir,
+                    PackageSaveMode.Defaultv3,
+                    new SimpleTestPackageContext("foo", "1.0.0"));
+
+                target.Exists(id, NuGetVersion.Parse("1.0.0")).Should().BeTrue();
+            }
+        }
+
+        [Fact]
+        public async Task NuGetv3LocalRepository_Exists_DoesNotExist()
+        {
+            using (var workingDir = TestDirectory.Create())
+            {
+                var target = new NuGetv3LocalRepository(workingDir);
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
+                    workingDir,
+                    PackageSaveMode.Defaultv3,
+                    new SimpleTestPackageContext("foo", "1.0.0"));
+
+                target.Exists("foo", NuGetVersion.Parse("2.0.0")).Should().BeFalse();
+                target.Exists("bar", NuGetVersion.Parse("1.0.0")).Should().BeFalse();
+            }
+        }
+
         [Fact]
         public async Task NuGetv3LocalRepository_FindPackagesById_UsesProvidedIdCase()
         {
@@ -154,7 +188,7 @@ namespace NuGet.Repositories.Test
             {
                 var id = "Foo";
                 var target = new NuGetv3LocalRepository(workingDir);
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     workingDir,
                     PackageSaveMode.Defaultv3,
                     new SimpleTestPackageContext("foo", "1.0.0"));
@@ -177,7 +211,7 @@ namespace NuGet.Repositories.Test
             {
                 var id = "Foo";
                 var target = new NuGetv3LocalRepository(workingDir);
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     workingDir,
                     PackageSaveMode.Defaultv3,
                     new SimpleTestPackageContext(id, "1.0.0"),
@@ -220,7 +254,7 @@ namespace NuGet.Repositories.Test
             {
                 var id = "Foo";
                 var target = new NuGetv3LocalRepository(workingDir);
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     workingDir,
                     PackageSaveMode.Defaultv3,
                     new SimpleTestPackageContext(id, "1.0.0"),
@@ -242,7 +276,7 @@ namespace NuGet.Repositories.Test
             {
                 var id = "Foo";
                 var target = new NuGetv3LocalRepository(workingDir);
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     workingDir,
                     PackageSaveMode.Defaultv3,
                     new SimpleTestPackageContext(id, "1.0.0"),
@@ -266,7 +300,7 @@ namespace NuGet.Repositories.Test
             {
                 var id = "Foo";
                 var target = new NuGetv3LocalRepository(workingDir);
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     workingDir,
                     PackageSaveMode.Defaultv3,
                     new SimpleTestPackageContext(id, "1.0.0"),
@@ -284,6 +318,72 @@ namespace NuGet.Repositories.Test
 
                 // These should contain different versions
                 Assert.False(ReferenceEquals(package1, package2));
+            }
+        }
+
+        [Fact]
+        public async Task NuGetv3LocalRepository_FindPackage_VerifyRuntimeGraphCached()
+        {
+            // Arrange
+            using (var workingDir = TestDirectory.Create())
+            {
+                var id = "packageX";
+
+                var runtimeJsonX1 = @"{
+                  ""runtimes"": {
+                    ""unix"": {
+                            ""packageX"": {
+                                ""runtime.packageX"": ""1.0.0""
+                            }
+                          }
+                        },
+                ""supports"": {
+                    ""x1.app"": {
+                            ""uap10.0"": [
+                                ""win10-x86""
+                        ]
+                    }
+                   }
+                  }";
+
+                var package = new SimpleTestPackageContext(id, "1.0.0");
+                package.RuntimeJson = runtimeJsonX1;
+
+                var target = new NuGetv3LocalRepository(workingDir);
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
+                    workingDir,
+                    PackageSaveMode.Defaultv3,
+                    package);
+
+                // Act
+                var packageResultA = target.FindPackage(id, NuGetVersion.Parse("1.0.0"));
+                var packageResultB = target.FindPackage(id, NuGetVersion.Parse("1.0.0"));
+
+                // Assert
+                Assert.True(ReferenceEquals(packageResultA.RuntimeGraph, packageResultB.RuntimeGraph));
+            }
+        }
+
+        [Fact]
+        public async Task NuGetv3LocalRepository_FindPackage_VerifyRuntimeGraphIsNullForNonExistantFile()
+        {
+            // Arrange
+            using (var workingDir = TestDirectory.Create())
+            {
+                var id = "packageX";
+                var package = new SimpleTestPackageContext(id, "1.0.0");
+
+                var target = new NuGetv3LocalRepository(workingDir);
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
+                    workingDir,
+                    PackageSaveMode.Defaultv3,
+                    package);
+
+                // Act
+                var packageResultA = target.FindPackage(id, NuGetVersion.Parse("1.0.0"));
+
+                // Assert
+                packageResultA.RuntimeGraph.Should().BeNull();
             }
         }
     }

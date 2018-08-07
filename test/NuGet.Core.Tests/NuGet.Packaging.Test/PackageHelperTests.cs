@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NuGet.Common;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.PackageExtraction;
 using NuGet.Test.Utility;
 using NuGet.Versioning;
 using Xunit;
@@ -207,10 +208,16 @@ namespace NuGet.Packaging.Test
             using (var test = PackageHelperTest.Create(TestPackagesCore.GetPackageContentReaderTestPackage()))
             {
                 await PackageExtractor.ExtractPackageAsync(
+                    test.Root,
                     test.Reader,
                     test.GetPackageStream(),
                     test.Resolver,
-                    new PackageExtractionContext(NullLogger.Instance),
+                    new PackageExtractionContext(
+                        PackageSaveMode.Defaultv2,
+                        PackageExtractionBehavior.XmlDocFileSaveMode,
+                        NullLogger.Instance,
+                        signedPackageVerifier: null,
+                        signedPackageVerifierSettings: null),
                     CancellationToken.None);
 
                 var packageIdentity = test.Reader.GetIdentity();
@@ -333,10 +340,16 @@ namespace NuGet.Packaging.Test
                     using (var packageStream = File.OpenRead(packageFileInfo.FullName))
                     {
                         await PackageExtractor.ExtractPackageAsync(
+                            test.Root,
                             packageReader,
                             packageStream,
                             packagePathResolver,
-                            new PackageExtractionContext(NullLogger.Instance),
+                            new PackageExtractionContext(
+                                PackageSaveMode.Defaultv2,
+                                PackageExtractionBehavior.XmlDocFileSaveMode,
+                                NullLogger.Instance,
+                                signedPackageVerifier: null,
+                                signedPackageVerifierSettings: null),
                             CancellationToken.None);
                     }
 
@@ -381,10 +394,15 @@ namespace NuGet.Packaging.Test
                 using (var packageStream = File.OpenRead(packageFileInfo.FullName))
                 {
                     await PackageExtractor.ExtractPackageAsync(
-                        packageReader,
+                        testDirectory.Path,
                         packageStream,
                         packagePathResolver,
-                        new PackageExtractionContext(NullLogger.Instance),
+                        new PackageExtractionContext(
+                            PackageSaveMode.Defaultv2,
+                            PackageExtractionBehavior.XmlDocFileSaveMode,
+                            NullLogger.Instance,
+                            signedPackageVerifier: null,
+                            signedPackageVerifierSettings: null),
                         CancellationToken.None);
                 }
 
@@ -393,10 +411,16 @@ namespace NuGet.Packaging.Test
                 using (var packageStream = File.OpenRead(satellitePackageInfo.FullName))
                 {
                     await PackageExtractor.ExtractPackageAsync(
+                        testDirectory.Path,
                         packageReader,
                         packageStream,
                         packagePathResolver,
-                        new PackageExtractionContext(NullLogger.Instance),
+                        new PackageExtractionContext(
+                            PackageSaveMode.Defaultv2,
+                            PackageExtractionBehavior.XmlDocFileSaveMode,
+                            NullLogger.Instance,
+                            signedPackageVerifier: null,
+                            signedPackageVerifierSettings: null),
                         CancellationToken.None);
                 }
 

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -11,8 +11,10 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using NuGet.Common;
+using NuGet.Configuration;
 using NuGet.PackageManagement.UI;
 using NuGet.Protocol.Core.Types;
 using NuGet.VisualStudio;
@@ -146,38 +148,61 @@ namespace NuGet.Options
 
         internal void InitializeOnActivated()
         {
-            if (_initialized)
+            try
             {
-                return;
+                if (_initialized)
+                {
+                    return;
+                }
+
+                _initialized = true;
+
+                // get packages sources
+                var allPackageSources = _packageSourceProvider.LoadPackageSources().ToList();
+                var packageSources = allPackageSources.Where(ps => !ps.IsMachineWide).ToList();
+                var machineWidePackageSources = allPackageSources.Where(ps => ps.IsMachineWide).ToList();
+                //_activeSource = _packageSourceProvider.ActivePackageSource;
+
+                // bind to the package sources, excluding Aggregate
+                _packageSources = new BindingSource(packageSources.Select(ps => ps.Clone()).ToList(), null);
+                _packageSources.CurrentChanged += OnSelectedPackageSourceChanged;
+                PackageSourcesListBox.GotFocus += PackageSourcesListBox_GotFocus;
+                PackageSourcesListBox.DataSource = _packageSources;
+
+                if (machineWidePackageSources.Count > 0)
+                {
+                    _machineWidepackageSources = new BindingSource(machineWidePackageSources.Select(ps => ps.Clone()).ToList(), null);
+                    _machineWidepackageSources.CurrentChanged += OnSelectedMachineWidePackageSourceChanged;
+                    MachineWidePackageSourcesListBox.GotFocus += MachineWidePackageSourcesListBox_GotFocus;
+                    MachineWidePackageSourcesListBox.DataSource = _machineWidepackageSources;
+                }
+                else
+                {
+                    MachineWidePackageSourcesListBox.Visible = MachineWideSourcesLabel.Visible = false;
+                }
+
+                OnSelectedPackageSourceChanged(null, EventArgs.Empty);
             }
-
-            _initialized = true;
-
-            // get packages sources
-            var allPackageSources = _packageSourceProvider.LoadPackageSources().ToList();
-            var packageSources = allPackageSources.Where(ps => !ps.IsMachineWide).ToList();
-            var machineWidePackageSources = allPackageSources.Where(ps => ps.IsMachineWide).ToList();
-            //_activeSource = _packageSourceProvider.ActivePackageSource;
-
-            // bind to the package sources, excluding Aggregate
-            _packageSources = new BindingSource(packageSources.Select(ps => ps.Clone()).ToList(), null);
-            _packageSources.CurrentChanged += OnSelectedPackageSourceChanged;
-            PackageSourcesListBox.GotFocus += PackageSourcesListBox_GotFocus;
-            PackageSourcesListBox.DataSource = _packageSources;
-
-            if (machineWidePackageSources.Count > 0)
+            // Thrown during creating or saving NuGet.Config.
+            catch (NuGetConfigurationException ex)
             {
-                _machineWidepackageSources = new BindingSource(machineWidePackageSources.Select(ps => ps.Clone()).ToList(), null);
-                _machineWidepackageSources.CurrentChanged += OnSelectedMachineWidePackageSourceChanged;
-                MachineWidePackageSourcesListBox.GotFocus += MachineWidePackageSourcesListBox_GotFocus;
-                MachineWidePackageSourcesListBox.DataSource = _machineWidepackageSources;
+                MessageHelper.ShowErrorMessage(ex.Message, Resources.ErrorDialogBoxTitle);
             }
-            else
+            // Thrown if no nuget.config found.
+            catch (InvalidOperationException ex)
             {
-                MachineWidePackageSourcesListBox.Visible = MachineWideSourcesLabel.Visible = false;
+                MessageHelper.ShowErrorMessage(ex.Message, Resources.ErrorDialogBoxTitle);
             }
-
-            OnSelectedPackageSourceChanged(null, EventArgs.Empty);
+            catch (UnauthorizedAccessException)
+            {
+                MessageHelper.ShowErrorMessage(Resources.ShowError_ConfigUnauthorizedAccess, Resources.ErrorDialogBoxTitle);
+            }
+            // Unknown exception.
+            catch (Exception ex)
+            {
+                MessageHelper.ShowErrorMessage(Resources.ShowError_SettingActivatedFailed, Resources.ErrorDialogBoxTitle);
+                ActivityLog.LogError(NuGetUI.LogEntrySource, ex.ToString());
+            }
         }
 
         private void MachineWidePackageSourcesListBox_GotFocus(object sender, EventArgs e)
@@ -208,7 +233,7 @@ namespace NuGet.Options
             // if user presses Enter after filling in Name/Source but doesn't click Update
             // the options will be closed without adding the source, try adding before closing
             // Only apply if nothing was added
-            TryUpdateSourceResults result = TryUpdateSource();
+            var result = TryUpdateSource();
             if (result != TryUpdateSourceResults.NotUpdated
                 &&
                 result != TryUpdateSourceResults.Unchanged)
@@ -228,9 +253,28 @@ namespace NuGet.Options
                     _packageSourceProvider.SavePackageSources(packageSources);
                 }
             }
-            catch (Configuration.NuGetConfigurationException e)
+            // Thrown during creating or saving NuGet.Config.
+            catch (NuGetConfigurationException ex)
             {
-                MessageHelper.ShowErrorMessage(ExceptionUtilities.DisplayMessage(e), Resources.ErrorDialogBoxTitle);
+                MessageHelper.ShowErrorMessage(ex.Message, Resources.ErrorDialogBoxTitle);
+                return false;
+            }
+            // Thrown if no nuget.config found.
+            catch (InvalidOperationException ex)
+            {
+                MessageHelper.ShowErrorMessage(ex.Message, Resources.ErrorDialogBoxTitle);
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MessageHelper.ShowErrorMessage(Resources.ShowError_ConfigUnauthorizedAccess, Resources.ErrorDialogBoxTitle);
+                return false;
+            }
+            // Unknown exception.
+            catch (Exception ex)
+            {
+                MessageHelper.ShowErrorMessage(Resources.ShowError_ApplySettingFailed, Resources.ErrorDialogBoxTitle);
+                ActivityLog.LogError(NuGetUI.LogEntrySource, ex.ToString());
                 return false;
             }
 

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -8,6 +8,7 @@ using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.Packaging;
 using NuGet.Packaging.PackageExtraction;
+using NuGet.Packaging.Signing;
 using NuGet.ProjectModel;
 using NuGet.Protocol.Core.Types;
 
@@ -136,9 +137,9 @@ namespace NuGet.Commands
         public string RestoreOutputPath { get; set; }
 
         /// <summary>
-        /// Base Intermediate output path
+        /// MSBuildProjectExtensionsPath
         /// </summary>
-        public string BaseIntermediateOutputPath { get; set; }
+        public string MSBuildProjectExtensionsPath { get; set; }
 
         
         /// <summary>
@@ -150,5 +151,17 @@ namespace NuGet.Commands
         /// Display Errors and warnings as they occur
         /// </summary>
         public bool HideWarningsAndErrors { get; set; } = false;
+
+        /// <summary>
+        /// Package Signature verifier
+        /// </summary>
+        public IPackageSignatureVerifier PackageSignatureVerifier { get; set; } = new PackageSignatureVerifier(SignatureVerificationProviderFactory.GetSignatureVerificationProviders());
+
+        /// <summary>
+        /// SignedPackageVerifierSettings to be used when verifying signed packages.
+        /// </summary>
+        public SignedPackageVerifierSettings SignedPackageVerifierSettings { get; set; } = SignedPackageVerifierSettings.GetDefault();
+
+        public Guid ParentId { get; set;}
     }
 }

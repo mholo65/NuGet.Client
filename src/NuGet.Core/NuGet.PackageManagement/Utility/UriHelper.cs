@@ -117,7 +117,7 @@ namespace NuGet.PackageManagement
 
         private static bool IsHttpUrl(Uri uri)
         {
-            return (uri.Scheme == "http" || uri.Scheme == "https");
+            return (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
 
         private static bool IsLocal(string currentSource)

@@ -19,7 +19,7 @@ namespace NuGet.PackageManagement.VisualStudio {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "4.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     public class Strings {
@@ -111,15 +111,6 @@ namespace NuGet.PackageManagement.VisualStudio {
         public static string Argument_Must_Be_GreaterThanOrEqualTo {
             get {
                 return ResourceManager.GetString("Argument_Must_Be_GreaterThanOrEqualTo", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The BaseIntermediateOutputPath MSBuild property could not be found for project &apos;{0}&apos;..
-        /// </summary>
-        public static string BaseIntermediateOutputPathNotFound {
-            get {
-                return ResourceManager.GetString("BaseIntermediateOutputPathNotFound", resourceCulture);
             }
         }
         
@@ -336,6 +327,15 @@ namespace NuGet.PackageManagement.VisualStudio {
         public static string InstallingPackage {
             get {
                 return ResourceManager.GetString("InstallingPackage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} MSBuild property could not be found for project &apos;{1}&apos;..
+        /// </summary>
+        public static string MSBuildPropertyNotFound {
+            get {
+                return ResourceManager.GetString("MSBuildPropertyNotFound", resourceCulture);
             }
         }
         

@@ -32,6 +32,7 @@ namespace NuGet.Protocol.Tests
             {
                 var exception = Assert.Throws<ArgumentNullException>(
                     () => new RemotePackageArchiveDownloader(
+                        null,
                         resource: null,
                         packageIdentity: _packageIdentity,
                         cacheContext: sourceCacheContext,
@@ -48,6 +49,7 @@ namespace NuGet.Protocol.Tests
             {
                 var exception = Assert.Throws<ArgumentNullException>(
                     () => new RemotePackageArchiveDownloader(
+                        null,
                         Mock.Of<FindPackageByIdResource>(),
                         packageIdentity: null,
                         cacheContext: sourceCacheContext,
@@ -62,6 +64,7 @@ namespace NuGet.Protocol.Tests
         {
             var exception = Assert.Throws<ArgumentNullException>(
                 () => new RemotePackageArchiveDownloader(
+                    null,
                     Mock.Of<FindPackageByIdResource>(),
                     _packageIdentity,
                     cacheContext: null,
@@ -77,6 +80,7 @@ namespace NuGet.Protocol.Tests
             {
                 var exception = Assert.Throws<ArgumentNullException>(
                     () => new RemotePackageArchiveDownloader(
+                        null,
                         Mock.Of<FindPackageByIdResource>(),
                         _packageIdentity,
                         sourceCacheContext,
@@ -88,9 +92,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task Constructor_InitializesProperties()
+        public async Task Constructor_InitializesPropertiesAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Resource.Setup(x => x.CopyNupkgToStreamAsync(
                         It.IsNotNull<string>(),
@@ -99,7 +103,7 @@ namespace NuGet.Protocol.Tests
                         It.IsNotNull<SourceCacheContext>(),
                         It.IsNotNull<ILogger>(),
                         It.IsAny<CancellationToken>()))
-                    .Callback<string, NuGetVersion, Stream, SourceCacheContext, ILogger, CancellationToken>(
+                    .Callback<string, NuGetVersion, Stream, SourceCacheContext, ILogger, CancellationToken>(async 
                         (id, version, stream, cacheContext, logger, cancellationToken) =>
                         {
                             var remoteDirectoryPath = Path.Combine(test.TestDirectory.Path, "remote");
@@ -114,7 +118,7 @@ namespace NuGet.Protocol.Tests
 
                             packageContext.AddFile($"lib/net45/{test.PackageIdentity.Id}.dll");
 
-                            SimpleTestPackageUtility.CreatePackages(remoteDirectoryPath, packageContext);
+                            await SimpleTestPackageUtility.CreatePackagesAsync(remoteDirectoryPath, packageContext);
 
                             var sourcePackageFilePath = Path.Combine(
                                 remoteDirectoryPath,
@@ -139,9 +143,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public void Dispose_IsIdempotent()
+        public async Task Dispose_IsIdempotentAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
                 test.Downloader.Dispose();
@@ -149,18 +153,18 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public void ContentReader_ThrowsIfCopyNupkgFileToAsyncNotCalledFirst()
+        public async Task ContentReader_ThrowsIfCopyNupkgFileToAsyncNotCalledFirstAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 Assert.Throws<InvalidOperationException>(() => test.Downloader.ContentReader);
             }
         }
 
         [Fact]
-        public void ContentReader_ThrowsIfDisposed()
+        public async Task ContentReader_ThrowsIfDisposedAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
 
@@ -171,18 +175,18 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public void CoreReader_ThrowsIfCopyNupkgFileToAsyncNotCalledFirst()
+        public async Task CoreReader_ThrowsIfCopyNupkgFileToAsyncNotCalledFirstAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 Assert.Throws<InvalidOperationException>(() => test.Downloader.CoreReader);
             }
         }
 
         [Fact]
-        public void CoreReader_ThrowsIfDisposed()
+        public async Task CoreReader_ThrowsIfDisposedAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
 
@@ -193,9 +197,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ThrowsIfDisposed()
+        public async Task CopyNupkgFileToAsync_ThrowsIfDisposedAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
 
@@ -211,9 +215,9 @@ namespace NuGet.Protocol.Tests
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public async Task CopyNupkgFileToAsync_ThrowsForNullOrEmptyDestinationFilePath(string destinationFilePath)
+        public async Task CopyNupkgFileToAsync_ThrowsForNullOrEmptyDestinationFilePathAsync(string destinationFilePath)
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentException>(
                     () => test.Downloader.CopyNupkgFileToAsync(
@@ -225,9 +229,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ThrowsIfCancelled()
+        public async Task CopyNupkgFileToAsync_ThrowsIfCancelledAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 await Assert.ThrowsAsync<OperationCanceledException>(
                     () => test.Downloader.CopyNupkgFileToAsync(
@@ -237,9 +241,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ReturnsFalseIfExceptionHandled()
+        public async Task CopyNupkgFileToAsync_ReturnsFalseIfExceptionHandledAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Resource.Setup(x => x.CopyNupkgToStreamAsync(
                         It.IsNotNull<string>(),
@@ -265,9 +269,9 @@ namespace NuGet.Protocol.Tests
         [Theory]
         [InlineData(true)]
         [InlineData(false)]
-        public async Task CopyNupkgFileToAsync_ReturnsResultFromFindPackageByIdResource(bool expectedResult)
+        public async Task CopyNupkgFileToAsync_ReturnsResultFromFindPackageByIdResourceAsync(bool expectedResult)
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Resource.Setup(x => x.CopyNupkgToStreamAsync(
                         It.IsNotNull<string>(),
@@ -289,9 +293,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_RespectsThrottle()
+        public async Task CopyNupkgFileToAsync_RespectsThrottleAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             using (var throttle = new SemaphoreSlim(initialCount: 0, maxCount: 1))
             using (var copyEvent = new ManualResetEventSlim())
             {
@@ -336,9 +340,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ReleasesThrottleOnException()
+        public async Task CopyNupkgFileToAsync_ReleasesThrottleOnExceptionAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             using (var throttle = new SemaphoreSlim(initialCount: 1, maxCount: 1))
             {
                 test.Resource.Setup(x => x.CopyNupkgToStreamAsync(
@@ -374,9 +378,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageHashAsync_ThrowsIfDisposed()
+        public async Task GetPackageHashAsync_ThrowsIfDisposedAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
 
@@ -392,9 +396,9 @@ namespace NuGet.Protocol.Tests
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public async Task GetPackageHashAsync_ThrowsForNullOrEmptyHashAlgorithm(string hashAlgorithm)
+        public async Task GetPackageHashAsync_ThrowsForNullOrEmptyHashAlgorithmAsync(string hashAlgorithm)
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentException>(
                     () => test.Downloader.GetPackageHashAsync(
@@ -406,9 +410,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageHashAsync_ThrowsIfCancelled()
+        public async Task GetPackageHashAsync_ThrowsIfCancelledAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 await Assert.ThrowsAsync<OperationCanceledException>(
                     () => test.Downloader.GetPackageHashAsync(
@@ -418,9 +422,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public async Task GetPackageHashAsync_ReturnsPackageHash()
+        public async Task GetPackageHashAsync_ReturnsPackageHashAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 var destinationFilePath = Path.Combine(test.TestDirectory.Path, "a");
 
@@ -446,9 +450,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public void SetExceptionHandler_ThrowsForNullHandler()
+        public async Task SetExceptionHandler_ThrowsForNullHandlerAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 var exception = Assert.Throws<ArgumentNullException>(
                     () => test.Downloader.SetExceptionHandler(handleExceptionAsync: null));
@@ -458,9 +462,9 @@ namespace NuGet.Protocol.Tests
         }
 
         [Fact]
-        public void SetThrottle_AcceptsNullThrottle()
+        public async Task SetThrottle_AcceptsNullThrottleAsync()
         {
-            using (var test = RemotePackageArchiveDownloaderTest.Create())
+            using (var test = await RemotePackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.SetThrottle(throttle: null);
             }
@@ -497,7 +501,7 @@ namespace NuGet.Protocol.Tests
                 GC.SuppressFinalize(this);
             }
 
-            internal static RemotePackageArchiveDownloaderTest Create()
+            internal static async Task<RemotePackageArchiveDownloaderTest> CreateAsync()
             {
                 var testDirectory = TestDirectory.Create();
                 var sourceCacheContext = new SourceCacheContext();
@@ -509,7 +513,7 @@ namespace NuGet.Protocol.Tests
 
                 packageContext.AddFile($"lib/net45/{_packageIdentity.Id}.dll");
 
-                SimpleTestPackageUtility.CreatePackages(testDirectory.Path, packageContext);
+                await SimpleTestPackageUtility.CreatePackagesAsync(testDirectory.Path, packageContext);
 
                 var packageFilePath = Path.Combine(
                     testDirectory.Path,
@@ -518,6 +522,7 @@ namespace NuGet.Protocol.Tests
                 var resource = new Mock<FindPackageByIdResource>(MockBehavior.Strict);
 
                 var downloader = new RemotePackageArchiveDownloader(
+                    testDirectory.Path,
                     resource.Object,
                     _packageIdentity,
                     sourceCacheContext,

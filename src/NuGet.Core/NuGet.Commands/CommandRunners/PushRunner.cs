@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -24,6 +24,7 @@ namespace NuGet.Commands
             int timeoutSeconds,
             bool disableBuffering,
             bool noSymbols,
+            bool noServiceEndpoint,
             ILogger logger)
         {
             source = CommandRunnerUtility.ResolveSource(sourceProvider, source);
@@ -36,26 +37,6 @@ namespace NuGet.Commands
 
             var packageUpdateResource = await CommandRunnerUtility.GetPackageUpdateResource(sourceProvider, source);
 
-            // only push to SymbolSource when the actual package is being pushed to the official NuGet.org
-            var sourceUri = packageUpdateResource.SourceUri;
-            if (string.IsNullOrEmpty(symbolSource)
-                && !noSymbols
-                && !sourceUri.IsFile
-                && sourceUri.IsAbsoluteUri)
-            {
-                if (sourceUri.Host.Equals(NuGetConstants.NuGetHostName, StringComparison.OrdinalIgnoreCase) // e.g. nuget.org
-                    || sourceUri.Host.EndsWith("." + NuGetConstants.NuGetHostName, StringComparison.OrdinalIgnoreCase)) // *.nuget.org, e.g. www.nuget.org
-                {
-                    symbolSource = NuGetConstants.DefaultSymbolServerUrl;
-
-                    if (string.IsNullOrEmpty(symbolApiKey))
-                    {
-                        // Use the nuget.org API key if it was given
-                        symbolApiKey = apiKey;
-                    }
-                }
-            }
-
             await packageUpdateResource.Push(
                 packagePath,
                 symbolSource,
@@ -63,6 +44,7 @@ namespace NuGet.Commands
                 disableBuffering,
                 endpoint => apiKey ?? CommandRunnerUtility.GetApiKey(settings, endpoint, source, defaultApiKey: null, isSymbolApiKey: false),
                 symbolsEndpoint => symbolApiKey ?? CommandRunnerUtility.GetApiKey(settings, symbolsEndpoint, symbolSource, apiKey, isSymbolApiKey: true),
+                noServiceEndpoint,
                 logger);
         }
     }

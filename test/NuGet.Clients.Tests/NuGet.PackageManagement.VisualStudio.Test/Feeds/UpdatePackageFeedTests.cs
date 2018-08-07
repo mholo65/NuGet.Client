@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -218,6 +218,41 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             Assert.Empty(packages);
         }
 
+        [Fact]
+        public async Task GetPackagesWithUpdatesAsync_WithHttpCache_RetrievesUpdate()
+        {
+            // Arrange
+            var testPackageIdentity = new PackageCollectionItem("FakePackage", new NuGetVersion("1.0.0"), null);
+
+            var projectA = SetupProject("FakePackage", "1.0.0");
+            SetupRemotePackageMetadata("FakePackage", "0.0.1", "1.0.0", "2.0.0");
+
+            var _target = new UpdatePackageFeed(new[] { testPackageIdentity }, _metadataProvider, new[] { projectA }, null, new TestLogger());
+
+            // Act
+            var packages = await _target.GetPackagesWithUpdatesAsync(
+                "fake", new SearchFilter(includePrerelease: false), CancellationToken.None);
+
+            Assert.Single(packages);
+            var updateCandidate = packages.Single();
+            Assert.Equal("2.0.0", updateCandidate.Identity.Version.ToString());
+
+            SetupRemotePackageMetadata("FakePackage", "0.0.1", "1.0.0", "2.0.1", "2.0.0", "1.0.1");
+
+            packages = await _target.GetPackagesWithUpdatesAsync(
+                "fake", new SearchFilter(includePrerelease: false), CancellationToken.None);
+
+            Assert.Single(packages);
+            updateCandidate = packages.Single();
+            Assert.Equal("2.0.1", updateCandidate.Identity.Version.ToString());
+
+            var actualVersions = await updateCandidate.GetVersionsAsync();
+            Assert.NotEmpty(actualVersions);
+            Assert.Equal(
+                new[] { "2.0.1", "2.0.0", "1.0.1", "1.0.0", "0.0.1" },
+                actualVersions.Select(v => v.Version.ToString()).ToArray());
+        }
+
         private NuGetProject SetupProject(string packageId, string packageVersion, string allowedVersions = null)
         {
             var packageIdentity = new PackageIdentity(packageId, NuGetVersion.Parse(packageVersion));
@@ -248,7 +283,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
                     .Build());
 
             Mock.Get(_metadataResource)
-                .Setup(x => x.GetMetadataAsync(id, It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<Common.ILogger>(), It.IsAny<CancellationToken>()))
+                .Setup(x => x.GetMetadataAsync(id, It.IsAny<bool>(), It.IsAny<bool>(), It.IsAny<SourceCacheContext>(), It.IsAny<Common.ILogger>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(metadata));
         }
     }

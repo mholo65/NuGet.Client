@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -10,10 +10,12 @@ using System.Management.Automation;
 using System.Management.Automation.Host;
 using System.Text;
 using System.Threading;
+using NuGet.Common;
 using NuGet.PackageManagement.VisualStudio;
 using NuGet.Packaging.Core;
 using NuGet.ProjectManagement;
 using NuGet.ProjectManagement.Projects;
+using NuGet.ProjectModel;
 using NuGet.Resolver;
 using NuGet.VisualStudio;
 using Task = System.Threading.Tasks.Task;
@@ -83,11 +85,11 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
                     result.Source));
             }
 
-            UpdateActiveSourceRepository(result.SourceRepository);
-            GetNuGetProject(ProjectName);
+            UpdateActiveSourceRepository(result.SourceRepository);            
             DetermineFileConflictAction();
             NuGetUIThreadHelper.JoinableTaskFactory.Run(async delegate
             {
+                await GetNuGetProjectAsync(ProjectName);
                 await CheckMissingPackagesAsync();
                 await CheckPackageManagementFormat();
             });
@@ -127,17 +129,17 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
                 }
 
                 // stop telemetry event timer to avoid UI interaction
-                TelemetryUtility.StopTimer();
+                TelemetryServiceUtility.StopTimer();
 
                 if (!ShouldContinueDueToDotnetDeprecation(actions, isPreview))
                 {
                     // resume telemetry event timer after ui confirmation
-                    TelemetryUtility.StartorResumeTimer();
+                    TelemetryServiceUtility.StartOrResumeTimer();
                     return;
                 }
 
                 // resume telemetry event timer after ui confirmation
-                TelemetryUtility.StartorResumeTimer();
+                TelemetryServiceUtility.StartOrResumeTimer();
 
                 if (isPreview)
                 {
@@ -146,8 +148,11 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
                 else
                 {
                     NuGetPackageManager.SetDirectInstall(identity, projectContext);
-                    await PackageManager.ExecuteNuGetProjectActionsAsync(project, actions, this, CancellationToken.None);
+                    await PackageManager.ExecuteNuGetProjectActionsAsync(project, actions, this, resolutionContext.SourceCacheContext, CancellationToken.None);
                     NuGetPackageManager.ClearDirectInstall(projectContext);
+
+                    // Refresh Manager UI if needed
+                    RefreshUI(actions);
                 }
             }
             catch (InvalidOperationException ex)
@@ -197,17 +202,17 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
                 }
 
                 // stop telemetry event timer to avoid UI interaction
-                TelemetryUtility.StopTimer();
+                TelemetryServiceUtility.StopTimer();
 
                 if (!ShouldContinueDueToDotnetDeprecation(actions, isPreview))
                 {
                     // resume telemetry event timer after ui confirmation
-                    TelemetryUtility.StartorResumeTimer();
+                    TelemetryServiceUtility.StartOrResumeTimer();
                     return;
                 }
 
                 // resume telemetry event timer after ui confirmation
-                TelemetryUtility.StartorResumeTimer();
+                TelemetryServiceUtility.StartOrResumeTimer();
 
                 if (isPreview)
                 {
@@ -217,8 +222,11 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
                 {
                     var identity = actions.Select(v => v.PackageIdentity).Where(p => p.Id.Equals(packageId, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
                     NuGetPackageManager.SetDirectInstall(identity, projectContext);
-                    await PackageManager.ExecuteNuGetProjectActionsAsync(project, actions, this, CancellationToken.None);
+                    await PackageManager.ExecuteNuGetProjectActionsAsync(project, actions, this, resolutionContext.SourceCacheContext, CancellationToken.None);
                     NuGetPackageManager.ClearDirectInstall(projectContext);
+
+                    // Refresh Manager UI if needed
+                    RefreshUI(actions);
                 }
             }
             catch (InvalidOperationException ex)
@@ -256,6 +264,15 @@ namespace NuGet.PackageManagement.PowerShellCmdlets
 
             // note that we're assuming that package id is the same for all versions.
             Id = metadata.First().Identity.Id;
+        }
+
+        protected virtual void WarnIfParametersAreNotSupported()
+        {
+            if (Source != null && Project is BuildIntegratedNuGetProject)
+            {
+                var warning = string.Format(CultureInfo.CurrentUICulture, Resources.Warning_SourceNotRespectedForProjectType, nameof(Source), NuGetProject.GetUniqueNameOrName(Project));
+                Log(MessageLevel.Warning, warning);
+            }
         }
 
         protected override void EndProcessing()

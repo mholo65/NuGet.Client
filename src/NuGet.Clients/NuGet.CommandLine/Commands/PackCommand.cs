@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NuGet.Commands;
+using NuGet.Common;
 using NuGet.Packaging.Core;
 
 namespace NuGet.CommandLine
@@ -79,8 +80,13 @@ namespace NuGet.CommandLine
         [Option(typeof(NuGetCommand), "CommandMSBuildPath")]
         public string MSBuildPath { get; set; }
 
-        // TODO: Temporarily hide the real ConfigFile parameter from the help text.
-        // When we fix #3230, we should remove this property.
+        [Option(typeof(NuGetCommand), "PackageCommandInstallPackageToOutputPath")]
+        public bool InstallPackageToOutputPath { get; set; }
+
+        [Option(typeof(NuGetCommand), "PackageCommandOutputFileNamesWithoutVersion")]
+        public bool OutputFileNamesWithoutVersion { get; set; }
+
+        [Option(typeof(NuGetCommand), "PackageCommandConfigFile")]
         public new string ConfigFile { get; set; }
 
         public override void ExecuteCommand()
@@ -116,17 +122,17 @@ namespace NuGet.CommandLine
             {
                 case Verbosity.Detailed:
                 {
-                    packArgs.LogLevel = Common.LogLevel.Verbose;
+                    packArgs.LogLevel = LogLevel.Verbose;
                     break;
                 }
                 case Verbosity.Normal:
                 {
-                    packArgs.LogLevel = Common.LogLevel.Information;
+                    packArgs.LogLevel = LogLevel.Information;
                     break;
                 }
                 case Verbosity.Quiet:
                 {
-                    packArgs.LogLevel = Common.LogLevel.Minimal;
+                    packArgs.LogLevel = LogLevel.Minimal;
                     break;
                 }
             }
@@ -140,13 +146,15 @@ namespace NuGet.CommandLine
             packArgs.Suffix = Suffix;
             packArgs.Symbols = Symbols;
             packArgs.Tool = Tool;
+            packArgs.InstallPackageToOutputPath = InstallPackageToOutputPath;
+            packArgs.OutputFileNamesWithoutVersion = OutputFileNamesWithoutVersion;
 
             if (!string.IsNullOrEmpty(Version))
             {
                 NuGetVersion version;
                 if (!NuGetVersion.TryParse(Version, out version))
                 {
-                    throw new ArgumentException(String.Format(CultureInfo.CurrentCulture, NuGetResources.InstallCommandPackageReferenceInvalidVersion, Version));
+                    throw new PackagingException(NuGetLogCode.NU5010, String.Format(CultureInfo.CurrentCulture, NuGetResources.InstallCommandPackageReferenceInvalidVersion, Version));
                 }
                 packArgs.Version = version.ToFullString();
             }

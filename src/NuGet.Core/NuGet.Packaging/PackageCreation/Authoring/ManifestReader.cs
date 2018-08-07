@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -334,6 +334,8 @@ namespace NuGet.Packaging
         {
             var repositoryType = element.Attribute("type");
             var repositoryUrl = element.Attribute("url");
+            var repositoryBranch = element.Attribute("branch");
+            var repositoryCommit = element.Attribute("commit");
             var repository = new RepositoryMetadata();
             if (!string.IsNullOrEmpty(repositoryType?.Value))
             {
@@ -342,15 +344,17 @@ namespace NuGet.Packaging
             if (!string.IsNullOrEmpty(repositoryUrl?.Value))
             {
                 repository.Url = repositoryUrl.Value;
+                repository.Branch = repositoryBranch?.Value;
+                repository.Commit = repositoryCommit?.Value;
             }
-            if (string.IsNullOrEmpty(repository.Type) && string.IsNullOrEmpty(repository.Type))
-            {
-                return null;
-            }
-            else
+
+            // Ensure the value is valid before returning it.
+            if (!string.IsNullOrEmpty(repository.Type) && !string.IsNullOrEmpty(repository.Url))
             {
                 return repository;
             }
+
+            return null;
         }
     }
 }

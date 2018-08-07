@@ -155,6 +155,7 @@ namespace NuGet.PackageManagement.VisualStudio
                 project.RestoreMetadata.Sources = VSRestoreSettingsUtilities.GetSources(settings, originalProject);
                 project.RestoreMetadata.FallbackFolders = VSRestoreSettingsUtilities.GetFallbackFolders(settings, originalProject);
                 project.RestoreMetadata.ConfigFilePaths = GetConfigFilePaths(settings);
+                IgnoreUnsupportProjectReference(project);
                 projects.Add(project);
             }
 
@@ -177,6 +178,24 @@ namespace NuGet.PackageManagement.VisualStudio
         private IList<string> GetConfigFilePaths(ISettings settings)
         {
             return SettingsUtility.GetConfigFilePaths(settings).ToList();
+        }
+
+        private void IgnoreUnsupportProjectReference(PackageSpec project)
+        {
+            foreach (var frameworkInfo in project.RestoreMetadata.TargetFrameworks)
+            {
+                var projectReferences = new List<ProjectRestoreReference>();
+
+                foreach (var projectReference in frameworkInfo.ProjectReferences)
+                {
+                    if (SupportedProjectTypes.IsSupportedProjectExtension(projectReference.ProjectPath))
+                    {
+                        projectReferences.Add(projectReference);
+                    }
+                }
+
+                frameworkInfo.ProjectReferences = projectReferences;
+            }
         }
 
         #endregion
@@ -268,16 +287,16 @@ namespace NuGet.PackageManagement.VisualStudio
                 // Install the package to all frameworks.
                 var configuredProject = await _unconfiguredProject.GetSuggestedConfiguredProjectAsync();
 
-                var result = await configuredProject?
+                var result = await configuredProject
                     .Services
                     .PackageReferences
                     .AddAsync(packageId, formattedRange);
 
                 // This is the update operation
-                if (result != null && !result.Added)
+                if (!result.Added)
                 {
                     var existingReference = result.Reference;
-                    await existingReference?.Metadata.SetPropertyValueAsync("Version", formattedRange);
+                    await existingReference.Metadata.SetPropertyValueAsync("Version", formattedRange);
                 }
             }
 

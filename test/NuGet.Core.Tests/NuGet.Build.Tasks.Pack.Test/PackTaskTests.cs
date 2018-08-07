@@ -1,8 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.Build.Framework;
 using Moq;
@@ -10,7 +11,9 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using NuGet.Commands;
+using NuGet.Common;
 using NuGet.Packaging;
+using NuGet.Versioning;
 using Xunit;
 
 namespace NuGet.Build.Tasks.Pack.Test
@@ -54,6 +57,50 @@ namespace NuGet.Build.Tasks.Pack.Test
         }
 
         [Fact]
+        public void PackTask_Dispose()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(dir);
+
+            var nuspecPath = Path.Combine(dir, "test.nuspec");
+            File.WriteAllText(nuspecPath, @"
+<package xmlns=""http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd"">
+  <metadata>
+    <id>Test</id>
+    <summary>Summary</summary>
+    <description>Description</description>
+    <version>1.0.0</version>
+    <authors>Microsoft</authors>
+    <dependencies>
+      <dependency id=""System.Collections.Immutable"" version=""4.3.0"" />
+    </dependencies>
+  </metadata>
+</package>
+");
+
+            var builder = new PackageBuilder();
+
+            var runner = new PackCommandRunner(
+                new PackArgs
+                {
+                    CurrentDirectory = dir,
+                    OutputDirectory = dir,
+                    Path = nuspecPath,
+                    Exclude = Array.Empty<string>(),
+                    Symbols = true,
+                    Logger = NullLogger.Instance
+                },
+                MSBuildProjectFactory.ProjectCreator,
+                builder);
+
+            runner.BuildPackage();
+
+            // It should be possible to delete the entire directory.
+            // If this fails the runner left some files open.
+            Directory.Delete(dir, recursive: true);
+        }
+
+        [Fact]
         public void PackTask_TrimsWhitespace()
         {
             // Arrange
@@ -73,7 +120,9 @@ namespace NuGet.Build.Tasks.Pack.Test
                 ProjectUrl = " ProjectUrl \t ",
                 ReleaseNotes = " ReleaseNotes \t ",
                 RepositoryType = " RepositoryType \t ",
-                RepositoryUrl = " RepositoryUrl \t "
+                RepositoryUrl = " RepositoryUrl \t ",
+                RepositoryCommit = " RepositoryCommit \t ",
+                RepositoryBranch = " RepositoryBranch \t "
             };
 
             // Act
@@ -95,6 +144,8 @@ namespace NuGet.Build.Tasks.Pack.Test
             Assert.Equal("ReleaseNotes", actual.ReleaseNotes);
             Assert.Equal("RepositoryType", actual.RepositoryType);
             Assert.Equal("RepositoryUrl", actual.RepositoryUrl);
+            Assert.Equal("RepositoryCommit", actual.RepositoryCommit);
+            Assert.Equal("RepositoryBranch", actual.RepositoryBranch);
         }
 
         [Fact]
@@ -118,6 +169,8 @@ namespace NuGet.Build.Tasks.Pack.Test
                 ReleaseNotes = " \t ",
                 RepositoryType = " \t ",
                 RepositoryUrl = " \t ",
+                RepositoryCommit = " \t ",
+                RepositoryBranch = " \t ",
             };
 
             // Act
@@ -139,6 +192,8 @@ namespace NuGet.Build.Tasks.Pack.Test
             Assert.Null(actual.ReleaseNotes);
             Assert.Null(actual.RepositoryType);
             Assert.Null(actual.RepositoryUrl);
+            Assert.Null(actual.RepositoryCommit);
+            Assert.Null(actual.RepositoryBranch);
         }
 
         [Fact]
@@ -263,7 +318,9 @@ namespace NuGet.Build.Tasks.Pack.Test
             {
                 AssemblyName = "AssemblyName",
                 FrameworkAssemblyReferences = new ITaskItem[0],
-                Authors = new string[0],
+                Authors = Array.Empty<string>(),
+                AllowedOutputExtensionsInPackageBuildOutputFolder = Array.Empty<string>(),
+                AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder = Array.Empty<string>(),
                 BuildOutputFolder = "BuildOutputFolder",
                 ContentTargetFolders = new string[] { "ContentTargetFolders" } ,
                 ContinuePackingAfterGeneratingNuspec = true,
@@ -279,23 +336,26 @@ namespace NuGet.Build.Tasks.Pack.Test
                 MinClientVersion = "MinClientVersion",
                 NoPackageAnalysis = true,
                 NuspecOutputPath = "NuspecOutputPath",
-                NuspecProperties = new string[0],
+                NuspecProperties = Array.Empty<string>(),
                 PackItem = null, // This is asserted by other tests. It does not serialize well.
                 PackageFiles = new ITaskItem[0],
                 PackageFilesToExclude = new ITaskItem[0],
                 PackageId = "PackageId",
                 PackageOutputPath = "PackageOutputPath",
-                PackageTypes = new string[0],
+                PackageTypes = Array.Empty<string>(),
                 PackageVersion = "PackageVersion",
+                ProjectReferencesWithVersions = new ITaskItem[0],
                 ProjectUrl = "ProjectUrl",
                 ReleaseNotes = "ReleaseNotes",
                 RepositoryType = "RepositoryType",
                 RepositoryUrl = "RepositoryUrl",
+                RepositoryCommit = "RepositoryCommit",
+                RepositoryBranch = "RepositoryBranch",
                 RequireLicenseAcceptance = true,
                 Serviceable = true,
                 SourceFiles = new ITaskItem[0],
-                Tags = new string[0],
-                TargetFrameworks = new string[0],
+                Tags = Array.Empty<string>(),
+                TargetFrameworks = Array.Empty<string>(),
                 BuildOutputInPackage = new ITaskItem[0],
                 TargetPathsToSymbols = new ITaskItem[0]
             };

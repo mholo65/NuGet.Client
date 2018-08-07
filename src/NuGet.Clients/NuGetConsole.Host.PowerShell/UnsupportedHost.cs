@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -46,7 +46,7 @@ namespace NuGetConsole.Host
 
         public string[] GetPackageSources()
         {
-            return new string[0];
+            return Array.Empty<string>();
         }
 
         public string DefaultProject
@@ -60,7 +60,7 @@ namespace NuGetConsole.Host
 
         public string[] GetAvailableProjects()
         {
-            return new string[0];
+            return Array.Empty<string>();
         }
 
         public void SetDefaultRunspace()
@@ -70,7 +70,8 @@ namespace NuGetConsole.Host
         public PackageManagementContext PackageManagementContext
         {
             get { return null; }
-            set { }
         }
+
+        public bool IsInitializedSuccessfully => false;
     }
 }

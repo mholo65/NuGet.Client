@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -9,6 +9,8 @@ namespace NuGet.Build.Tasks.Pack
 {
     public class PackTaskRequest : IPackTaskRequest<IMSBuildItem>
     {
+        public string[] AllowedOutputExtensionsInPackageBuildOutputFolder { get; set; }
+        public string[] AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder { get; set; }
         public string AssemblyName { get; set; }
         public string[] Authors { get; set; }
         public IMSBuildItem[] BuildOutputInPackage { get; set; }
@@ -37,12 +39,15 @@ namespace NuGet.Build.Tasks.Pack
         public string[] PackageTypes { get; set; }
         public string PackageVersion { get; set; }
         public IMSBuildItem PackItem { get; set; }
+        public IMSBuildItem[] ProjectReferencesWithVersions { get; set; }
         public string ProjectUrl { get; set; }
         public string NuspecBasePath { get; set; }
         public string[] NuspecProperties { get; set; }
         public string ReleaseNotes { get; set; }
         public string RepositoryType { get; set; }
         public string RepositoryUrl { get; set; }
+        public string RepositoryBranch { get; set; }
+        public string RepositoryCommit { get; set; }
         public bool RequireLicenseAcceptance { get; set; }
         public string RestoreOutputPath { get; set; }
         public bool Serviceable { get; set; }
@@ -51,5 +56,8 @@ namespace NuGet.Build.Tasks.Pack
         public string[] TargetFrameworks { get; set; }
         public IMSBuildItem[] TargetPathsToSymbols { get; set; }
         public string Title { get; set; }
+        public string NoWarn { get; set; }
+        public string TreatWarningsAsErrors { get; set; }
+        public string WarningsAsErrors { get; set; }
     }
 }

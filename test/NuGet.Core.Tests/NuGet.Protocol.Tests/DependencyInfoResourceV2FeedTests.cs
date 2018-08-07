@@ -1,10 +1,11 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Moq;
 using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.Packaging.Core;
@@ -21,11 +22,11 @@ namespace NuGet.Protocol.Tests
         public async Task DependencyInfoResourceV2Feed_GetDependencyInfoById()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "FindPackagesById()?id='WindowsAzure.Storage'&semVerLevel=2.0.0",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageFindPackagesById.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -35,6 +36,7 @@ namespace NuGet.Protocol.Tests
             // Act
             var dependencyInfoList = await dependencyInfoResource.ResolvePackages("WindowsAzure.Storage",
                                                                             NuGetFramework.Parse("aspnetcore50"),
+                                                                            NullSourceCacheContext.Instance,
                                                                             NullLogger.Instance,
                                                                             CancellationToken.None);
 
@@ -46,13 +48,11 @@ namespace NuGet.Protocol.Tests
         public async Task DependencyInfoResourceV2Feed_GetDependencyInfoByPackageIdentity()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
-            responses.Add(serviceAddress + "FindPackagesById()?id='WindowsAzure.Storage'",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress + "Packages(Id='WindowsAzure.Storage',Version='4.3.2-preview')",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageGetPackages.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.WindowsAzureStorageGetPackages.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -64,6 +64,7 @@ namespace NuGet.Protocol.Tests
             // Act
             var dependencyInfo = await dependencyInfoResource.ResolvePackage(packageIdentity,
                                                                             NuGetFramework.Parse("aspnetcore50"),
+                                                                            NullSourceCacheContext.Instance,
                                                                             NullLogger.Instance,
                                                                             CancellationToken.None);
 
@@ -75,11 +76,11 @@ namespace NuGet.Protocol.Tests
         public async Task DependencyInfo_RetrieveExactVersion()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "Packages(Id='xunit',Version='2.1.0-beta1-build2945')",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.Xunit.2.1.0-beta1-build2945GetPackages.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.Xunit.2.1.0-beta1-build2945GetPackages.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -91,7 +92,7 @@ namespace NuGet.Protocol.Tests
             var dep2 = new PackageIdentity("xunit.assert", NuGetVersion.Parse("2.1.0-beta1-build2945"));
 
             // Act
-            var result = await dependencyInfoResource.ResolvePackage(package, NuGetFramework.Parse("net45"), Common.NullLogger.Instance, CancellationToken.None);
+            var result = await dependencyInfoResource.ResolvePackage(package, NuGetFramework.Parse("net45"), NullSourceCacheContext.Instance, Common.NullLogger.Instance, CancellationToken.None);
 
             // Assert
             Assert.Equal(package, result, PackageIdentity.Comparer);
@@ -104,11 +105,11 @@ namespace NuGet.Protocol.Tests
         public async Task DependencyInfo_RetrieveDependencies()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "FindPackagesById()?id='xunit'&semVerLevel=2.0.0",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.XunitFindPackagesById.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.XunitFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -121,7 +122,7 @@ namespace NuGet.Protocol.Tests
             var filterRange = new VersionRange(NuGetVersion.Parse("2.0.0-rc4-build2924"), true, NuGetVersion.Parse("2.1.0-beta1-build2945"), true);
 
             // Act
-            var results = await dependencyInfoResource.ResolvePackages("xunit", NuGetFramework.Parse("net45"), Common.NullLogger.Instance, CancellationToken.None);
+            var results = await dependencyInfoResource.ResolvePackages("xunit", NuGetFramework.Parse("net45"), NullSourceCacheContext.Instance, Common.NullLogger.Instance, CancellationToken.None);
 
             var filtered = results.Where(result => filterRange.Satisfies(result.Version));
 
@@ -138,23 +139,23 @@ namespace NuGet.Protocol.Tests
         public async Task DependencyInfo_RetrieveExactVersion_NotFound()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "Packages(Id='xunit',Version='1.0.0-notfound')", string.Empty);
             responses.Add(serviceAddress + "FindPackagesById()?id='xunit'&semVerLevel=2.0.0",
-                TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.XunitFindPackagesById.xml", GetType()));
+                ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.XunitFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses,
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.500Error.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.500Error.xml", GetType()));
 
             var dependencyInfoResource = await repo.GetResourceAsync<DependencyInfoResource>();
 
             var package = new PackageIdentity("xunit", NuGetVersion.Parse("1.0.0-notfound"));
 
             // Act
-            var result = await dependencyInfoResource.ResolvePackage(package, NuGetFramework.Parse("net45"), Common.NullLogger.Instance, CancellationToken.None);
+            var result = await dependencyInfoResource.ResolvePackage(package, NuGetFramework.Parse("net45"), NullSourceCacheContext.Instance, Common.NullLogger.Instance, CancellationToken.None);
 
             // Assert
             Assert.Null(result);
@@ -164,11 +165,11 @@ namespace NuGet.Protocol.Tests
         public async Task DependencyInfo_RetrieveDependencies_NotFound()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "FindPackagesById()?id='not-found'&semVerLevel=2.0.0",
-                TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.NotFoundFindPackagesById.xml", GetType()));
+                ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.NotFoundFindPackagesById.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -176,7 +177,7 @@ namespace NuGet.Protocol.Tests
             var dependencyInfoResource = await repo.GetResourceAsync<DependencyInfoResource>();
 
             // Act
-            var results = await dependencyInfoResource.ResolvePackages("not-found", NuGetFramework.Parse("net45"), Common.NullLogger.Instance, CancellationToken.None);
+            var results = await dependencyInfoResource.ResolvePackages("not-found", NuGetFramework.Parse("net45"), NullSourceCacheContext.Instance, Common.NullLogger.Instance, CancellationToken.None);
 
             // Assert
             Assert.Equal(0, results.Count());
@@ -186,11 +187,11 @@ namespace NuGet.Protocol.Tests
         public async Task DependencyInfo_GetNearestFramework()
         {
             // Arrange
-            var serviceAddress = TestUtility.CreateServiceAddress();
+            var serviceAddress = ProtocolUtility.CreateServiceAddress();
 
             var responses = new Dictionary<string, string>();
             responses.Add(serviceAddress + "Packages(Id='DotNetOpenAuth.Core',Version='4.3.2.13293')",
-                 TestUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.DotNetOpenAuth.Core.4.3.2.13293GetPackages.xml", GetType()));
+                 ProtocolUtility.GetResource("NuGet.Protocol.Tests.compiler.resources.DotNetOpenAuth.Core.4.3.2.13293GetPackages.xml", GetType()));
             responses.Add(serviceAddress, string.Empty);
 
             var repo = StaticHttpHandler.CreateSource(serviceAddress, Repository.Provider.GetCoreV3(), responses);
@@ -200,7 +201,7 @@ namespace NuGet.Protocol.Tests
             var package = new PackageIdentity("DotNetOpenAuth.Core", NuGetVersion.Parse("4.3.2.13293"));
 
             // Act
-            var result = await dependencyInfoResource.ResolvePackage(package, NuGetFramework.Parse("net45"), Common.NullLogger.Instance, CancellationToken.None);
+            var result = await dependencyInfoResource.ResolvePackage(package, NuGetFramework.Parse("net45"), NullSourceCacheContext.Instance, Common.NullLogger.Instance, CancellationToken.None);
 
             // Assert
             Assert.Equal(1, result.Dependencies.Count());

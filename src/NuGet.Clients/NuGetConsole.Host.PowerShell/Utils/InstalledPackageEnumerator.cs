@@ -126,7 +126,7 @@ namespace NuGetConsole.Host.PowerShell
             // if A -> B, we invoke B's init.ps1 before A's.
             var installedPackages = new List<PackageItem>();
 
-            var projects = _solutionManager.GetNuGetProjects().ToList();
+            var projects = (await _solutionManager.GetNuGetProjectsAsync()).ToList();
 
             // Skip project K projects.
             projects.RemoveAll(p => p is ProjectKNuGetProjectBase);
@@ -238,26 +238,30 @@ namespace NuGetConsole.Host.PowerShell
                 .PackagesFolderSourceRepository
                 .GetResourceAsync<DependencyInfoResource>();
 
-            // Order by the highest framework first to make this deterministic
-            // Process each framework/id/version once to avoid duplicate work
-            // Packages may have different dependency orders depending on the framework, but there is 
-            // no way to fully solve this across an entire solution so we make a best effort here.
-            foreach (var framework in packagesConfigInstalled.Keys.OrderByDescending(fw => fw, new NuGetFrameworkSorter()))
+            using (var sourceCacheContext = new SourceCacheContext())
             {
-                foreach (var package in packagesConfigInstalled[framework])
+                // Order by the highest framework first to make this deterministic
+                // Process each framework/id/version once to avoid duplicate work
+                // Packages may have different dependency orders depending on the framework, but there is 
+                // no way to fully solve this across an entire solution so we make a best effort here.
+                foreach (var framework in packagesConfigInstalled.Keys.OrderByDescending(fw => fw, new NuGetFrameworkSorter()))
                 {
-                    if (resolvedPackages.Add(package))
+                    foreach (var package in packagesConfigInstalled[framework])
                     {
-                        var dependencyInfo = await dependencyInfoResource.ResolvePackage(
-                            package,
-                            framework,
-                            NullLogger.Instance,
-                            token);
-
-                        // This will be null for unrestored packages
-                        if (dependencyInfo != null)
+                        if (resolvedPackages.Add(package))
                         {
-                            packagesToSort.Add(new ResolverPackage(dependencyInfo, listed: true, absent: false));
+                            var dependencyInfo = await dependencyInfoResource.ResolvePackage(
+                                package,
+                                framework,
+                                sourceCacheContext,
+                                NullLogger.Instance,
+                                token);
+
+                            // This will be null for unrestored packages
+                            if (dependencyInfo != null)
+                            {
+                                packagesToSort.Add(new ResolverPackage(dependencyInfo, listed: true, absent: false));
+                            }
                         }
                     }
                 }

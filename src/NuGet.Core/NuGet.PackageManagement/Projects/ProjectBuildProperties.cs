@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 
@@ -9,7 +9,7 @@ namespace NuGet.ProjectManagement
     /// </summary>
     public static class ProjectBuildProperties
     {
-        public const string BaseIntermediateOutputPath = "BaseIntermediateOutputPath";
+        public const string MSBuildProjectExtensionsPath = "MSBuildProjectExtensionsPath";
         public const string PackageTargetFallback = "PackageTargetFallback";
         public const string AssetTargetFallback = "AssetTargetFallback";
         public const string PackageVersion = "PackageVersion";
@@ -27,6 +27,7 @@ namespace NuGet.ProjectManagement
         public const string RestorePackagesPath = "RestorePackagesPath";
         public const string RestoreSources = "RestoreSources";
         public const string RestoreFallbackFolders = "RestoreFallbackFolders";
+        public const string ProjectTypeGuids = "ProjectTypeGuids";
         public const string RestoreAdditionalProjectSources = nameof(RestoreAdditionalProjectSources);
         public const string RestoreAdditionalProjectFallbackFolders = nameof(RestoreAdditionalProjectFallbackFolders);
         public const string NoWarn = nameof(NoWarn);

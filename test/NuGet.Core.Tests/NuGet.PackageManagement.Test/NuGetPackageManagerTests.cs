@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -24,6 +24,8 @@ using NuGet.Protocol.Core.Types;
 using NuGet.Resolver;
 using NuGet.Test.Utility;
 using NuGet.Versioning;
+using NuGet.VisualStudio;
+using NuGet.VisualStudio.Telemetry;
 using Test.Utility;
 using Xunit;
 
@@ -1925,16 +1927,16 @@ namespace NuGet.Test
         [Fact]
         public Task TestPacManGetInstalledPackagesByDependencyOrder()
         {
-            return TestPacManGetInstalledPackagesByDependencyOrder(deletePackages: false);
+            return TestPacManGetInstalledPackagesByDependencyOrderInternal(deletePackages: false);
         }
 
         [Fact]
-        public Task TestPacManGetUnrestoredPackagesByDependencyOrder()
+        public Task TestPacManGetUnrestoredPackagesByDependencyOrderDeleteTrue()
         {
-            return TestPacManGetInstalledPackagesByDependencyOrder(deletePackages: true);
+            return TestPacManGetInstalledPackagesByDependencyOrderInternal(deletePackages: true);
         }
 
-        private async Task TestPacManGetInstalledPackagesByDependencyOrder(bool deletePackages)
+        private async Task TestPacManGetInstalledPackagesByDependencyOrderInternal(bool deletePackages)
         {
             // Arrange
             var sourceRepositoryProvider = TestSourceRepositoryUtility.CreateV3OnlySourceRepositoryProvider();
@@ -2537,6 +2539,156 @@ namespace NuGet.Test
         }
 
         [Fact]
+        public async Task TestPacMan_PreviewUpdatePackagesAsync_MultiProjects()
+        {
+            // Arrange
+
+            // Set up Package Source
+            var packages = new List<SourcePackageDependencyInfo>
+            {
+                new SourcePackageDependencyInfo("a", new NuGetVersion(1, 0, 0), new Packaging.Core.PackageDependency[] { }, true, null),
+                new SourcePackageDependencyInfo("a", new NuGetVersion(2, 0, 0), new Packaging.Core.PackageDependency[] { }, true, null),
+                new SourcePackageDependencyInfo("b", new NuGetVersion(1, 0, 0), new[] { new Packaging.Core.PackageDependency("a", new VersionRange(new NuGetVersion(1, 0, 0))) }, true, null),
+                new SourcePackageDependencyInfo("b", new NuGetVersion(2, 0, 0), new[] { new Packaging.Core.PackageDependency("a", new VersionRange(new NuGetVersion(2, 0, 0))) }, true, null),
+                new SourcePackageDependencyInfo("c", new NuGetVersion(1, 0, 0), new Packaging.Core.PackageDependency[] { }, true, null),
+                new SourcePackageDependencyInfo("c", new NuGetVersion(2, 0, 0), new Packaging.Core.PackageDependency[] { }, true, null),
+                new SourcePackageDependencyInfo("d", new NuGetVersion(1, 0, 0), new[] { new Packaging.Core.PackageDependency("c", new VersionRange(new NuGetVersion(1, 0, 0))) }, true, null),
+                new SourcePackageDependencyInfo("d", new NuGetVersion(2, 0, 0), new[] { new Packaging.Core.PackageDependency("c", new VersionRange(new NuGetVersion(2, 0, 0))) }, true, null),
+            };
+
+            var sourceRepositoryProvider = CreateSource(packages);
+
+            // Set up NuGetProject
+            var fwk45 = NuGetFramework.Parse("net45");
+
+            var installedPackagesA = new List<NuGet.Packaging.PackageReference>
+            {
+                new NuGet.Packaging.PackageReference(new PackageIdentity("a", new NuGetVersion(1, 0, 0)), fwk45, true),
+                new NuGet.Packaging.PackageReference(new PackageIdentity("b", new NuGetVersion(1, 0, 0)), fwk45, true),
+            };
+
+            var installedPackagesB = new List<NuGet.Packaging.PackageReference>
+            {
+                new NuGet.Packaging.PackageReference(new PackageIdentity("d", new NuGetVersion(1, 0, 0)), fwk45, true),
+            };
+
+            var nuGetProjectA = new TestNuGetProject(installedPackagesA);
+            var nuGetProjectB = new TestNuGetProject(installedPackagesB);
+
+            // Create Package Manager
+            using (var solutionManager = new TestSolutionManager(true))
+            {
+                var nuGetPackageManager = new NuGetPackageManager(
+                    sourceRepositoryProvider,
+                    NullSettings.Instance,
+                    solutionManager,
+                    new TestDeleteOnRestartManager());
+
+                // Main Act
+                var targets = new List<PackageIdentity>
+                  {
+                    new PackageIdentity("b", new NuGetVersion(2, 0, 0))
+                  };
+
+                var result = await nuGetPackageManager.PreviewUpdatePackagesAsync(
+                    targets,
+                    new List<NuGetProject> { nuGetProjectA, nuGetProjectB },
+                    new ResolutionContext(),
+                    new TestNuGetProjectContext(),
+                    sourceRepositoryProvider.GetRepositories(),
+                    sourceRepositoryProvider.GetRepositories(),
+                    CancellationToken.None);
+
+                // Assert
+                var resulting = result.Select(a => Tuple.Create(a.PackageIdentity, a.NuGetProjectActionType)).ToArray();
+
+                var expected = new List<Tuple<PackageIdentity, NuGetProjectActionType>>();
+                Expected(expected, "a", new NuGetVersion(1, 0, 0), new NuGetVersion(2, 0, 0));
+                Expected(expected, "b", new NuGetVersion(1, 0, 0), new NuGetVersion(2, 0, 0));
+
+                Assert.True(Compare(resulting, expected));
+            }
+        }
+
+        [Fact]
+        public async Task TestPacMan_PreviewUpdatePackagesAsync_MultiProjects_MultiDependencies()
+        {
+            // Arrange
+
+            // Set up Package Source
+            var packages = new List<SourcePackageDependencyInfo>
+            {
+                new SourcePackageDependencyInfo("a", new NuGetVersion(1, 0, 0), new Packaging.Core.PackageDependency[] { }, true, null),
+                new SourcePackageDependencyInfo("a", new NuGetVersion(2, 0, 0), new Packaging.Core.PackageDependency[] { }, true, null),
+                new SourcePackageDependencyInfo("b", new NuGetVersion(1, 0, 0), new[] { new Packaging.Core.PackageDependency("a", new VersionRange(new NuGetVersion(1, 0, 0))) }, true, null),
+                new SourcePackageDependencyInfo("b", new NuGetVersion(2, 0, 0), new[] { new Packaging.Core.PackageDependency("a", new VersionRange(new NuGetVersion(2, 0, 0))) }, true, null),
+                new SourcePackageDependencyInfo("c", new NuGetVersion(1, 0, 0), new Packaging.Core.PackageDependency[] { }, true, null),
+                new SourcePackageDependencyInfo("c", new NuGetVersion(2, 0, 0), new Packaging.Core.PackageDependency[] { }, true, null),
+                new SourcePackageDependencyInfo("d", new NuGetVersion(1, 0, 0), new[] { new Packaging.Core.PackageDependency("c", new VersionRange(new NuGetVersion(1, 0, 0))) }, true, null),
+                new SourcePackageDependencyInfo("d", new NuGetVersion(2, 0, 0), new[] { new Packaging.Core.PackageDependency("c", new VersionRange(new NuGetVersion(2, 0, 0))) }, true, null),
+            };
+
+            var sourceRepositoryProvider = CreateSource(packages);
+
+            // Set up NuGetProject
+            var fwk45 = NuGetFramework.Parse("net45");
+
+            var installedPackagesA = new List<NuGet.Packaging.PackageReference>
+            {
+                new NuGet.Packaging.PackageReference(new PackageIdentity("a", new NuGetVersion(1, 0, 0)), fwk45, true),
+                new NuGet.Packaging.PackageReference(new PackageIdentity("b", new NuGetVersion(1, 0, 0)), fwk45, true),
+            };
+
+            var installedPackagesB = new List<NuGet.Packaging.PackageReference>
+            {
+                new NuGet.Packaging.PackageReference(new PackageIdentity("c", new NuGetVersion(1, 0, 0)), fwk45, true),
+                new NuGet.Packaging.PackageReference(new PackageIdentity("d", new NuGetVersion(1, 0, 0)), fwk45, true),
+            };
+
+            var nuGetProjectA = new TestNuGetProject("projectA", installedPackagesA);
+            var nuGetProjectB = new TestNuGetProject("projectB", installedPackagesB);
+
+            // Create Package Manager
+            using (var solutionManager = new TestSolutionManager(true))
+            {
+                var nuGetPackageManager = new NuGetPackageManager(
+                    sourceRepositoryProvider,
+                    NullSettings.Instance,
+                    solutionManager,
+                    new TestDeleteOnRestartManager());
+
+                // Main Act
+                var targets = new List<PackageIdentity>
+                  {
+                    new PackageIdentity("b", new NuGetVersion(2, 0, 0)),
+                    new PackageIdentity("d", new NuGetVersion(2, 0, 0))
+                  };
+
+                var result = await nuGetPackageManager.PreviewUpdatePackagesAsync(
+                    targets,
+                    new List<NuGetProject> { nuGetProjectA, nuGetProjectB },
+                    new ResolutionContext(),
+                    new TestNuGetProjectContext(),
+                    sourceRepositoryProvider.GetRepositories(),
+                    sourceRepositoryProvider.GetRepositories(),
+                    CancellationToken.None);
+
+                // Assert
+                var resulting = result.Where(a => a.NuGetProjectActionType == NuGetProjectActionType.Install)
+                    .Select(a => Tuple.Create(a.Project as TestNuGetProject, a.PackageIdentity)).ToArray();
+
+                var expected = new List<Tuple<TestNuGetProject, PackageIdentity>>();
+                expected.Add(Tuple.Create(nuGetProjectA, new PackageIdentity("a", new NuGetVersion(2, 0, 0))));
+                expected.Add(Tuple.Create(nuGetProjectA, new PackageIdentity("b", new NuGetVersion(2, 0, 0))));
+                expected.Add(Tuple.Create(nuGetProjectB, new PackageIdentity("c", new NuGetVersion(2, 0, 0))));
+                expected.Add(Tuple.Create(nuGetProjectB, new PackageIdentity("d", new NuGetVersion(2, 0, 0))));
+
+                Assert.Equal(4, resulting.Length);
+                Assert.True(PreviewResultsCompare(resulting, expected));
+            }
+        }
+
+        [Fact]
         public async Task TestPacManPreviewInstallPackageFollowingForceUninstall()
         {
             // Arrange
@@ -3076,7 +3228,7 @@ namespace NuGet.Test
                 Assert.Equal(singlePackageSource, packageActions[5].SourceRepository.PackageSource.Source);
 
                 // Main Act
-                await nuGetPackageManager.ExecuteNuGetProjectActionsAsync(msBuildNuGetProject, packageActions, new TestNuGetProjectContext(), token);
+                await nuGetPackageManager.ExecuteNuGetProjectActionsAsync(msBuildNuGetProject, packageActions, new TestNuGetProjectContext(), NullSourceCacheContext.Instance, token);
 
                 // Check that the packages.config file exists after the installation
                 Assert.True(File.Exists(packagesConfigPath));
@@ -5124,7 +5276,7 @@ namespace NuGet.Test
                     // Main Act
                     await
                         nuGetPackageManager.ExecuteNuGetProjectActionsAsync(projectA, actions,
-                            new TestNuGetProjectContext(), token);
+                            new TestNuGetProjectContext(), NullSourceCacheContext.Instance, token);
 
                     //Assert
                     // Check batch events data
@@ -5260,7 +5412,7 @@ namespace NuGet.Test
                     // Main Act
                     await
                         nuGetPackageManager.ExecuteNuGetProjectActionsAsync(projectA, new List<NuGetProjectAction>(),
-                            new TestNuGetProjectContext(), token);
+                            new TestNuGetProjectContext(), NullSourceCacheContext.Instance, token);
 
                     // Check that the packages.config file exists after the installation
                     Assert.False(File.Exists(projectA.PackagesConfigNuGetProject.FullPath));
@@ -5399,7 +5551,7 @@ namespace NuGet.Test
                     {
                         // Act
                         await nuGetPackageManager.ExecuteNuGetProjectActionsAsync(projectA, projectActions,
-                            new TestNuGetProjectContext(), token);
+                            new TestNuGetProjectContext(), NullSourceCacheContext.Instance, token);
                     }
                     catch (Exception ex)
                     {
@@ -5469,7 +5621,7 @@ namespace NuGet.Test
                     {
                         // Act
                         await nuGetPackageManager.ExecuteNuGetProjectActionsAsync(projectA, projectActions,
-                            new TestNuGetProjectContext(), token);
+                            new TestNuGetProjectContext(), NullSourceCacheContext.Instance, token);
                     }
                     catch (Exception ex)
                     {
@@ -5677,6 +5829,7 @@ namespace NuGet.Test
                     new List<NuGetProject>() {buildIntegratedProjectA, buildIntegratedProjectB },
                     projectActions,
                     new TestNuGetProjectContext(),
+                    NullSourceCacheContext.Instance,
                     token);
 
                 // Assert
@@ -5740,6 +5893,7 @@ namespace NuGet.Test
                     new List<NuGetProject>() { projectA, projectB, projectC },
                     projectActions,
                     new TestNuGetProjectContext(),
+                    NullSourceCacheContext.Instance,
                     token);
 
                 // Assert
@@ -5826,9 +5980,16 @@ namespace NuGet.Test
             var sourceRepositoryProvider = CreateSource(packages);
 
             // set up telemetry service
-            var telemetryService = new TelemetryServiceHelper();
+            var telemetrySession = new Mock<ITelemetrySession>();
+
+            var telemetryEvents= new List<TelemetryEvent>();
+            telemetrySession
+                .Setup(x => x.PostEvent(It.IsAny<TelemetryEvent>()))
+                .Callback<TelemetryEvent>(x => telemetryEvents.Add(x));
+
             var nugetProjectContext = new TestNuGetProjectContext();
-            nugetProjectContext.TelemetryService = telemetryService;
+            var telemetryService = new NuGetVSTelemetryService(telemetrySession.Object);
+            TelemetryActivity.NuGetTelemetryService = telemetryService;
 
             // Create Package Manager
             using (var solutionManager = new TestSolutionManager(true))
@@ -5854,11 +6015,10 @@ namespace NuGet.Test
                     CancellationToken.None);
 
                 // Assert
-                var telemetryEvents = telemetryService.TelemetryEvents;
                 Assert.Equal(3, telemetryEvents.Count);
                 var projectId = string.Empty;
                 nugetProject.TryGetMetadata<string>(NuGetProjectMetadataKeys.ProjectId, out projectId);
-                VerifyPreviewActionsTelemetryEvents_PackagesConfig(projectId, telemetryEvents);
+                VerifyPreviewActionsTelemetryEvents_PackagesConfig(projectId, telemetryEvents.Select(p => (string)p["StepName"]));
             }
         }
 
@@ -5869,9 +6029,17 @@ namespace NuGet.Test
             var sourceRepositoryProvider = TestSourceRepositoryUtility.CreateV3OnlySourceRepositoryProvider();
 
             // set up telemetry service
-            var telemetryService = new TelemetryServiceHelper();
+            var telemetrySession = new Mock<ITelemetrySession>();
+
+            var telemetryEvents = new List<TelemetryEvent>();
+            telemetrySession
+                .Setup(x => x.PostEvent(It.IsAny<TelemetryEvent>()))
+                .Callback<TelemetryEvent>(x => telemetryEvents.Add(x));
+
             var nugetProjectContext = new TestNuGetProjectContext();
-            nugetProjectContext.TelemetryService = telemetryService;
+            var telemetryService = new NuGetVSTelemetryService(telemetrySession.Object);
+
+            TelemetryActivity.NuGetTelemetryService = telemetryService;
 
             // Create Package Manager
             using (var solutionManager = new TestSolutionManager(true))
@@ -5897,12 +6065,13 @@ namespace NuGet.Test
                     CancellationToken.None);
 
                 // Assert
-                var telemetryEvents = telemetryService.TelemetryEvents;
-                Assert.Equal(1, telemetryEvents.Count);
+                Assert.Equal(3, telemetryEvents.Count);
+                Assert.Equal(2, telemetryEvents.Where(p => p.Name == "ProjectRestoreInformation").Count());
+
                 var projectId = string.Empty;
                 buildIntegratedProject.TryGetMetadata<string>(NuGetProjectMetadataKeys.ProjectId, out projectId);
-                Assert.True(telemetryEvents.ContainsKey(
-                    string.Format(TelemetryConstants.PreviewBuildIntegratedStepName, projectId)));
+                Assert.True(telemetryEvents.Where(p => p.Name == "NugetActionSteps").
+                    Any(p => (string)p["StepName"] == string.Format(TelemetryConstants.PreviewBuildIntegratedStepName, projectId)));
             }
         }
 
@@ -5935,9 +6104,16 @@ namespace NuGet.Test
             var nuGetProject = new TestNuGetProject(installedPackages);
 
             // set up telemetry service
-            var telemetryService = new TelemetryServiceHelper();
+            var telemetrySession = new Mock<ITelemetrySession>();
+
+            var telemetryEvents = new List<TelemetryEvent>();
+            telemetrySession
+                .Setup(x => x.PostEvent(It.IsAny<TelemetryEvent>()))
+                .Callback<TelemetryEvent>(x => telemetryEvents.Add(x));
+
             var nugetProjectContext = new TestNuGetProjectContext();
-            nugetProjectContext.TelemetryService = telemetryService;
+            var telemetryService = new NuGetVSTelemetryService(telemetrySession.Object);
+            TelemetryActivity.NuGetTelemetryService = telemetryService;
 
             // Create Package Manager
             using (var solutionManager = new TestSolutionManager(true))
@@ -5961,11 +6137,10 @@ namespace NuGet.Test
                     CancellationToken.None);
 
                 // Assert
-                var telemetryEvents = telemetryService.TelemetryEvents;
                 Assert.Equal(3, telemetryEvents.Count);
                 var projectId = string.Empty;
                 nuGetProject.TryGetMetadata<string>(NuGetProjectMetadataKeys.ProjectId, out projectId);
-                VerifyPreviewActionsTelemetryEvents_PackagesConfig(projectId, telemetryEvents);
+                VerifyPreviewActionsTelemetryEvents_PackagesConfig(projectId, telemetryEvents.Select(p => (string)p["StepName"]));
             }
         }        
 
@@ -5976,9 +6151,16 @@ namespace NuGet.Test
             var sourceRepositoryProvider = TestSourceRepositoryUtility.CreateV3OnlySourceRepositoryProvider();
 
             // set up telemetry service
-            var telemetryService = new TelemetryServiceHelper();
+            var telemetrySession = new Mock<ITelemetrySession>();
+
+            var telemetryEvents = new List<TelemetryEvent>();
+            telemetrySession
+                .Setup(x => x.PostEvent(It.IsAny<TelemetryEvent>()))
+                .Callback<TelemetryEvent>(x => telemetryEvents.Add(x));
+
             var nugetProjectContext = new TestNuGetProjectContext();
-            nugetProjectContext.TelemetryService = telemetryService;
+            var telemetryService = new NuGetVSTelemetryService(telemetrySession.Object);
+            TelemetryActivity.NuGetTelemetryService = telemetryService;
 
             // Create Package Manager
             using (var solutionManager = new TestSolutionManager(true))
@@ -6004,16 +6186,19 @@ namespace NuGet.Test
                     new List<NuGetProject>() { nugetProject },
                     projectActions,
                     nugetProjectContext,
+                    NullSourceCacheContext.Instance,
                     CancellationToken.None);
 
                 // Assert
-                var telemetryEvents = telemetryService.TelemetryEvents;
                 var projectId = string.Empty;
                 nugetProject.TryGetMetadata<string>(NuGetProjectMetadataKeys.ProjectId, out projectId);
 
-                Assert.Equal(1, telemetryEvents.Count);
-                Assert.True(telemetryEvents.ContainsKey(
-                    string.Format(TelemetryConstants.ExecuteActionStepName, projectId)));
+                Assert.Equal(3, telemetryEvents.Count);
+                Assert.Equal(1, telemetryEvents.Where(p => p.Name == "PackagePreFetcherInformation").Count());
+                Assert.Equal(1, telemetryEvents.Where(p => p.Name == "PackageExtractionInformation").Count());
+                Assert.Equal(1, telemetryEvents.Where(p => p.Name == "NugetActionSteps").Count());
+                Assert.True(telemetryEvents.Where(p => p.Name == "NugetActionSteps").
+                     Any(p => (string)p["StepName"] == string.Format(TelemetryConstants.ExecuteActionStepName, projectId)));
             }
         }
 
@@ -6024,9 +6209,16 @@ namespace NuGet.Test
             var sourceRepositoryProvider = TestSourceRepositoryUtility.CreateV3OnlySourceRepositoryProvider();
 
             // set up telemetry service
-            var telemetryService = new TelemetryServiceHelper();
+            var telemetrySession = new Mock<ITelemetrySession>();
+
+            var telemetryEvents = new List<TelemetryEvent>();
+            telemetrySession
+                .Setup(x => x.PostEvent(It.IsAny<TelemetryEvent>()))
+                .Callback<TelemetryEvent>(x => telemetryEvents.Add(x));
+
             var nugetProjectContext = new TestNuGetProjectContext();
-            nugetProjectContext.TelemetryService = telemetryService;
+            var telemetryService = new NuGetVSTelemetryService(telemetrySession.Object);
+            TelemetryActivity.NuGetTelemetryService = telemetryService;
 
             using (var settingsdir = TestDirectory.Create())
             using (var testSolutionManager = new TestSolutionManager(true))
@@ -6062,32 +6254,34 @@ namespace NuGet.Test
                     new List<NuGetProject>() { buildIntegratedProject },
                     projectActions,
                     nugetProjectContext,
+                    NullSourceCacheContext.Instance,
                     token);
 
                 // Assert
-                var telemetryEvents = telemetryService.TelemetryEvents;
                 var projectId = string.Empty;
                 buildIntegratedProject.TryGetMetadata<string>(NuGetProjectMetadataKeys.ProjectId, out projectId);
 
-                Assert.Equal(2, telemetryEvents.Count);
-                Assert.True(telemetryEvents.ContainsKey(
-                    string.Format(TelemetryConstants.PreviewBuildIntegratedStepName, projectId)));
-                Assert.True(telemetryEvents.ContainsKey(
-                    string.Format(TelemetryConstants.ExecuteActionStepName, projectId)));
+                Assert.Equal(4, telemetryEvents.Count);
 
+                Assert.Equal(2, telemetryEvents.Where(p => p.Name == "ProjectRestoreInformation").Count());
+                Assert.Equal(2, telemetryEvents.Where(p => p.Name == "NugetActionSteps").Count());
+                Assert.True(telemetryEvents.Where(p => p.Name == "NugetActionSteps").
+                    Any(p => (string)p["StepName"] == string.Format(TelemetryConstants.PreviewBuildIntegratedStepName, projectId)));
+                Assert.True(telemetryEvents.Where(p => p.Name == "NugetActionSteps").
+                    Any(p => (string)p["StepName"] == string.Format(TelemetryConstants.ExecuteActionStepName, projectId)));
             }
         }
 
-        private void VerifyPreviewActionsTelemetryEvents_PackagesConfig(string operationId, IDictionary<string, double> actual)
+        private void VerifyPreviewActionsTelemetryEvents_PackagesConfig(string operationId, IEnumerable<string> actual)
         {
             var key = string.Format(TelemetryConstants.GatherDependencyStepName, operationId);
-            Assert.True(actual.ContainsKey(key));
+            Assert.True(actual.Contains(key));
 
             key = string.Format(TelemetryConstants.ResolveDependencyStepName, operationId);
-            Assert.True(actual.ContainsKey(key));
+            Assert.True(actual.Contains(key));
 
             key = string.Format(TelemetryConstants.ResolvedActionsStepName, operationId);
-            Assert.True(actual.ContainsKey(key));
+            Assert.True(actual.Contains(key));
         }
 
         private static void AddToPackagesFolder(PackageIdentity package, string root)
@@ -6152,6 +6346,30 @@ namespace NuGet.Test
             return true;
         }
 
+        private static bool PreviewResultsCompare(
+            IEnumerable<Tuple<TestNuGetProject, PackageIdentity>> lhs,
+            IEnumerable<Tuple<TestNuGetProject, PackageIdentity>> rhs)
+        {
+            var ok = true;
+            ok &= RhsContainsAllLhs(lhs, rhs);
+            ok &= RhsContainsAllLhs(rhs, lhs);
+            return ok;
+        }
+
+        private static bool RhsContainsAllLhs(
+            IEnumerable<Tuple<TestNuGetProject, PackageIdentity>> lhs,
+            IEnumerable<Tuple<TestNuGetProject, PackageIdentity>> rhs)
+        {
+            foreach (var item in lhs)
+            {
+                if (!rhs.Contains(item, new PreviewResultComparer()))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private class ActionComparer : IEqualityComparer<Tuple<PackageIdentity, NuGetProjectActionType>>
         {
             public bool Equals(Tuple<PackageIdentity, NuGetProjectActionType> x, Tuple<PackageIdentity, NuGetProjectActionType> y)
@@ -6162,6 +6380,22 @@ namespace NuGet.Test
             }
 
             public int GetHashCode(Tuple<PackageIdentity, NuGetProjectActionType> obj)
+            {
+                return obj.GetHashCode();
+            }
+        }
+
+        private class PreviewResultComparer : IEqualityComparer<Tuple<TestNuGetProject, PackageIdentity>>
+        {
+            public bool Equals(Tuple<TestNuGetProject, PackageIdentity> x, Tuple<TestNuGetProject, PackageIdentity> y)
+            {
+                var f1 = x.Item1.Metadata[NuGetProjectMetadataKeys.Name].ToString().Equals(
+                    y.Item1.Metadata[NuGetProjectMetadataKeys.Name].ToString());
+                var f2 = x.Item2.Equals(y.Item2);
+                return f1 && f2;
+            }
+
+            public int GetHashCode(Tuple<TestNuGetProject, PackageIdentity> obj)
             {
                 return obj.GetHashCode();
             }

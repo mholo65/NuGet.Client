@@ -39,23 +39,24 @@ namespace NuGet.PackageManagement.VisualStudio
             ProjectServices = projectServices;
         }
 
-        protected override async Task<string> GetBaseIntermediatePathAsync()
+        protected override async Task<string> GetMSBuildProjectExtensionsPathAsync()
         {
-            var baseIntermediatePath = await ProjectServices.BuildProperties.GetPropertyValueAsync(ProjectBuildProperties.BaseIntermediateOutputPath);
+            var msbuildProjectExtensionsPath = await ProjectServices.BuildProperties.GetPropertyValueAsync(ProjectBuildProperties.MSBuildProjectExtensionsPath);
 
-            if (string.IsNullOrEmpty(baseIntermediatePath))
+            if (string.IsNullOrEmpty(msbuildProjectExtensionsPath))
             {
                 throw new InvalidDataException(string.Format(
-                    Strings.BaseIntermediateOutputPathNotFound,
+                    Strings.MSBuildPropertyNotFound,
+                    ProjectBuildProperties.MSBuildProjectExtensionsPath,
                     MSBuildProjectPath));
             }
 
-            return UriUtility.GetAbsolutePathFromFile(MSBuildProjectPath, baseIntermediatePath);
+            return UriUtility.GetAbsolutePathFromFile(MSBuildProjectPath, msbuildProjectExtensionsPath);
         }
 
         public override async Task<string> GetCacheFilePathAsync()
         {
-            return NoOpRestoreUtilities.GetProjectCacheFilePath(await GetBaseIntermediatePathAsync(), MSBuildProjectPath);
+            return NoOpRestoreUtilities.GetProjectCacheFilePath(await GetMSBuildProjectExtensionsPathAsync(), MSBuildProjectPath);
         }
 
         protected override async Task UpdateInternalTargetFrameworkAsync()
@@ -76,7 +77,15 @@ namespace NuGet.PackageManagement.VisualStudio
                         ? new Version(platformMinVersionString)
                         : null;
 
-                    if (platformMinVersion != null && jsonTargetFramework.Version != platformMinVersion)
+                    var targetFrameworkMonikerString = await _vsProjectAdapter
+                        .BuildProperties
+                        .GetPropertyValueAsync(ProjectBuildProperties.TargetFrameworkMoniker);
+
+                    var targetFrameworkMoniker = !string.IsNullOrWhiteSpace(targetFrameworkMonikerString)
+                        ? NuGetFramework.Parse(targetFrameworkMonikerString)
+                        : null;
+
+                    if (platformMinVersion != null && jsonTargetFramework.Version != platformMinVersion && FrameworkConstants.CommonFrameworks.NetCore50 == targetFrameworkMoniker)
                     {
                         // Found the TPMinV in csproj and it is different from project json's framework version,
                         // store this as a new target framework to be replaced in project.json

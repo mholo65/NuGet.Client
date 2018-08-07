@@ -323,11 +323,38 @@ namespace NuGet.Protocol {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Failed to fetch results from V2 feed at &apos;{0}&apos; with following message : {1}.
+        /// </summary>
+        internal static string Log_FailedToFetchV2FeedHttp {
+            get {
+                return ResourceManager.GetString("Log_FailedToFetchV2FeedHttp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Unable to load nuspec from package &apos;{0}&apos;..
         /// </summary>
         internal static string Log_FailedToGetNuspecStream {
             get {
                 return ResourceManager.GetString("Log_FailedToGetNuspecStream", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unable to parse {0} information from {1}. .
+        /// </summary>
+        internal static string Log_FailedToParseRepoSignInfor {
+            get {
+                return ResourceManager.GetString("Log_FailedToParseRepoSignInfor", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unable to get repository signature information for source {0}..
+        /// </summary>
+        internal static string Log_FailedToReadRepositorySignature {
+            get {
+                return ResourceManager.GetString("Log_FailedToReadRepositorySignature", resourceCulture);
             }
         }
         
@@ -395,6 +422,15 @@ namespace NuGet.Protocol {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The local source &apos;{0}&apos; doesn&apos;t exist..
+        /// </summary>
+        internal static string Log_LocalSourceNotExist {
+            get {
+                return ResourceManager.GetString("Log_LocalSourceNotExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Retrying &apos;{0}&apos; for source &apos;{1}&apos;..
         /// </summary>
         internal static string Log_RetryingFindPackagesById {
@@ -409,6 +445,15 @@ namespace NuGet.Protocol {
         internal static string Log_RetryingHttp {
             get {
                 return ResourceManager.GetString("Log_RetryingHttp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Retrying repository signature request for source &apos;{0}&apos;..
+        /// </summary>
+        internal static string Log_RetryingRepositorySignature {
+            get {
+                return ResourceManager.GetString("Log_RetryingRepositorySignature", resourceCulture);
             }
         }
         

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 
 namespace NuGet.Protocol.Plugins
 {
@@ -48,6 +49,18 @@ namespace NuGet.Protocol.Plugins
                 return _packageReader;
             }
         }
+
+        public ISignedPackageReader SignedPackageReader
+        {
+            get
+            {
+                ThrowIfDisposed();
+
+                return _packageReader;
+            }
+        }
+
+        public string Source => _packageSourceRepository;
 
         /// <summary>
         /// Initializes a new <see cref="PluginPackageDownloader" /> class.

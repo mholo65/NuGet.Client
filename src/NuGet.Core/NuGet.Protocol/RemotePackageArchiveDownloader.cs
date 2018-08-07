@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using NuGet.Common;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.Protocol.Core.Types;
 
 namespace NuGet.Protocol
@@ -55,9 +56,22 @@ namespace NuGet.Protocol
             }
         }
 
+        public ISignedPackageReader SignedPackageReader
+        {
+            get
+            {
+                ThrowIfDisposed();
+
+                return _packageReader.Value;
+            }
+        }
+
+        public string Source { get; }
+
         /// <summary>
         /// Initializes a new <see cref="RemotePackageArchiveDownloader" /> class.
         /// </summary>
+        /// <param name="source">A package source.</param>
         /// <param name="resource">A <see cref="FindPackageByIdResource" /> resource.</param>
         /// <param name="packageIdentity">A package identity.</param>
         /// <param name="cacheContext">A source cache context.</param>
@@ -69,6 +83,7 @@ namespace NuGet.Protocol
         /// is <c>null</c>.</exception>
         /// <exception cref="ArgumentNullException">Thrown if <paramref name="logger" /> is <c>null</c>.</exception>
         public RemotePackageArchiveDownloader(
+            string source,
             FindPackageByIdResource resource,
             PackageIdentity packageIdentity,
             SourceCacheContext cacheContext,
@@ -100,6 +115,7 @@ namespace NuGet.Protocol
             _logger = logger;
             _packageReader = new Lazy<PackageArchiveReader>(GetPackageReader);
             _handleExceptionAsync = exception => Task.FromResult(false);
+            Source = source;
         }
 
         /// <summary>

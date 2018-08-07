@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -8,6 +8,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using NuGet.Common;
+using NuGet.ContentModel;
 using NuGet.DependencyResolver;
 using NuGet.Frameworks;
 using NuGet.LibraryModel;
@@ -25,9 +26,9 @@ namespace NuGet.Commands
         private readonly ILogger _logger;
         private readonly Dictionary<RestoreTargetGraph, Dictionary<string, LibraryIncludeFlags>> _includeFlagGraphs;
 
-        public LockFileBuilder(int lockFileVersion, 
-            ILogger logger, 
-            Dictionary<RestoreTargetGraph, 
+        public LockFileBuilder(int lockFileVersion,
+            ILogger logger,
+            Dictionary<RestoreTargetGraph,
             Dictionary<string, LibraryIncludeFlags>> includeFlagGraphs)
         {
             _lockFileVersion = lockFileVersion;
@@ -45,11 +46,13 @@ namespace NuGet.Commands
             {
                 Version = _lockFileVersion
             };
+
             var previousLibraries = previousLockFile?.Libraries.ToDictionary(l => Tuple.Create(l.Name, l.Version));
 
-            if (project.RestoreMetadata?.ProjectStyle == ProjectStyle.PackageReference)
+            if (project.RestoreMetadata?.ProjectStyle == ProjectStyle.PackageReference ||
+                project.RestoreMetadata?.ProjectStyle == ProjectStyle.DotnetToolReference)
             {
-                AddProjectFileDependenciesForNETCore(project, lockFile, targetGraphs);
+                AddProjectFileDependenciesForPackageReference(project, lockFile, targetGraphs);
             }
             else
             {
@@ -109,51 +112,40 @@ namespace NuGet.Commands
                     // Packages
                     var packageInfo = NuGetv3LocalRepositoryUtility.GetPackage(localRepositories, library.Name, library.Version);
 
-                    if (packageInfo == null)
+                    // Add the library if it was resolved, unresolved packages are not added to the assets file.
+                    if (packageInfo != null)
                     {
-                        continue;
+                        var package = packageInfo.Package;
+                        var resolver = packageInfo.Repository.PathResolver;
+
+                        var sha512 = package.Sha512;
+                        var path = PathUtility.GetPathWithForwardSlashes(resolver.GetPackageDirectory(package.Id, package.Version));
+                        LockFileLibrary lockFileLib = null;
+                        LockFileLibrary previousLibrary = null;
+
+                        if (previousLibraries?.TryGetValue(Tuple.Create(package.Id, package.Version), out previousLibrary) == true)
+                        {
+                            // Check that the previous library is still valid
+                            if (previousLibrary != null
+                                && StringComparer.Ordinal.Equals(path, previousLibrary.Path)
+                                && StringComparer.Ordinal.Equals(sha512, previousLibrary.Sha512))
+                            {
+                                // We mutate this previous library so we must take a clone of it. This is
+                                // important because later, when deciding whether the lock file has changed,
+                                // we compare the new lock file to the previous (in-memory) lock file.
+                                lockFileLib = previousLibrary.Clone();
+                            }
+                        }
+
+                        // Create a new lock file library if one doesn't exist already.
+                        if (lockFileLib == null)
+                        {
+                            lockFileLib = CreateLockFileLibrary(package, sha512, path);
+                        }
+
+                        // Create a new lock file library
+                        lockFile.Libraries.Add(lockFileLib);
                     }
-
-                    var package = packageInfo.Package;
-                    var resolver = packageInfo.Repository.PathResolver;
-
-                    LockFileLibrary previousLibrary = null;
-                    if (previousLibraries?.TryGetValue(Tuple.Create(package.Id, package.Version), out previousLibrary) == true)
-                    {
-                        // We mutate this previous library so we must take a clone of it. This is
-                        // important because later, when deciding whether the lock file has changed,
-                        // we compare the new lock file to the previous (in-memory) lock file.
-                        previousLibrary = previousLibrary.Clone();
-                    }
-
-                    var sha512 = File.ReadAllText(resolver.GetHashPath(package.Id, package.Version));
-                    var path = PathUtility.GetPathWithForwardSlashes(
-                        resolver.GetPackageDirectory(package.Id, package.Version));
-
-                    var lockFileLib = previousLibrary;
-
-                    // If we have the same library in the lock file already, use that.
-                    if (previousLibrary == null ||
-                        previousLibrary.Sha512 != sha512 ||
-                        previousLibrary.Path != path)
-                    {
-                        lockFileLib = CreateLockFileLibrary(
-                            package,
-                            sha512,
-                            path);
-                    }
-                    else if (Path.DirectorySeparatorChar != LockFile.DirectorySeparatorChar)
-                    {
-                        // Fix slashes for content model patterns
-                        lockFileLib.Files = lockFileLib.Files
-                            .Select(p => p.Replace(Path.DirectorySeparatorChar, LockFile.DirectorySeparatorChar))
-                            .ToList();
-                    }
-
-                    lockFile.Libraries.Add(lockFileLib);
-
-                    var packageIdentity = new PackageIdentity(lockFileLib.Name, lockFileLib.Version);
-                    context.PackageFileCache.TryAdd(packageIdentity, lockFileLib.Files);
                 }
             }
 
@@ -163,14 +155,19 @@ namespace NuGet.Commands
 
             var rootProjectStyle = project.RestoreMetadata?.ProjectStyle ?? ProjectStyle.Unknown;
 
+            // Cache package data and selection criteria across graphs.
+            var builderCache = new LockFileBuilderCache();
+
             // Add the targets
             foreach (var targetGraph in targetGraphs
                 .OrderBy(graph => graph.Framework.ToString(), StringComparer.Ordinal)
                 .ThenBy(graph => graph.RuntimeIdentifier, StringComparer.Ordinal))
             {
-                var target = new LockFileTarget();
-                target.TargetFramework = targetGraph.Framework;
-                target.RuntimeIdentifier = targetGraph.RuntimeIdentifier;
+                var target = new LockFileTarget
+                {
+                    TargetFramework = targetGraph.Framework,
+                    RuntimeIdentifier = targetGraph.RuntimeIdentifier
+                };
 
                 var flattenedFlags = IncludeFlagUtils.FlattenDependencyTypes(_includeFlagGraphs, project, targetGraph);
 
@@ -227,7 +224,8 @@ namespace NuGet.Commands
                             targetGraph,
                             dependencyType: includeFlags,
                             targetFrameworkOverride: null,
-                            dependencies: graphItem.Data.Dependencies);
+                            dependencies: graphItem.Data.Dependencies,
+                            cache: builderCache);
 
                         target.Libraries.Add(targetLibrary);
 
@@ -242,7 +240,8 @@ namespace NuGet.Commands
                                 targetGraph,
                                 targetFrameworkOverride: nonFallbackFramework,
                                 dependencyType: includeFlags,
-                                dependencies: graphItem.Data.Dependencies);
+                                dependencies: graphItem.Data.Dependencies,
+                                cache: builderCache);
 
                             if (!targetLibrary.Equals(targetLibraryWithoutFallback))
                             {
@@ -310,7 +309,7 @@ namespace NuGet.Commands
             }
         }
 
-        private static void AddProjectFileDependenciesForNETCore(PackageSpec project, LockFile lockFile, IEnumerable<RestoreTargetGraph> targetGraphs)
+        private static void AddProjectFileDependenciesForPackageReference(PackageSpec project, LockFile lockFile, IEnumerable<RestoreTargetGraph> targetGraphs)
         {
             // For NETCore put everything under a TFM section
             // Projects are included for NETCore
@@ -322,7 +321,7 @@ namespace NuGet.Commands
                 dependencies.AddRange(project.Dependencies.Select(e => e.LibraryRange));
                 dependencies.AddRange(frameworkInfo.Dependencies.Select(e => e.LibraryRange));
 
-                var targetGraph = targetGraphs.SingleOrDefault(graph => 
+                var targetGraph = targetGraphs.SingleOrDefault(graph =>
                     graph.Framework.Equals(frameworkInfo.FrameworkName)
                     && string.IsNullOrEmpty(graph.RuntimeIdentifier));
 
@@ -368,52 +367,26 @@ namespace NuGet.Commands
 
         private static LockFileLibrary CreateLockFileLibrary(LocalPackageInfo package, string sha512, string path)
         {
-            var lockFileLib = new LockFileLibrary();
-            
-            lockFileLib.Name = package.Id;
-            lockFileLib.Version = package.Version;
-            lockFileLib.Type = LibraryType.Package;
-            lockFileLib.Sha512 = sha512;
-
-            // This is the relative path, appended to the global packages folder path. All
-            // of the paths in the in the Files property should be appended to this path along
-            // with the global packages folder path to get the absolute path to each file in the
-            // package.
-            lockFileLib.Path = path;
-
-            using (var packageReader = new PackageFolderReader(package.ExpandedPath))
+            var lockFileLib = new LockFileLibrary
             {
-                // Get package files, excluding directory entries and OPC files
-                // This is sorted before it is written out
-                lockFileLib.Files = packageReader
-                    .GetFiles()
-                    .Where(file => IsAllowedLibraryFile(file))
-                    .ToList();
+                Name = package.Id,
+                Version = package.Version,
+                Type = LibraryType.Package,
+                Sha512 = sha512,
+
+                // This is the relative path, appended to the global packages folder path. All
+                // of the paths in the in the Files property should be appended to this path along
+                // with the global packages folder path to get the absolute path to each file in the
+                // package.
+                Path = path
+            };
+
+            foreach (var file in package.Files)
+            {
+                lockFileLib.Files.Add(file);
             }
 
             return lockFileLib;
-        }
-
-        /// <summary>
-        /// True if the file should be added to the lock file library
-        /// Fale if it is an OPC file or empty directory
-        /// </summary>
-        private static bool IsAllowedLibraryFile(string path)
-        {
-            switch (path)
-            {
-                case "_rels/.rels":
-                case "[Content_Types].xml":
-                    return false;
-            }
-
-            if (path.EndsWith("/", StringComparison.Ordinal)
-                || path.EndsWith(".psmdcp", StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            return true;
         }
     }
 }
