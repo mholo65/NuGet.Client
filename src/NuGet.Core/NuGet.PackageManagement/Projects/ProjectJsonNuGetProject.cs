@@ -336,7 +336,7 @@ namespace NuGet.ProjectManagement.Projects
         {
             await FileUtility.ReplaceAsync(async (outputPath) =>
             {
-                using (var writer = new StreamWriter(outputPath, false, Encoding.UTF8))
+                using (var writer = File.CreateText(outputPath))
                 {
                     await writer.WriteAsync(json.ToString());
                 }
