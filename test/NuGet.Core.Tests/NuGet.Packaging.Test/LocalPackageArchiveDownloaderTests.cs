@@ -23,9 +23,10 @@ namespace NuGet.Packaging.Test
         {
             var exception = Assert.Throws<ArgumentException>(
                 () => new LocalPackageArchiveDownloader(
-                    packageFilePath,
-                    new PackageIdentity(id: "a", version: NuGetVersion.Parse("1.0.0")),
-                    NullLogger.Instance));
+                    source: null,
+                    packageFilePath: packageFilePath,
+                    packageIdentity: new PackageIdentity(id: "a", version: NuGetVersion.Parse("1.0.0")),
+                    logger: NullLogger.Instance));
 
             Assert.Equal("packageFilePath", exception.ParamName);
         }
@@ -35,6 +36,7 @@ namespace NuGet.Packaging.Test
         {
             var exception = Assert.Throws<ArgumentNullException>(
                 () => new LocalPackageArchiveDownloader(
+                    source: null,
                     packageFilePath: "a",
                     packageIdentity: null,
                     logger: NullLogger.Instance));
@@ -47,6 +49,7 @@ namespace NuGet.Packaging.Test
         {
             var exception = Assert.Throws<ArgumentNullException>(
                 () => new LocalPackageArchiveDownloader(
+                    source: null,
                     packageFilePath: "a",
                     packageIdentity: new PackageIdentity(id: "a", version: NuGetVersion.Parse("1.0.0")),
                     logger: null));
@@ -55,9 +58,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public void Constructor_InitializesProperties()
+        public async Task Constructor_InitializesPropertiesAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 Assert.IsType<PackageArchiveReader>(test.Downloader.ContentReader);
                 Assert.IsType<PackageArchiveReader>(test.Downloader.CoreReader);
@@ -65,9 +68,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public void Dispose_IsIdempotent()
+        public async Task Dispose_IsIdempotentAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
                 test.Downloader.Dispose();
@@ -75,9 +78,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public void ContentReader_ThrowsIfDisposed()
+        public async Task ContentReader_ThrowsIfDisposedAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
 
@@ -88,9 +91,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public void CoreReader_ThrowsIfDisposed()
+        public async Task CoreReader_ThrowsIfDisposedAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
 
@@ -101,9 +104,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ThrowsIfDisposed()
+        public async Task CopyNupkgFileToAsync_ThrowsIfDisposedAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
 
@@ -119,9 +122,9 @@ namespace NuGet.Packaging.Test
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public async Task CopyNupkgFileToAsync_ThrowsForNullOrEmptyDestinationFilePath(string destinationFilePath)
+        public async Task CopyNupkgFileToAsync_ThrowsForNullOrEmptyDestinationFilePathAsync(string destinationFilePath)
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentException>(
                     () => test.Downloader.CopyNupkgFileToAsync(
@@ -133,9 +136,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ThrowsIfCancelled()
+        public async Task CopyNupkgFileToAsync_ThrowsIfCancelledAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 await Assert.ThrowsAsync<OperationCanceledException>(
                     () => test.Downloader.CopyNupkgFileToAsync(
@@ -145,9 +148,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ReturnsFalseIfExceptionHandled()
+        public async Task CopyNupkgFileToAsync_ReturnsFalseIfExceptionHandledAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 var destinationFilePath = Path.Combine(test.TestDirectory.Path, "a");
 
@@ -170,9 +173,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ReturnsTrueOnSuccess()
+        public async Task CopyNupkgFileToAsync_ReturnsTrueOnSuccessAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 var destinationFilePath = Path.Combine(test.TestDirectory.Path, "copied.nupkg");
 
@@ -190,9 +193,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_RespectsThrottle()
+        public async Task CopyNupkgFileToAsync_RespectsThrottleAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             using (var throttle = new SemaphoreSlim(initialCount: 0, maxCount: 1))
             {
                 var destinationFilePath = Path.Combine(test.TestDirectory.Path, "copied.nupkg");
@@ -223,9 +226,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task CopyNupkgFileToAsync_ReleasesThrottleOnException()
+        public async Task CopyNupkgFileToAsync_ReleasesThrottleOnExceptionAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             using (var throttle = new SemaphoreSlim(initialCount: 1, maxCount: 1))
             {
                 var destinationFilePath = Path.Combine(test.TestDirectory.Path, "a");
@@ -260,9 +263,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task GetPackageHashAsync_ThrowsIfDisposed()
+        public async Task GetPackageHashAsync_ThrowsIfDisposedAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.Dispose();
 
@@ -278,9 +281,9 @@ namespace NuGet.Packaging.Test
         [Theory]
         [InlineData(null)]
         [InlineData("")]
-        public async Task GetPackageHashAsync_ThrowsForNullOrEmptyHashAlgorithm(string hashAlgorithm)
+        public async Task GetPackageHashAsync_ThrowsForNullOrEmptyHashAlgorithmAsync(string hashAlgorithm)
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 var exception = await Assert.ThrowsAsync<ArgumentException>(
                     () => test.Downloader.GetPackageHashAsync(
@@ -292,9 +295,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task GetPackageHashAsync_ThrowsIfCancelled()
+        public async Task GetPackageHashAsync_ThrowsIfCancelledAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 await Assert.ThrowsAsync<OperationCanceledException>(
                     () => test.Downloader.GetPackageHashAsync(
@@ -304,9 +307,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public async Task GetPackageHashAsync_ReturnsPackageHash()
+        public async Task GetPackageHashAsync_ReturnsPackageHashAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 var hashAlgorithm = "SHA512";
                 var expectedPackageHash = CalculatePackageHash(test.SourcePackageFile.FullName, hashAlgorithm);
@@ -319,9 +322,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public void SetExceptionHandler_ThrowsForNullHandler()
+        public async Task SetExceptionHandler_ThrowsForNullHandlerAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 var exception = Assert.Throws<ArgumentNullException>(
                     () => test.Downloader.SetExceptionHandler(handleExceptionAsync: null));
@@ -331,9 +334,9 @@ namespace NuGet.Packaging.Test
         }
 
         [Fact]
-        public void SetThrottle_AcceptsNullThrottle()
+        public async Task SetThrottle_AcceptsNullThrottleAsync()
         {
-            using (var test = LocalPackageArchiveDownloaderTest.Create())
+            using (var test = await LocalPackageArchiveDownloaderTest.CreateAsync())
             {
                 test.Downloader.SetThrottle(throttle: null);
             }
@@ -379,7 +382,7 @@ namespace NuGet.Packaging.Test
                 GC.SuppressFinalize(this);
             }
 
-            internal static LocalPackageArchiveDownloaderTest Create()
+            internal static async Task<LocalPackageArchiveDownloaderTest> CreateAsync()
             {
                 var testDirectory = TestDirectory.Create();
                 var packageIdentity = new PackageIdentity(id: "a", version: NuGetVersion.Parse("1.0.0"));
@@ -405,13 +408,14 @@ namespace NuGet.Packaging.Test
 
                 packageContext.AddFile($"lib/net45/{packageIdentity.Id}.dll");
 
-                SimpleTestPackageUtility.CreatePackages(testDirectory.Path, packageContext);
+                await SimpleTestPackageUtility.CreatePackagesAsync(testDirectory.Path, packageContext);
 
                 var sourcePackageFilePath = Path.Combine(
                     testDirectory.Path,
                     $"{packageIdentity.Id}.{packageIdentity.Version.ToNormalizedString()}.nupkg");
 
                 var downloader = new LocalPackageArchiveDownloader(
+                    testDirectory.Path,
                     sourcePackageFilePath,
                     packageIdentity,
                     NullLogger.Instance);

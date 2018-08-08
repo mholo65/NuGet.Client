@@ -51,16 +51,27 @@ namespace NuGet.Packaging.Signing
         /// <summary>
         /// Timestamps data present in the TimestampRequest.
         /// </summary>
-        public Task<Signature> TimestampSignatureAsync(TimestampRequest request, ILogger logger, CancellationToken token)
+        public Task<PrimarySignature> TimestampSignatureAsync(PrimarySignature primarySignature, TimestampRequest request, ILogger logger, CancellationToken token)
         {
-            var timestampedSignature = TimestampData(request, logger, token);
-            return Task.FromResult(Signature.Load(timestampedSignature));
+            var timestampCms = GetTimestamp(request, logger, token);
+            using (var signatureNativeCms = NativeCms.Decode(primarySignature.GetBytes()))
+            {
+                if (request.Target == SignaturePlacement.Countersignature)
+                {
+                    signatureNativeCms.AddTimestampToRepositoryCountersignature(timestampCms);
+                }
+                else
+                {
+                    signatureNativeCms.AddTimestamp(timestampCms);
+                }
+                return Task.FromResult(PrimarySignature.Load(signatureNativeCms.Encode()));
+            }
         }
 
         /// <summary>
         /// Timestamps data present in the TimestampRequest.
         /// </summary>
-        public byte[] TimestampData(TimestampRequest request, ILogger logger, CancellationToken token)
+        public SignedCms GetTimestamp(TimestampRequest request, ILogger logger, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
 
@@ -74,52 +85,41 @@ namespace NuGet.Packaging.Signing
                 throw new ArgumentNullException(nameof(logger));
             }
 
-            // Get the signatureValue from the signerInfo object
-            using (var signatureNativeCms = NativeCms.Decode(request.SignatureValue, detached: false))
+            // Allows us to track the request.
+            var nonce = GenerateNonce();
+            var rfc3161TimestampRequest = new Rfc3161TimestampRequest(
+                request.HashedMessage,
+                request.HashAlgorithm.ConvertToSystemSecurityHashAlgorithmName(),
+                nonce: nonce,
+                requestSignerCertificates: true);
+
+            // Request a timestamp
+            // The response status need not be checked here as lower level api will throw if the response is invalid
+            var timestampToken = rfc3161TimestampRequest.SubmitRequest(
+                _timestamperUrl,
+                TimeSpan.FromSeconds(_rfc3161RequestTimeoutSeconds));
+
+            // quick check for response validity
+            ValidateTimestampResponse(nonce, request.HashedMessage, timestampToken);
+
+            var timestampCms = timestampToken.AsSignedCms();
+            ValidateTimestampCms(request.SigningSpecifications, timestampCms);
+
+            // If the timestamp signed CMS already has a complete chain for the signing certificate,
+            // it's ready to be added to the signature to be timestamped.
+            // However, a timestamp service is not required to include all certificates in a complete
+            // chain for the signing certificate in the SignedData.certificates collection.
+            // Some timestamp services include all certificates except the root in the
+            // SignedData.certificates collection.
+            var signerInfo = timestampCms.SignerInfos[0];
+
+            using (var chain = CertificateChainUtility.GetCertificateChain(
+                signerInfo.Certificate,
+                timestampCms.Certificates,
+                logger,
+                CertificateType.Timestamp))
             {
-                var signatureValueHashByteArray = NativeCms.GetSignatureValueHash(
-                    request.TimestampHashAlgorithm,
-                    signatureNativeCms);
-
-                // Allows us to track the request.
-                var nonce = GenerateNonce();
-                var rfc3161TimestampRequest = new Rfc3161TimestampRequest(
-                    signatureValueHashByteArray,
-                    request.TimestampHashAlgorithm.ConvertToSystemSecurityHashAlgorithmName(),
-                    nonce: nonce,
-                    requestSignerCertificates: true);
-
-                // Request a timestamp
-                // The response status need not be checked here as lower level api will throw if the response is invalid
-                var timestampToken = rfc3161TimestampRequest.SubmitRequest(
-                    _timestamperUrl,
-                    TimeSpan.FromSeconds(_rfc3161RequestTimeoutSeconds));
-
-                // quick check for response validity
-                ValidateTimestampResponse(nonce, signatureValueHashByteArray, timestampToken);
-
-                var timestampCms = timestampToken.AsSignedCms();
-                ValidateTimestampCms(request.SigningSpec, timestampCms);
-
-                // If the timestamp signed CMS already has a complete chain for the signing certificate,
-                // it's ready to be added to the signature to be timestamped.
-                // However, a timestamp service is not required to include all certificates in a complete
-                // chain for the signing certificate in the SignedData.certificates collection.
-                // Some timestamp services include all certificates except the root in the
-                // SignedData.certificates collection.
-                var signerInfo = timestampCms.SignerInfos[0];
-                var chain = CertificateChainUtility.GetCertificateChain(
-                    signerInfo.Certificate,
-                    timestampCms.Certificates,
-                    logger,
-                    CertificateType.Timestamp);
-
-                var timestampCmsWithChainCertificates = EnsureCertificatesInCertificatesCollection(timestampCms, chain);
-                var bytes = timestampCmsWithChainCertificates.Encode();
-
-                signatureNativeCms.AddTimestamp(bytes);
-
-                return signatureNativeCms.Encode();
+                return EnsureCertificatesInCertificatesCollection(timestampCms, chain);
             }
         }
 
@@ -127,7 +127,7 @@ namespace NuGet.Packaging.Signing
             SignedCms timestampCms,
             IReadOnlyList<X509Certificate2> chain)
         {
-            using (var timestampNativeCms = NativeCms.Decode(timestampCms.Encode(), detached: false))
+            using (var timestampNativeCms = NativeCms.Decode(timestampCms.Encode()))
             {
                 timestampNativeCms.AddCertificates(
                     chain.Where(certificate => !timestampCms.Certificates.Contains(certificate))
@@ -151,45 +151,45 @@ namespace NuGet.Packaging.Signing
             }
             catch (Exception e)
             {
-                throw new TimestampException(NuGetLogCode.NU3021, Strings.TimestampSignatureValidationFailed, e);
+                throw new TimestampException(NuGetLogCode.NU3021, Strings.SignError_TimestampSignatureValidationFailed, e);
             }
 
             if (signerInfo.Certificate == null)
             {
-                throw new TimestampException(NuGetLogCode.NU3020, Strings.TimestampNoCertificate);
+                throw new TimestampException(NuGetLogCode.NU3020, Strings.SignError_TimestampNoCertificate);
             }
 
             if (!CertificateUtility.IsSignatureAlgorithmSupported(signerInfo.Certificate))
             {
-                throw new TimestampException(NuGetLogCode.NU3022, Strings.TimestampUnsupportedSignatureAlgorithm);
+                throw new TimestampException(NuGetLogCode.NU3022, Strings.SignError_TimestampUnsupportedSignatureAlgorithm);
             }
 
             if (!CertificateUtility.IsCertificatePublicKeyValid(signerInfo.Certificate))
             {
-                throw new TimestampException(NuGetLogCode.NU3023, Strings.TimestampCertificateFailsPublicKeyLengthRequirement);
+                throw new TimestampException(NuGetLogCode.NU3023, Strings.SignError_TimestampCertificateFailsPublicKeyLengthRequirement);
             }
 
             if (!spec.AllowedHashAlgorithmOids.Contains(signerInfo.DigestAlgorithm.Value))
             {
-                throw new TimestampException(NuGetLogCode.NU3024, Strings.TimestampUnsupportedSignatureAlgorithm);
+                throw new TimestampException(NuGetLogCode.NU3024, Strings.SignError_TimestampUnsupportedSignatureAlgorithm);
             }
 
             if (CertificateUtility.IsCertificateValidityPeriodInTheFuture(signerInfo.Certificate))
             {
-                throw new TimestampException(NuGetLogCode.NU3025, Strings.TimestampNotYetValid);
+                throw new TimestampException(NuGetLogCode.NU3025, Strings.SignError_TimestampNotYetValid);
             }
         }
 
-        private static void ValidateTimestampResponse(byte[] nonce, byte[] data, Rfc3161TimestampToken timestampToken)
+        private static void ValidateTimestampResponse(byte[] nonce, byte[] messageHash, Rfc3161TimestampToken timestampToken)
         {
             if (!nonce.SequenceEqual(timestampToken.TokenInfo.GetNonce()))
             {
                 throw new TimestampException(NuGetLogCode.NU3026, Strings.TimestampFailureNonceMismatch);
             }
 
-            if (!timestampToken.TokenInfo.HasMessageHash(data))
+            if (!timestampToken.TokenInfo.HasMessageHash(messageHash))
             {
-                throw new TimestampException(NuGetLogCode.NU3019, Strings.TimestampIntegrityCheckFailed);
+                throw new TimestampException(NuGetLogCode.NU3019, Strings.SignError_TimestampIntegrityCheckFailed);
             }
         }
 
@@ -224,7 +224,7 @@ namespace NuGet.Packaging.Signing
         /// <summary>
         /// Timestamp a signature.
         /// </summary>
-        public Task<Signature> TimestampSignatureAsync(TimestampRequest timestampRequest, ILogger logger, CancellationToken token)
+        public Task<PrimarySignature> TimestampSignatureAsync(PrimarySignature primarySignature, TimestampRequest timestampRequest, ILogger logger, CancellationToken token)
         {
             throw new NotImplementedException();
         }

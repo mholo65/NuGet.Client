@@ -20,6 +20,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
         [InlineData(NuGetProjectType.XProjProjectJson)]
         [InlineData(NuGetProjectType.CPSBasedPackageRefs)]
         [InlineData(NuGetProjectType.LegacyProjectSystemWithPackageRefs)]
+        [InlineData(NuGetProjectType.UnconfiguredNuGetType)]
         public void NuGetTelemetryService_EmitProjectInformation(NuGetProjectType projectType)
         {
             // Arrange
@@ -33,7 +34,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
                 "3.5.0-beta2",
                 "15e9591f-9391-4ddf-a246-ca9e0351277d",
                 projectType,
-                3);
+                true);
             var target = new NuGetVSTelemetryService(telemetrySession.Object);
 
             // Act
@@ -60,10 +61,10 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             Assert.IsType<NuGetProjectType>(actualProjectType);
             Assert.Equal(projectInformation.NuGetProjectType, actualProjectType);
 
-            var installedPackageCount = lastTelemetryEvent["InstalledPackageCount"];
-            Assert.NotNull(installedPackageCount);
-            Assert.IsType<int>(installedPackageCount);
-            Assert.Equal(projectInformation.InstalledPackageCount, installedPackageCount);
+            var isPRUpgradable = lastTelemetryEvent["IsPRUpgradable"];
+            Assert.NotNull(isPRUpgradable);
+            Assert.IsType<bool>(isPRUpgradable);
+            Assert.Equal(projectInformation.IsProjectPRUpgradable, isPRUpgradable);
         }
     }
 }

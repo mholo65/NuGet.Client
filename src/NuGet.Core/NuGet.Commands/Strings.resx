@@ -131,6 +131,8 @@
   </data>
   <data name="Log_InstallingPackage" xml:space="preserve">
     <value>Installing {0} {1}.</value>
+    <comment>0 - package id
+1 - package version</comment>
   </data>
   <data name="Log_MergingRuntimes" xml:space="preserve">
     <value>Merging in runtimes defined in {0}.</value>
@@ -229,15 +231,14 @@
   </data>
   <data name="Log_InstalledSummaryCount" xml:space="preserve">
     <value>{0} package(s) to {1}</value>
+    <comment>0 - installed package count
+1 - folder path</comment>
   </data>
   <data name="Log_Committing" xml:space="preserve">
     <value>Committing restore...</value>
   </data>
   <data name="Log_FoundProjectRoot" xml:space="preserve">
     <value>Found project root directory: {0}.</value>
-  </data>
-  <data name="Log_LoadedProject" xml:space="preserve">
-    <value>Loaded project {0} from {1}.</value>
   </data>
   <data name="Log_RestoreComplete" xml:space="preserve">
     <value>Restore completed in {0} for {1}.</value>
@@ -319,13 +320,7 @@
     <value>'{0}' key already exists in Properties collection. Overriding value.</value>
   </data>
   <data name="Warning_SemanticVersion" xml:space="preserve">
-    <value>Version "{0}" does not follow semantic versioning guidelines.</value>
-  </data>
-  <data name="Warning_SemanticVersionSolution" xml:space="preserve">
-    <value>Update your nuspec file or use the AssemblyInformationalVersion assembly attribute to specify a semantic version as described at http://semver.org.</value>
-  </data>
-  <data name="Warning_SemanticVersionTitle" xml:space="preserve">
-    <value>Use semantic versioning</value>
+    <value>Version "{0}" does not follow semantic versioning guidelines. Update your nuspec file or use the AssemblyInformationalVersion assembly attribute to specify a semantic version as described at http://semver.org.</value>
   </data>
   <data name="MSBuildWarning_MultiTarget" xml:space="preserve">
     <value>Packages containing MSBuild targets and props files cannot be fully installed in projects targeting multiple frameworks. The MSBuild targets and props files have been ignored.</value>
@@ -668,7 +663,8 @@ For more information, visit http://docs.nuget.org/docs/reference/command-line-re
     <comment>{0} is the number of errors produced and {1} is the number of warnings.</comment>
   </data>
   <data name="VerifyCommand_Success" xml:space="preserve">
-    <value>Successfully verified package(s).</value>
+    <value>Successfully verified package '{0}'.</value>
+    <comment>0 - package id</comment>
   </data>
   <data name="VerifyCommand_VerifyingPackage" xml:space="preserve">
     <value>Verifying {0}</value>
@@ -680,5 +676,26 @@ For more information, visit http://docs.nuget.org/docs/reference/command-line-re
   <data name="SignCommandCertificateStoreNotFound" xml:space="preserve">
     <value>Certificate store '{0}' not found. For a list of accepted ways to provide a certificate, please visit https://docs.nuget.org/docs/reference/command-line-reference</value>
     <comment>{0} is the certificate store name</comment>
+  </data>
+  <data name="Error_ProjectWithIncorrectDependenciesCount" xml:space="preserve">
+    <value>Project {0} must have a single package reference(s).</value>
+  </data>
+  <data name="Log_SkippingCompatibiilityCheckOnRidlessGraphForDotnetToolReferenceProject" xml:space="preserve">
+    <value>Skipping compatibility checks of the ridless graph for DotnetToolReference project type. This graph is not used. </value>
+  </data>
+  <data name="Error_InvalidProjectPackageCombo" xml:space="preserve">
+    <value>Invalid project-package combination for {0} {1}. DotnetToolReference project style can only contain references of the DotnetTool type</value>
+  </data>
+  <data name="Error_ToolsPackageWithExtraPackageTypes" xml:space="preserve">
+    <value>Invalid tools package {0} {1}. Tools packages cannot contain more than one PackageType.</value>
+  </data>
+  <data name="Error_InvalidDependencyVersionConstraints" xml:space="preserve">
+    <value>Package version constraints for '{0}' return a version range that is empty.</value>
+  </data>
+  <data name="Error_UnableToSignPackage" xml:space="preserve">
+    <value>Unable to sign package.</value>
+  </data>
+  <data name="Warning_FileExcludedByDefault" xml:space="preserve">
+    <value>File '{0}' was not added to the package. Files and folders starting with '.' or ending with '.nupkg' are excluded by default. To include this file, use -NoDefaultExcludes from the commandline</value>
   </data>
 </root>

@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,51 +12,115 @@ namespace NuGet.Packaging.Signing
 {
     public class AllowListVerificationProvider : ISignatureVerificationProvider
     {
-        private HashAlgorithmName _fingerprintAlgorithm;
-        private IReadOnlyList<VerificationAllowListEntry> _allowList;
-
-        public AllowListVerificationProvider(IReadOnlyList<VerificationAllowListEntry> allowList)
+        public Task<PackageVerificationResult> GetTrustResultAsync(ISignedPackageReader package, PrimarySignature signature, SignedPackageVerifierSettings settings, CancellationToken token)
         {
-            _fingerprintAlgorithm = HashAlgorithmName.SHA256;
-            _allowList = allowList;
-        }
-
-        public Task<PackageVerificationResult> GetTrustResultAsync(ISignedPackageReader package, Signature signature, SignedPackageVerifierSettings settings, CancellationToken token)
-        {
-            return Task.FromResult(VerifyAllowList(package, signature, settings));
+            return VerifyAllowListAsync(package, signature, settings);
         }
 
 #if IS_DESKTOP
-        private PackageVerificationResult VerifyAllowList(ISignedPackageReader package, Signature signature, SignedPackageVerifierSettings settings)
+        private async Task<PackageVerificationResult> VerifyAllowListAsync(ISignedPackageReader package, PrimarySignature signature, SignedPackageVerifierSettings settings)
         {
-            var status = SignatureVerificationStatus.Trusted;
-            var issues = new List<SignatureLog>();
+            var treatIssuesAsErrors = !settings.AllowUntrusted;
 
-            if (_allowList.Count() > 0 && !IsSignatureAllowed(signature))
+            var certificateListVertificationRequests = new List<CertificateListVerificationRequest>()
             {
-                status = SignatureVerificationStatus.Invalid;
-                issues.Add(SignatureLog.Issue(fatal: true, code: NuGetLogCode.NU3003, message: string.Format(CultureInfo.CurrentCulture, Strings.Error_NoMatchingCertificate, _fingerprintAlgorithm.ToString())));
-            }
+                new CertificateListVerificationRequest()
+                {
+                    CertificateList = settings.ClientCertificateList,
+                    RequireCertificateList = !settings.AllowNoClientCertificateList,
+                    NoListErrorMessage = Strings.Error_NoClientAllowList,
+                    NoMatchErrorMessage = Strings.Error_NoMatchingClientCertificate,
+                    Signature = signature,
+                    TreatIssuesAsErrors = treatIssuesAsErrors
+                },
+                new CertificateListVerificationRequest()
+                {
+                    CertificateList = settings.RepositoryCertificateList,
+                    RequireCertificateList = !settings.AllowNoRepositoryCertificateList,
+                    NoListErrorMessage = Strings.Error_NoRepoAllowList,
+                    NoMatchErrorMessage = Strings.Error_NoMatchingRepositoryCertificate,
+                    Signature = signature,
+                    TreatIssuesAsErrors = treatIssuesAsErrors
+                }
+            };
 
-            return new SignedPackageVerificationResult(status, signature, issues);
+            var allowListResults = await Task.WhenAll(certificateListVertificationRequests.Select(r => VerifyAllowList(r)));
+
+            return new SignedPackageVerificationResult(GetValidity(allowListResults), signature, allowListResults.SelectMany(r => r.Issues));
         }
 
-        private bool IsSignatureAllowed(Signature signature)
+        /// <summary>
+        /// Verify an allow list with a given request
+        /// </summary>
+        /// <param name="request">Information about the allow list verification to perform</param>
+        /// <remarks>This method should never return a status unknown. Min is used to take the most severe status in <see cref="GetValidity"/>
+        /// therefore, if unknown is returned the verification process will return an unknown status for the whole operation</remarks>
+        private Task<SignedPackageVerificationResult> VerifyAllowList(CertificateListVerificationRequest request)
         {
-            // Get information needed for allow list verification
-            var primarySignatureCertificateFingerprint = CertificateUtility.GetHash(signature.SignerInfo.Certificate, _fingerprintAlgorithm);
-            var primarySignatureCertificateFingerprintString = BitConverter.ToString(primarySignatureCertificateFingerprint).Replace("-", "");
+            var status = SignatureVerificationStatus.Valid;
+            var issues = new List<SignatureLog>();
 
-            foreach (var allowedEntry in _allowList)
+            if (request.CertificateList == null || request.CertificateList.Count == 0)
+            {
+                if (request.RequireCertificateList)
+                {
+                    status = SignatureVerificationStatus.Suspect;
+                    issues.Add(SignatureLog.Error(code: NuGetLogCode.NU3034, message: request.NoListErrorMessage));
+                }
+            }
+            else if (!IsSignatureAllowed(request.Signature, request.CertificateList))
+            {
+                status = SignatureVerificationStatus.Untrusted;
+                issues.Add(SignatureLog.Issue(fatal: request.TreatIssuesAsErrors, code: NuGetLogCode.NU3034, message: request.NoMatchErrorMessage));
+            }
+
+            return Task.FromResult(new SignedPackageVerificationResult(status, request.Signature, issues));
+        }
+
+        private bool IsSignatureAllowed(
+            PrimarySignature signature,
+            IReadOnlyList<VerificationAllowListEntry> allowList)
+        {
+            var primarySignatureCertificateFingerprintLookUp = new Dictionary<HashAlgorithmName, string>();
+            var countersignatureCertificateFingerprintLookUp = new Dictionary<HashAlgorithmName, string>();
+            var repositoryCountersignature = new Lazy<RepositoryCountersignature>(() => RepositoryCountersignature.GetRepositoryCountersignature(signature));
+
+            foreach (var allowedEntry in allowList)
             {
                 // Verify the certificate hash allow list objects
                 var certificateHashEntry = allowedEntry as CertificateHashAllowListEntry;
                 if (certificateHashEntry != null)
                 {
-                    if (certificateHashEntry.VerificationTarget.HasFlag(VerificationTarget.Primary) &&
-                        StringComparer.OrdinalIgnoreCase.Equals(certificateHashEntry.CertificateFingerprint, primarySignatureCertificateFingerprintString))
+                    if (certificateHashEntry.Placement.HasFlag(SignaturePlacement.PrimarySignature))
                     {
-                        return true;
+                        // Get information needed for allow list verification
+                        var primarySignatureCertificateFingerprint = GetCertificateFingerprint(
+                            signature,
+                            certificateHashEntry.FingerprintAlgorithm,
+                            primarySignatureCertificateFingerprintLookUp);
+
+                        if (IsSignatureTargeted(certificateHashEntry.Target, signature) &&
+                            StringComparer.OrdinalIgnoreCase.Equals(certificateHashEntry.Fingerprint, primarySignatureCertificateFingerprint))
+                        {
+                            return true;
+                        }
+                    }
+                    if (certificateHashEntry.Placement.HasFlag(SignaturePlacement.Countersignature))
+                    {
+                        if (repositoryCountersignature.Value != null)
+                        {
+                            // Get information needed for allow list verification
+                            var countersignatureCertificateFingerprint = GetCertificateFingerprint(
+                                repositoryCountersignature.Value,
+                                certificateHashEntry.FingerprintAlgorithm,
+                                countersignatureCertificateFingerprintLookUp);
+
+                            if (IsSignatureTargeted(certificateHashEntry.Target, repositoryCountersignature.Value) &&
+                                StringComparer.OrdinalIgnoreCase.Equals(certificateHashEntry.Fingerprint, countersignatureCertificateFingerprint))
+                            {
+                                return true;
+                            }
+                        }
                     }
                 }
             }
@@ -65,8 +128,55 @@ namespace NuGet.Packaging.Signing
             return false;
         }
 
+        private static bool IsSignatureTargeted(VerificationTarget target, Signature signature)
+        {
+            return (target.HasFlag(VerificationTarget.Author) && signature is AuthorPrimarySignature) ||
+                (target.HasFlag(VerificationTarget.Repository) && signature is RepositoryPrimarySignature) ||
+                (target.HasFlag(VerificationTarget.Repository) && signature is RepositoryCountersignature);
+        }
+
+        private static string GetCertificateFingerprint(
+            Signature signature,
+            HashAlgorithmName fingerprintAlgorithm,
+            IDictionary<HashAlgorithmName, string> CertificateFingerprintLookUp)
+        {
+            if (!CertificateFingerprintLookUp.TryGetValue(fingerprintAlgorithm, out var fingerprintString))
+            {
+                var primarySignatureCertificateFingerprint = CertificateUtility.GetHash(signature.SignerInfo.Certificate, fingerprintAlgorithm);
+                fingerprintString = BitConverter.ToString(primarySignatureCertificateFingerprint).Replace("-", "");
+                CertificateFingerprintLookUp[fingerprintAlgorithm] = fingerprintString;
+            }
+            
+            return fingerprintString;
+        }
+
+        private static SignatureVerificationStatus GetValidity(IEnumerable<PackageVerificationResult> verificationResults)
+        {
+            if (!verificationResults.Any())
+            {
+                return SignatureVerificationStatus.Untrusted;
+            }
+
+            return verificationResults.Min(e => e.Trust);
+        }
+
+        private class CertificateListVerificationRequest
+        {
+            public PrimarySignature Signature { get; set; }
+
+            public IReadOnlyList<VerificationAllowListEntry> CertificateList { get; set; }
+
+            public bool TreatIssuesAsErrors { get; set; }
+
+            public bool RequireCertificateList { get; set; }
+
+            public string NoListErrorMessage { get; set; }
+
+            public string NoMatchErrorMessage { get; set; }
+        }
+
 #else
-        private PackageVerificationResult VerifyAllowList(ISignedPackageReader package, Signature signature, SignedPackageVerifierSettings settings)
+        private Task<PackageVerificationResult> VerifyAllowListAsync(ISignedPackageReader package, PrimarySignature signature, SignedPackageVerifierSettings settings)
         {
             throw new NotSupportedException();
         }

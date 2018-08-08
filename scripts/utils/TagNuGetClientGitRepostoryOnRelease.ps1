@@ -26,8 +26,8 @@ param
     [string]$BuildOutputPath
 )
 
-# set security protocol for Invoke-RestMethod
-. "$PSScriptRoot\SetSecurityProtocol.ps1"
+# Set security protocol to tls1.2 for Invoke-RestMethod powershell cmdlet
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # These environment variables are set on the VSTS Release Definition agents.
 $Branch = ${env:BUILD_SOURCEBRANCHNAME}
@@ -38,7 +38,14 @@ $NuGetExePath = [System.IO.Path]::Combine($BuildOutputPath, $Branch, $Build, 'ar
 Write-Host $NuGetExePath
 
 $TagName = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($NuGetExePath).FileVersion
+$AttemptNum = ${env:RELEASE_ATTEMPTNUMBER}
 $ProductVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($NuGetExePath).ProductVersion
+$index = $ProductVersion.LastIndexOf('+')
+if($index -ne '-1')
+{
+    $ProductVersion = $ProductVersion.Substring(0,$index).Trim()
+}
+
 $Date = Get-Date
 $Message = "Insert $ProductVersion into $VsTargetBranch on $Date"
 $BuildInfoJsonFile = [System.IO.Path]::Combine($BuildOutputPath, $Branch, $Build, 'buildinfo.json')
@@ -62,20 +69,38 @@ $Headers= @{
     Authorization='Basic {0}' -f $Base64Token;
 }
 
-$Body = @{
-tag = $TagName;
-object = $CommitHash;
-type = 'commit';
-message= $TagMessage;
-} | ConvertTo-Json;
+try {
+    $Body = @{
+        tag = $TagName;
+        object = $CommitHash;
+        type = 'commit';
+        message= $TagMessage;
+        } | ConvertTo-Json;
+        
+        Write-Host $Body
+        
+    $tagObject = "refs/tags/$TagName"
+    $r1 = Invoke-RestMethod -Headers $Headers -Method Post -Uri "https://api.github.com/repos/NuGet/$NuGetRepository/git/tags" -Body $Body
+    Write-Host $r1    
+}
+catch {
+    # The above would fail if the tag already existed, in which case we would append the attempt number to the tag name to make it unique
+    Write-Host "Tagging failed, appending attempt number...."
+    $TagName = "$TagName-$AttemptNum"
+    $Body = @{
+        tag = $TagName;
+        object = $CommitHash;
+        type = 'commit';
+        message= $TagMessage;
+        } | ConvertTo-Json;
+        
+        Write-Host $Body
+        
+    $tagObject = "refs/tags/$TagName"
+    $r1 = Invoke-RestMethod -Headers $Headers -Method Post -Uri "https://api.github.com/repos/NuGet/$NuGetRepository/git/tags" -Body $Body
+    Write-Host $r1
+}
 
-Write-Host $Body
-
-$tagObject = "refs/tags/$TagName"
-
-$r1 = Invoke-RestMethod -Headers $Headers -Method Post -Uri "https://api.github.com/repos/NuGet/$NuGetRepository/git/tags" -Body $Body
-
-Write-Host $r1
 
 $Body2 = @{
 ref = $tagObject;

@@ -1,9 +1,11 @@
 ﻿<#
 .SYNOPSIS
-Script to insert NuGet into CLI and SDK
+Script to insert NuGet into CLI and SDK. 
 
 .DESCRIPTION
 Uses the Personal Access Token of NuGetLurker to automate the insertion process into CLI and SDK
+Note - This script can only be used from a VSTS Release Definition because of the env variables it
+depends on.
 
 .PARAMETER PersonalAccessToken
 PersonalAccessToken of the NuGetLurker account
@@ -39,8 +41,8 @@ param
     [string]$BuildOutputPath
 )
 
-# set security protocol for Invoke-RestMethod
-. "$PSScriptRoot\SetSecurityProtocol.ps1"
+# Set security protocol to tls1.2 for Invoke-RestMethod powershell cmdlet
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $repoOwner = "dotnet"
 $Base64Token = [System.Convert]::ToBase64String([char[]]$PersonalAccessToken)
@@ -51,10 +53,18 @@ $Headers= @{
 
 $Build = ${env:BUILD_BUILDNUMBER}
 $Branch = ${env:BUILD_SOURCEBRANCHNAME}
+$AttemptNum = ${env:RELEASE_ATTEMPTNUMBER}
+$Release = ${env:RELEASE_RELEASENAME}
 $NuGetExePath = [System.IO.Path]::Combine($BuildOutputPath, $Branch, $Build, 'artifacts', 'VS15', "NuGet.exe")
 
 $ProductVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($NuGetExePath).ProductVersion
-$CreatedBranchName = "nuget-insertbuild$Build"
+$index = $ProductVersion.LastIndexOf('+')
+if($index -ne '-1')
+{
+    $ProductVersion = $ProductVersion.Substring(0,$index).Trim()
+}
+
+$CreatedBranchName = "$Release-$AttemptNum"
 
 Function UpdateNuGetVersionInXmlFile {
     param(

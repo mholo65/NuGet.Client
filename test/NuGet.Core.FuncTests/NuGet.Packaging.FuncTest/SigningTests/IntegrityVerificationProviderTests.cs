@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
@@ -21,12 +23,12 @@ using Xunit;
 
 namespace NuGet.Packaging.FuncTest
 {
-    [Collection("Signing Functional Test Collection")]
+    [Collection(SigningTestCollection.Name)]
     public class IntegrityVerificationProviderTests
     {
         private const string _packageTamperedError = "The package integrity check failed.";
         private const string _packageUnsignedError = "The package is not signed.";
-        private const string _packageInvalidSignatureError = "The package signature is invalid.";
+        private const string _packageInvalidSignatureError = "The package signature is invalid or cannot be verified on this platform.";
 
         private SigningTestFixture _testFixture;
         private TrustedTestCert<TestCertificate> _trustedTestCert;
@@ -46,15 +48,15 @@ namespace NuGet.Packaging.FuncTest
         {
             if (StringComparer.Ordinal.Equals(policyString, "command"))
             {
-                return SignedPackageVerifierSettings.VerifyCommandDefaultPolicy;
+                return SignedPackageVerifierSettings.GetVerifyCommandDefaultPolicy();
             }
 
             if (StringComparer.Ordinal.Equals(policyString, "vs"))
             {
-                return SignedPackageVerifierSettings.VSClientDefaultPolicy;
+                return SignedPackageVerifierSettings.GetAcceptModeDefaultPolicy();
             }
 
-            return SignedPackageVerifierSettings.Default;
+            return SignedPackageVerifierSettings.GetDefault();
         }
 
         [CIOnlyTheory]
@@ -69,13 +71,13 @@ namespace NuGet.Packaging.FuncTest
             using (var dir = TestDirectory.Create())
             using (var testCertificate = new X509Certificate2(_trustedTestCert.Source.Cert))
             {
-                var signedPackagePath = await SignedArchiveTestUtility.CreateSignedPackageAsync(testCertificate, nupkg, dir);
-                var verifier = new PackageSignatureVerifier(_trustProviders, policy);
+                var signedPackagePath = await SignedArchiveTestUtility.AuthorSignPackageAsync(testCertificate, nupkg, dir);
+                var verifier = new PackageSignatureVerifier(_trustProviders);
 
                 using (var packageReader = new PackageArchiveReader(signedPackagePath))
                 {
                     // Act
-                    var result = await verifier.VerifySignaturesAsync(packageReader, CancellationToken.None);
+                    var result = await verifier.VerifySignaturesAsync(packageReader, policy, CancellationToken.None);
 
                     // Assert
                     result.Valid.Should().BeTrue();
@@ -95,21 +97,15 @@ namespace NuGet.Packaging.FuncTest
             using (var dir = TestDirectory.Create())
             using (var testCertificate = new X509Certificate2(_trustedTestCert.Source.Cert))
             {
-                var signedPackagePath = await SignedArchiveTestUtility.CreateSignedPackageAsync(testCertificate, nupkg, dir);
+                var signedPackagePath = await SignedArchiveTestUtility.AuthorSignPackageAsync(testCertificate, nupkg, dir);
+                SignedArchiveTestUtility.TamperWithPackage(signedPackagePath);
 
-                // tamper with the package
-                using (var stream = File.Open(signedPackagePath, FileMode.Open))
-                using (var zip = new ZipArchive(stream, ZipArchiveMode.Update))
-                {
-                    zip.Entries.First().Delete();
-                }
-
-                var verifier = new PackageSignatureVerifier(_trustProviders, policy);
+                var verifier = new PackageSignatureVerifier(_trustProviders);
 
                 using (var packageReader = new PackageArchiveReader(signedPackagePath))
                 {
                     // Act
-                    var result = await verifier.VerifySignaturesAsync(packageReader, CancellationToken.None);
+                    var result = await verifier.VerifySignaturesAsync(packageReader, policy, CancellationToken.None);
                     var resultsWithErrors = result.Results.Where(r => r.GetErrorIssues().Any());
                     var totalErrorIssues = resultsWithErrors.SelectMany(r => r.GetErrorIssues());
 
@@ -137,7 +133,7 @@ namespace NuGet.Packaging.FuncTest
             using (var dir = TestDirectory.Create())
             using (var testCertificate = new X509Certificate2(_trustedTestCert.Source.Cert))
             {
-                var signedPackagePath = await SignedArchiveTestUtility.CreateSignedPackageAsync(testCertificate, nupkg, dir);
+                var signedPackagePath = await SignedArchiveTestUtility.AuthorSignPackageAsync(testCertificate, nupkg, dir);
 
                 // tamper with the package
                 using (var stream = File.Open(signedPackagePath, FileMode.Open))
@@ -149,12 +145,12 @@ namespace NuGet.Packaging.FuncTest
                     newEntryDataStream.CopyTo(newEntryStream);
                 }
 
-                var verifier = new PackageSignatureVerifier(_trustProviders, policy);
+                var verifier = new PackageSignatureVerifier(_trustProviders);
 
                 using (var packageReader = new PackageArchiveReader(signedPackagePath))
                 {
                     // Act
-                    var result = await verifier.VerifySignaturesAsync(packageReader, CancellationToken.None);
+                    var result = await verifier.VerifySignaturesAsync(packageReader, policy, CancellationToken.None);
                     var resultsWithErrors = result.Results.Where(r => r.GetErrorIssues().Any());
                     var totalErrorIssues = resultsWithErrors.SelectMany(r => r.GetErrorIssues());
 
@@ -181,7 +177,7 @@ namespace NuGet.Packaging.FuncTest
             using (var dir = TestDirectory.Create())
             using (var testCertificate = new X509Certificate2(_trustedTestCert.Source.Cert))
             {
-                var signedPackagePath = await SignedArchiveTestUtility.CreateSignedPackageAsync(testCertificate, nupkg, dir);
+                var signedPackagePath = await SignedArchiveTestUtility.AuthorSignPackageAsync(testCertificate, nupkg, dir);
 
                 // tamper with the package
                 using (var stream = File.Open(signedPackagePath, FileMode.Open))
@@ -193,12 +189,12 @@ namespace NuGet.Packaging.FuncTest
                     extraStream.CopyTo(entryStream);
                 }
 
-                var verifier = new PackageSignatureVerifier(_trustProviders, policy);
+                var verifier = new PackageSignatureVerifier(_trustProviders);
 
                 using (var packageReader = new PackageArchiveReader(signedPackagePath))
                 {
                     // Act
-                    var result = await verifier.VerifySignaturesAsync(packageReader, CancellationToken.None);
+                    var result = await verifier.VerifySignaturesAsync(packageReader, policy, CancellationToken.None);
                     var resultsWithErrors = result.Results.Where(r => r.GetErrorIssues().Any());
                     var totalErrorIssues = resultsWithErrors.SelectMany(r => r.GetErrorIssues());
 
@@ -224,7 +220,7 @@ namespace NuGet.Packaging.FuncTest
             using (var dir = TestDirectory.Create())
             using (var testCertificate = new X509Certificate2(_trustedTestCert.Source.Cert))
             {
-                var signedPackagePath = await SignedArchiveTestUtility.CreateSignedPackageAsync(testCertificate, nupkg, dir);
+                var signedPackagePath = await SignedArchiveTestUtility.AuthorSignPackageAsync(testCertificate, nupkg, dir);
 
                 // tamper with the package
                 using (var stream = File.Open(signedPackagePath, FileMode.Open))
@@ -234,12 +230,12 @@ namespace NuGet.Packaging.FuncTest
                     entryStream.SetLength(entryStream.Length - 1);
                 }
 
-                var verifier = new PackageSignatureVerifier(_trustProviders, policy);
+                var verifier = new PackageSignatureVerifier(_trustProviders);
 
                 using (var packageReader = new PackageArchiveReader(signedPackagePath))
                 {
                     // Act
-                    var result = await verifier.VerifySignaturesAsync(packageReader, CancellationToken.None);
+                    var result = await verifier.VerifySignaturesAsync(packageReader, policy, CancellationToken.None);
                     var resultsWithErrors = result.Results.Where(r => r.GetErrorIssues().Any());
                     var totalErrorIssues = resultsWithErrors.SelectMany(r => r.GetErrorIssues());
 
@@ -265,7 +261,7 @@ namespace NuGet.Packaging.FuncTest
             using (var dir = TestDirectory.Create())
             using (var testCertificate = new X509Certificate2(_trustedTestCert.Source.Cert))
             {
-                var signedPackagePath = await SignedArchiveTestUtility.CreateSignedPackageAsync(testCertificate, nupkg, dir);
+                var signedPackagePath = await SignedArchiveTestUtility.AuthorSignPackageAsync(testCertificate, nupkg, dir);
 
                 // tamper with the package
                 using (var stream = File.Open(signedPackagePath, FileMode.Open))
@@ -278,12 +274,12 @@ namespace NuGet.Packaging.FuncTest
                     entry.LastWriteTime = entry.LastWriteTime.AddSeconds(2);
                 }
 
-                var verifier = new PackageSignatureVerifier(_trustProviders, policy);
+                var verifier = new PackageSignatureVerifier(_trustProviders);
 
                 using (var packageReader = new PackageArchiveReader(signedPackagePath))
                 {
                     // Act
-                    var result = await verifier.VerifySignaturesAsync(packageReader, CancellationToken.None);
+                    var result = await verifier.VerifySignaturesAsync(packageReader, policy, CancellationToken.None);
                     var resultsWithErrors = result.Results.Where(r => r.GetErrorIssues().Any());
                     var totalErrorIssues = resultsWithErrors.SelectMany(r => r.GetErrorIssues());
 
@@ -309,7 +305,7 @@ namespace NuGet.Packaging.FuncTest
             using (var dir = TestDirectory.Create())
             using (var testCertificate = new X509Certificate2(_trustedTestCert.Source.Cert))
             {
-                var signedPackagePath = await SignedArchiveTestUtility.CreateSignedPackageAsync(testCertificate, nupkg, dir);
+                var signedPackagePath = await SignedArchiveTestUtility.AuthorSignPackageAsync(testCertificate, nupkg, dir);
 
                 // unsign the package
                 using (var stream = File.Open(signedPackagePath, FileMode.Open))
@@ -319,12 +315,12 @@ namespace NuGet.Packaging.FuncTest
                     entry.Delete();
                 }
 
-                var verifier = new PackageSignatureVerifier(_trustProviders, policy);
+                var verifier = new PackageSignatureVerifier(_trustProviders);
 
                 using (var packageReader = new PackageArchiveReader(signedPackagePath))
                 {
                     // Act
-                    var result = await verifier.VerifySignaturesAsync(packageReader, CancellationToken.None);
+                    var result = await verifier.VerifySignaturesAsync(packageReader, policy, CancellationToken.None);
                     var resultsWithErrors = result.Results.Where(r => r.GetErrorIssues().Any());
                     var totalErrorIssues = resultsWithErrors.SelectMany(r => r.GetErrorIssues());
 
@@ -344,7 +340,7 @@ namespace NuGet.Packaging.FuncTest
         [CIOnlyTheory]
         [InlineData("command", false)]
         [InlineData("vs", true)]
-        public async Task Signer_VerifyOnTamperedPackage_SignatureTruncatedAsync(string policyString, bool expectedValidity)
+        public async Task Signer_VerifyOnTamperedPackage_SignatureTamperedAsync(string policyString, bool expectedValidity)
         {
             // Arrange
             var nupkg = new SimpleTestPackageContext();
@@ -353,22 +349,16 @@ namespace NuGet.Packaging.FuncTest
             using (var dir = TestDirectory.Create())
             using (var testCertificate = new X509Certificate2(_trustedTestCert.Source.Cert))
             {
-                var signedPackagePath = await SignedArchiveTestUtility.CreateSignedPackageAsync(testCertificate, nupkg, dir);
+                var signedPackagePath = await SignedArchiveTestUtility.AuthorSignPackageAsync(testCertificate, nupkg, dir);
 
-                // tamper with the signature
-                using (var stream = File.Open(signedPackagePath, FileMode.Open))
-                using (var zip = new ZipArchive(stream, ZipArchiveMode.Update))
-                using (var entryStream = zip.GetEntry(SigningSpecifications.V1.SignaturePath).Open())
-                {
-                    entryStream.SetLength(entryStream.Length - 1);
-                }
+                TamperSignature(signedPackagePath);
 
-                var verifier = new PackageSignatureVerifier(_trustProviders, policy);
+                var verifier = new PackageSignatureVerifier(_trustProviders);
 
                 using (var packageReader = new PackageArchiveReader(signedPackagePath))
                 {
                     // Act
-                    var result = await verifier.VerifySignaturesAsync(packageReader, CancellationToken.None);
+                    var result = await verifier.VerifySignaturesAsync(packageReader, policy, CancellationToken.None);
                     var resultsWithErrors = result.Results.Where(r => r.GetErrorIssues().Any());
                     var totalErrorIssues = resultsWithErrors.SelectMany(r => r.GetErrorIssues());
 
@@ -381,6 +371,40 @@ namespace NuGet.Packaging.FuncTest
                         totalErrorIssues.First().Code.Should().Be(NuGetLogCode.NU3003);
                         totalErrorIssues.First().Message.Should().Be(_packageInvalidSignatureError);
                     }
+                }
+            }
+        }
+
+        private static void TamperSignature(string packageFilePath)
+        {
+            var packageSignature = ReadPackageSignature(packageFilePath);
+            var randomBytes = new byte[packageSignature.Length];
+
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(randomBytes);
+            }
+
+            var fileBytes = File.ReadAllBytes(packageFilePath);
+            var newFileBytes = SignatureTestUtility.FindAndReplaceSequence(
+                fileBytes,
+                packageSignature,
+                randomBytes);
+
+            File.WriteAllBytes(packageFilePath, newFileBytes);
+        }
+
+        private static byte[] ReadPackageSignature(string packageFilePath)
+        {
+            using (var stream = File.OpenRead(packageFilePath))
+            using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true))
+            {
+                var entry = zip.GetEntry(SigningSpecifications.V1.SignaturePath);
+
+                using (var entryStream = entry.Open())
+                using (var reader = new BinaryReader(entryStream))
+                {
+                    return reader.ReadBytes((int)entryStream.Length);
                 }
             }
         }

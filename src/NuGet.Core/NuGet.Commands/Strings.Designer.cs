@@ -170,6 +170,24 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Package version constraints for &apos;{0}&apos; return a version range that is empty..
+        /// </summary>
+        internal static string Error_InvalidDependencyVersionConstraints {
+            get {
+                return ResourceManager.GetString("Error_InvalidDependencyVersionConstraints", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid project-package combination for {0} {1}. DotnetToolReference project style can only contain references of the DotnetTool type.
+        /// </summary>
+        internal static string Error_InvalidProjectPackageCombo {
+            get {
+                return ResourceManager.GetString("Error_InvalidProjectPackageCombo", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Failed to build package because of an unsupported targetFramework value on &apos;{0}&apos;..
         /// </summary>
         internal static string Error_InvalidTargetFramework {
@@ -260,6 +278,24 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Project {0} must have a single package reference(s)..
+        /// </summary>
+        internal static string Error_ProjectWithIncorrectDependenciesCount {
+            get {
+                return ResourceManager.GetString("Error_ProjectWithIncorrectDependenciesCount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid tools package {0} {1}. Tools packages cannot contain more than one PackageType..
+        /// </summary>
+        internal static string Error_ToolsPackageWithExtraPackageTypes {
+            get {
+                return ResourceManager.GetString("Error_ToolsPackageWithExtraPackageTypes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Unable to find project information for &apos;{0}&apos;. The project file may be invalid or missing targets required for restore..
         /// </summary>
         internal static string Error_UnableToFindProjectInfo {
@@ -292,6 +328,15 @@ namespace NuGet.Commands {
         internal static string Error_UnableToLocateRestoreTarget_Because {
             get {
                 return ResourceManager.GetString("Error_UnableToLocateRestoreTarget_Because", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Unable to sign package..
+        /// </summary>
+        internal static string Error_UnableToSignPackage {
+            get {
+                return ResourceManager.GetString("Error_UnableToSignPackage", resourceCulture);
             }
         }
         
@@ -666,15 +711,6 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Loaded project {0} from {1}..
-        /// </summary>
-        internal static string Log_LoadedProject {
-            get {
-                return ResourceManager.GetString("Log_LoadedProject", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to {0} {1} is specified in the Lock File target for {2} but is not present in the top-level Libraries list..
         /// </summary>
         internal static string Log_LockFileMissingLibraryForTargetLibrary {
@@ -995,6 +1031,15 @@ namespace NuGet.Commands {
         internal static string Log_SkippingCacheFile {
             get {
                 return ResourceManager.GetString("Log_SkippingCacheFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Skipping compatibility checks of the ridless graph for DotnetToolReference project type. This graph is not used. .
+        /// </summary>
+        internal static string Log_SkippingCompatibiilityCheckOnRidlessGraphForDotnetToolReferenceProject {
+            get {
+                return ResourceManager.GetString("Log_SkippingCompatibiilityCheckOnRidlessGraphForDotnetToolReferenceProject", resourceCulture);
             }
         }
         
@@ -1467,7 +1512,7 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Successfully verified package(s)..
+        ///   Looks up a localized string similar to Successfully verified package &apos;{0}&apos;..
         /// </summary>
         internal static string VerifyCommand_Success {
             get {
@@ -1508,6 +1553,15 @@ namespace NuGet.Commands {
         internal static string Warning_FileDoesNotExist {
             get {
                 return ResourceManager.GetString("Warning_FileDoesNotExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to File &apos;{0}&apos; was not added to the package. Files and folders starting with &apos;.&apos; or ending with &apos;.nupkg&apos; are excluded by default. To include this file, use -NoDefaultExcludes from the commandline.
+        /// </summary>
+        internal static string Warning_FileExcludedByDefault {
+            get {
+                return ResourceManager.GetString("Warning_FileExcludedByDefault", resourceCulture);
             }
         }
         
@@ -1584,29 +1638,11 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Version &quot;{0}&quot; does not follow semantic versioning guidelines..
+        ///   Looks up a localized string similar to Version &quot;{0}&quot; does not follow semantic versioning guidelines. Update your nuspec file or use the AssemblyInformationalVersion assembly attribute to specify a semantic version as described at http://semver.org..
         /// </summary>
         internal static string Warning_SemanticVersion {
             get {
                 return ResourceManager.GetString("Warning_SemanticVersion", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Update your nuspec file or use the AssemblyInformationalVersion assembly attribute to specify a semantic version as described at http://semver.org..
-        /// </summary>
-        internal static string Warning_SemanticVersionSolution {
-            get {
-                return ResourceManager.GetString("Warning_SemanticVersionSolution", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Use semantic versioning.
-        /// </summary>
-        internal static string Warning_SemanticVersionTitle {
-            get {
-                return ResourceManager.GetString("Warning_SemanticVersionTitle", resourceCulture);
             }
         }
         

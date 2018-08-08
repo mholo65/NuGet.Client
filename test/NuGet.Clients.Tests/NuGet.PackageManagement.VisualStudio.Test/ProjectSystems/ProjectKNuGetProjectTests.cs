@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -53,7 +53,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             using (var testDirectory = TestDirectory.Create())
             {
                 var tc = new TestContext(testDirectory);
-                using (var download = tc.InitializePackage())
+                using (var download = await tc.InitializePackageAsync())
                 {
                     // Act
                     var result = await tc.Target.InstallPackageAsync(
@@ -87,7 +87,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             using (var testDirectory = TestDirectory.Create())
             {
                 var tc = new TestContext(testDirectory);
-                using (var download = tc.InitializePackage())
+                using (var download = await tc.InitializePackageAsync())
                 {
                     // Act
                     var result = await tc.Target.InstallPackageAsync(
@@ -168,17 +168,17 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             public List<PackageType> PackageTypes { get; }
             public List<NuGetFramework> SupportedFrameworks { get; }
 
-            public DownloadResourceResult InitializePackage()
+            public async Task<DownloadResourceResult> InitializePackageAsync()
             {
                 var context = new SimpleTestPackageContext(PackageIdentity);
                 context.PackageTypes.Clear();
                 context.PackageTypes.AddRange(PackageTypes);
 
-                var package = SimpleTestPackageUtility.CreateFullPackage(
+                var package = await SimpleTestPackageUtility.CreateFullPackageAsync(
                     TestDirectory,
                     context);
 
-                return new DownloadResourceResult(package.OpenRead());
+                return new DownloadResourceResult(package.OpenRead(), TestDirectory.Path);
             }
         }
     }

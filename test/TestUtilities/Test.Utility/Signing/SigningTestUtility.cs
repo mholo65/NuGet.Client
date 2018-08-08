@@ -8,6 +8,9 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.Pkcs;
 #endif
 using System.Security.Cryptography.X509Certificates;
+using NuGet.Common;
+using NuGet.Packaging.Signing;
+using NuGet.Shared;
 using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.Crypto;
@@ -94,12 +97,36 @@ namespace Test.Utility.Signing
         };
 
         /// <summary>
+        /// Modification generator that can be passed to TestCertificate.Generate().
+        /// The generator will create a certificate that is valid but will expire in a 15 seconds
+        /// </summary>
+        public static Action<X509V3CertificateGenerator> CertificateModificationGeneratorExpireIn5Seconds = delegate (X509V3CertificateGenerator gen)
+        {
+            // CodeSigning EKU
+            var usages = new[] { KeyPurposeID.IdKPCodeSigning };
+
+            gen.AddExtension(
+                X509Extensions.ExtendedKeyUsage.Id,
+                critical: true,
+                extensionValue: new ExtendedKeyUsage(usages));
+
+            var notBefore = DateTime.UtcNow.Subtract(TimeSpan.FromHours(1));
+            var notAfter = DateTime.UtcNow.Add(TimeSpan.FromSeconds(5));
+
+            gen.SetNotBefore(notBefore);
+            gen.SetNotAfter(notAfter);
+        };
+
+        /// <summary>
         /// Generates a list of certificates representing a chain of certificates.
         /// The first certificate is the root certificate stored in StoreName.Root and StoreLocation.LocalMachine.
         /// The last certificate is the leaf certificate stored in StoreName.TrustedPeople and StoreLocation.LocalMachine.
         /// Please dispose all the certificates in the list after use.
         /// </summary>
         /// <param name="length">Length of the chain.</param>
+        /// <param name="crlServerUri">Uri for crl server</param>
+        /// <param name="crlLocalUri">Uri for crl local</param>
+        /// <param name="configureLeafCrl">Indicates if leaf crl should be configured</param>
         /// <returns>List of certificates representing a chain of certificates.</returns>
         public static IList<TrustedTestCert<TestCertificate>> GenerateCertificateChain(int length, string crlServerUri, string crlLocalUri, bool configureLeafCrl = true)
         {
@@ -201,7 +228,7 @@ namespace Test.Utility.Signing
                 {
                     // for a certificate in a chain create CRL distribution point extension
                     var crlServerUri = $"{chainCertificateRequest.CrlServerBaseUri}{issuerDN}.crl";
-                    var generalName = new GeneralName(GeneralName.UniformResourceIdentifier, new DerIA5String(crlServerUri));
+                    var generalName = new Org.BouncyCastle.Asn1.X509.GeneralName(Org.BouncyCastle.Asn1.X509.GeneralName.UniformResourceIdentifier, new DerIA5String(crlServerUri));
                     var distPointName = new DistributionPointName(new GeneralNames(generalName));
                     var distPoint = new DistributionPoint(distPointName, null, null);
 
@@ -414,6 +441,7 @@ namespace Test.Utility.Signing
         /// Generates a SignedCMS object for some content.
         /// </summary>
         /// <param name="content"></param>
+        /// <param name="cert">Certificate for cms signer</param>
         /// <returns>SignedCms object</returns>
         public static SignedCms GenerateSignedCms(X509Certificate2 cert, byte[] content)
         {
@@ -430,6 +458,32 @@ namespace Test.Utility.Signing
             cms.ComputeSignature(cmsSigner);
 
             return cms;
+        }
+
+        /// <summary>
+        /// Generates a SignedCMS object for some content.
+        /// </summary>
+        /// <param name="content"></param>
+        /// <param name="cert">Certificate for cms signer</param>
+        /// <returns>SignedCms object</returns>
+        public static SignedCms GenerateRepositoryCountersignedSignedCms(X509Certificate2 cert, byte[] content)
+        {
+            var contentInfo = new ContentInfo(content);
+            var hashAlgorithm = NuGet.Common.HashAlgorithmName.SHA256;
+
+            using (var primarySignatureRequest = new AuthorSignPackageRequest(new X509Certificate2(cert), hashAlgorithm))
+            using (var countersignatureRequest = new RepositorySignPackageRequest(new X509Certificate2(cert), hashAlgorithm, hashAlgorithm, new Uri("https://api.nuget.org/v3/index.json"), null))
+            {
+                var cmsSigner = SigningUtility.CreateCmsSigner(primarySignatureRequest, NullLogger.Instance);
+
+                var cms = new SignedCms(contentInfo);
+                cms.ComputeSignature(cmsSigner);
+
+                var counterCmsSigner = SigningUtility.CreateCmsSigner(countersignatureRequest, NullLogger.Instance);
+                cms.SignerInfos[0].ComputeCounterSignature(counterCmsSigner);
+
+                return cms;
+            }
         }
 #endif
 
@@ -448,6 +502,104 @@ namespace Test.Utility.Signing
         {
             var pass = new Guid().ToString();
             return new X509Certificate2(cert.Export(X509ContentType.Pfx, pass), pass, X509KeyStorageFlags.PersistKeySet);
+        }
+
+        public static TrustedTestCert<TestCertificate> GenerateTrustedTestCertificate()
+        {
+            var actionGenerator = CertificateModificationGeneratorForCodeSigningEkuCert;
+
+            // Code Sign EKU needs trust to a root authority
+            // Add the cert to Root CA list in LocalMachine as it does not prompt a dialog
+            // This makes all the associated tests to require admin privilege
+            return TestCertificate.Generate(actionGenerator).WithTrust(StoreName.Root, StoreLocation.LocalMachine);
+        }
+
+        public static TrustedTestCert<TestCertificate> GenerateTrustedTestCertificateExpired()
+        {
+            var actionGenerator = CertificateModificationGeneratorExpiredCert;
+
+            // Code Sign EKU needs trust to a root authority
+            // Add the cert to Root CA list in LocalMachine as it does not prompt a dialog
+            // This makes all the associated tests to require admin privilege
+            return TestCertificate.Generate(actionGenerator).WithTrust(StoreName.Root, StoreLocation.LocalMachine);
+        }
+
+        public static TrustedTestCert<TestCertificate> GenerateTrustedTestCertificateNotYetValid()
+        {
+            var actionGenerator = CertificateModificationGeneratorNotYetValidCert;
+
+            // Code Sign EKU needs trust to a root authority
+            // Add the cert to Root CA list in LocalMachine as it does not prompt a dialog
+            // This makes all the associated tests to require admin privilege
+            return TestCertificate.Generate(actionGenerator).WithTrust(StoreName.Root, StoreLocation.LocalMachine);
+        }
+
+        public static TrustedTestCert<TestCertificate> GenerateTrustedTestCertificateThatExpiresIn5Seconds()
+        {
+            var actionGenerator = CertificateModificationGeneratorExpireIn5Seconds;
+
+            // Code Sign EKU needs trust to a root authority
+            // Add the cert to Root CA list in LocalMachine as it does not prompt a dialog
+            // This makes all the associated tests to require admin privilege
+            return TestCertificate.Generate(actionGenerator).WithTrust(StoreName.Root, StoreLocation.LocalMachine);
+        }
+
+        public static bool AreVerifierSettingsEqual(SignedPackageVerifierSettings first, SignedPackageVerifierSettings second)
+        {
+            return first.AllowIgnoreTimestamp == second.AllowIgnoreTimestamp &&
+                first.AllowIllegal == second.AllowIllegal &&
+                first.AllowMultipleTimestamps == second.AllowMultipleTimestamps &&
+                first.AllowNoTimestamp == second.AllowNoTimestamp &&
+                first.AllowUnknownRevocation == second.AllowUnknownRevocation &&
+                first.AllowUnsigned == second.AllowUnsigned &&
+                first.AllowUntrusted == second.AllowUntrusted &&
+                first.AllowNoRepositoryCertificateList == second.AllowNoRepositoryCertificateList &&
+                first.AllowNoClientCertificateList == second.AllowNoClientCertificateList &&
+                first.AlwaysVerifyCountersignature == second.AlwaysVerifyCountersignature &&
+                AreCertificateHashAllowListEqual(first.ClientCertificateList, second.ClientCertificateList) &&
+                AreCertificateHashAllowListEqual(first.RepositoryCertificateList, second.RepositoryCertificateList);
+        }
+
+        private static bool AreCertificateHashAllowListEqual(IReadOnlyList<VerificationAllowListEntry> first, IReadOnlyList<VerificationAllowListEntry> second)
+        {
+            return (first as IEnumerable<CertificateHashAllowListEntry>).
+                SequenceEqualWithNullCheck((second as IEnumerable<CertificateHashAllowListEntry>), new CertificateHashAllowListEntryComparer());
+        }
+
+        private class CertificateHashAllowListEntryComparer : IEqualityComparer<CertificateHashAllowListEntry>
+        {
+            public bool Equals(CertificateHashAllowListEntry x, CertificateHashAllowListEntry y)
+            {
+                if (ReferenceEquals(x, y))
+                {
+                    return true;
+                }
+
+                if (x == null || y == null)
+                {
+                    return false;
+                }
+
+                return x.Target == y.Target &&
+                    x.FingerprintAlgorithm == y.FingerprintAlgorithm &&
+                    string.Equals(x.Fingerprint, y.Fingerprint, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public int GetHashCode(CertificateHashAllowListEntry obj)
+            {
+                if (obj == null)
+                {
+                    return 0;
+                }
+
+                var combiner = new HashCodeCombiner();
+
+                combiner.AddObject(obj.Target);
+                combiner.AddObject(obj.Fingerprint);
+                combiner.AddObject(obj.FingerprintAlgorithm);
+
+                return combiner.CombinedHash;
+            }
         }
 
 #if IS_DESKTOP

@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using NuGet.Packaging.Core;
 
 namespace NuGet.Packaging.Signing
 {
@@ -12,9 +11,9 @@ namespace NuGet.Packaging.Signing
         /// <summary>
         /// Signature
         /// </summary>
-        public Signature Signature { get; }
+        public PrimarySignature Signature { get; }
 
-        public SignedPackageVerificationResult(SignatureVerificationStatus trust, Signature signature, IEnumerable<SignatureLog> issues):
+        public SignedPackageVerificationResult(SignatureVerificationStatus trust, PrimarySignature signature, IEnumerable<SignatureLog> issues):
             base(trust, issues)
         {
             Signature = signature ?? throw new ArgumentNullException(nameof(signature));

@@ -93,7 +93,8 @@ namespace NuGet.Commands
                 if (spec.RestoreMetadata.ProjectStyle == ProjectStyle.PackageReference
                     || spec.RestoreMetadata.ProjectStyle == ProjectStyle.ProjectJson
                     || spec.RestoreMetadata.ProjectStyle == ProjectStyle.DotnetCliTool
-                    || spec.RestoreMetadata.ProjectStyle == ProjectStyle.Standalone)
+                    || spec.RestoreMetadata.ProjectStyle == ProjectStyle.Standalone
+                    || spec.RestoreMetadata.ProjectStyle == ProjectStyle.DotnetToolReference)
                 {
                     validForRestore.Add(spec.RestoreMetadata.ProjectUniqueName);
                 }
@@ -194,7 +195,8 @@ namespace NuGet.Commands
                 if (restoreType == ProjectStyle.PackageReference
                     || restoreType == ProjectStyle.Standalone
                     || restoreType == ProjectStyle.DotnetCliTool
-                    || restoreType == ProjectStyle.ProjectJson)
+                    || restoreType == ProjectStyle.ProjectJson
+                    || restoreType == ProjectStyle.DotnetToolReference)
                 {
 
                     foreach (var source in MSBuildStringUtility.Split(specItem.GetProperty("Sources")))
@@ -222,7 +224,8 @@ namespace NuGet.Commands
                 // Read package references for netcore, tools, and standalone
                 if (restoreType == ProjectStyle.PackageReference
                     || restoreType == ProjectStyle.Standalone
-                    || restoreType == ProjectStyle.DotnetCliTool)
+                    || restoreType == ProjectStyle.DotnetCliTool
+                    || restoreType == ProjectStyle.DotnetToolReference)
                 {
                     AddFrameworkAssemblies(result, items);
                     AddPackageReferences(result, items);
@@ -235,7 +238,8 @@ namespace NuGet.Commands
                 }
 
                 if (restoreType == ProjectStyle.PackageReference
-                    || restoreType == ProjectStyle.Standalone)
+                    || restoreType == ProjectStyle.Standalone
+                    || restoreType == ProjectStyle.DotnetToolReference)
                 {
                     // Set project version
                     result.Version = GetVersion(specItem);
@@ -274,7 +278,8 @@ namespace NuGet.Commands
                 if (restoreType == ProjectStyle.PackageReference
                     || restoreType == ProjectStyle.ProjectJson
                     || restoreType == ProjectStyle.Unknown
-                    || restoreType == ProjectStyle.PackagesConfig)
+                    || restoreType == ProjectStyle.PackagesConfig
+                    || restoreType == ProjectStyle.DotnetToolReference)
                 {
                     var projectDir = string.Empty;
 
@@ -580,7 +585,7 @@ namespace NuGet.Commands
                 dependency.AutoReferenced = IsPropertyTrue(item, "IsImplicitlyDefined");
 
                 // Add warning suppressions
-                foreach (var code in GetNuGetLogCodes(item.GetProperty("NoWarn")))
+                foreach (var code in MSBuildStringUtility.GetNuGetLogCodes(item.GetProperty("NoWarn")))
                 {
                     dependency.NoWarn.Add(code);
                 }
@@ -813,26 +818,10 @@ namespace NuGet.Commands
 
         private static WarningProperties GetWarningProperties(IMSBuildItem specItem)
         {
-            return GetWarningProperties(
+            return WarningProperties.GetWarningProperties(
                 treatWarningsAsErrors: specItem.GetProperty("TreatWarningsAsErrors"),
                 warningsAsErrors: specItem.GetProperty("WarningsAsErrors"),
                 noWarn: specItem.GetProperty("NoWarn"));
-        }
-
-        /// <summary>
-        /// Create warning properties from the msbuild property strings.
-        /// </summary>
-        public static WarningProperties GetWarningProperties(string treatWarningsAsErrors, string warningsAsErrors, string noWarn)
-        {
-            var props = new WarningProperties()
-            {
-                AllWarningsAsErrors = MSBuildStringUtility.IsTrue(treatWarningsAsErrors)
-            };
-
-            props.WarningsAsErrors.UnionWith(GetNuGetLogCodes(warningsAsErrors));
-            props.NoWarn.UnionWith(GetNuGetLogCodes(noWarn));
-
-            return props;
         }
 
         /// <summary>
@@ -894,22 +883,6 @@ namespace NuGet.Commands
             }
 
             return false;
-        }
-
-        /// <summary>
-        /// Splits and parses a ; or , delimited list of log codes.
-        /// Ignores codes that are unknown.
-        /// </summary>
-        public static IEnumerable<NuGetLogCode> GetNuGetLogCodes(string s)
-        {
-            foreach (var item in MSBuildStringUtility.Split(s, ';', ','))
-            {
-                if (item.StartsWith("NU", StringComparison.OrdinalIgnoreCase) && 
-                    Enum.TryParse<NuGetLogCode>(value: item, ignoreCase: true , result: out var result))
-                {
-                    yield return result;
-                }
-            }
         }
 
         /// <summary>

@@ -21,7 +21,6 @@ using NuGet.PackageManagement.VisualStudio;
 using NuGet.Packaging.Signing;
 using NuGet.ProjectManagement;
 using NuGet.ProjectManagement.Projects;
-using NuGet.ProjectModel;
 using NuGet.Protocol.Core.Types;
 using NuGet.VisualStudio;
 using Task = System.Threading.Tasks.Task;
@@ -246,6 +245,11 @@ namespace NuGet.SolutionRestoreManager
                 duration);
 
             TelemetryActivity.EmitTelemetryEvent(restoreTelemetryEvent);
+
+            var sources = _sourceRepositoryProvider.PackageSourceProvider.LoadPackageSources().ToList();
+            var sourceEvent = SourceTelemetry.GetSourceSummaryEvent(_nuGetProjectContext.OperationId, sources);
+
+            TelemetryActivity.EmitTelemetryEvent(sourceEvent);
         }
 
         private async Task RestorePackageSpecProjectsAsync(
@@ -348,13 +352,6 @@ namespace NuGet.SolutionRestoreManager
             }
         }
 
-        private bool IsProjectBuildIntegrated(PackageSpec packageSpec)
-        {
-            return packageSpec.RestoreMetadata?.ProjectStyle == ProjectStyle.PackageReference ||
-                packageSpec.RestoreMetadata?.ProjectStyle == ProjectStyle.ProjectJson ||
-                packageSpec.RestoreMetadata?.ProjectStyle == ProjectStyle.DotnetCliTool;
-        }
-
         // This event could be raised from multiple threads. Only perform thread-safe operations
         private void PackageRestoreManager_PackageRestored(
             object sender,
@@ -406,7 +403,7 @@ namespace NuGet.SolutionRestoreManager
                 _status = NuGetOperationStatus.Failed;
 
                 _logger.Do((l, _) =>
-                { 
+                {
                     foreach (var projectName in args.ProjectNames)
                     {
                         var exceptionMessage =

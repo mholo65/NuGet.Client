@@ -79,7 +79,16 @@ namespace NuGet.PackageManagement.Telemetry
                 var projectType = NuGetProjectType.Unknown;
                 if (nuGetProject is MSBuildNuGetProject)
                 {
-                    projectType = NuGetProjectType.PackagesConfig;
+                    var msbuildProject = nuGetProject as MSBuildNuGetProject;
+
+                    if (msbuildProject?.DoesPackagesConfigExists() == true)
+                    {
+                        projectType = NuGetProjectType.PackagesConfig;
+                    }
+                    else
+                    {
+                        projectType = NuGetProjectType.UnconfiguredNuGetType;
+                    }
                 }
 #if VS15
                 else if (nuGetProject is NetCorePackageReferenceProject)
@@ -100,15 +109,13 @@ namespace NuGet.PackageManagement.Telemetry
                     projectType = NuGetProjectType.XProjProjectJson;
                 }
 
-                // Get package count.
-                var installedPackages = await nuGetProject.GetInstalledPackagesAsync(CancellationToken.None);
-                var installedPackagesCount = installedPackages.Count();
+                var isUpgradable = await NuGetProjectUpgradeUtility.IsNuGetProjectUpgradeableAsync(nuGetProject);
 
                 return new ProjectTelemetryEvent(
                     NuGetVersion.Value,
                     projectId,
                     projectType,
-                    installedPackagesCount);
+                    isUpgradable);
             }
             catch (Exception ex)
             {
@@ -121,6 +128,28 @@ namespace NuGet.PackageManagement.Telemetry
                 Debug.Fail(message);
                 return null;
             }
+        }
+
+        public static TelemetryEvent GetUpgradeTelemetryEvent(
+            IEnumerable<NuGetProject> projects,
+            NuGetOperationStatus status,
+            int packageCount)
+        {
+            var eventName = "UpgradeInformation";
+
+            var sortedProjects = projects.OrderBy(
+                project => project.GetMetadata<string>(NuGetProjectMetadataKeys.UniqueName));
+
+            var projectIds = sortedProjects.Select(
+                project => project.GetMetadata<string>(NuGetProjectMetadataKeys.ProjectId)).ToArray();
+
+            var telemetryEvent = new TelemetryEvent(eventName);
+
+            telemetryEvent["ProjectIds"] = string.Join(",", projectIds);
+            telemetryEvent["Status"] = status;
+            telemetryEvent["PackageCount"] = packageCount;
+
+            return telemetryEvent;
         }
     }
 }

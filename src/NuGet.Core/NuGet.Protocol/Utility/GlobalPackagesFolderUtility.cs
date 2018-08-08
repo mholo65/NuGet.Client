@@ -52,7 +52,7 @@ namespace NuGet.Protocol
                 {
                     stream = File.Open(nupkgPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                     packageReader = new PackageFolderReader(installPath);
-                    return new DownloadResourceResult(stream, packageReader) { SignatureVerified = true };
+                    return new DownloadResourceResult(stream, packageReader, source: null) { SignatureVerified = true };
                 }
                 catch
                 {
@@ -74,6 +74,7 @@ namespace NuGet.Protocol
         }
 
         public static async Task<DownloadResourceResult> AddPackageAsync(
+            string source,
             PackageIdentity packageIdentity,
             Stream packageStream,
             string globalPackagesFolder,
@@ -96,9 +97,7 @@ namespace NuGet.Protocol
                 throw new ArgumentNullException(nameof(globalPackagesFolder));
             }
 
-            var signedPackageVerifier = new PackageSignatureVerifier(
-                          SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
-                          SignedPackageVerifierSettings.Default);
+            var signedPackageVerifier = new PackageSignatureVerifier(SignatureVerificationProviderFactory.GetSignatureVerificationProviders());
 
             // The following call adds it to the global packages folder.
             // Addition is performed using ConcurrentUtils, such that,
@@ -108,11 +107,13 @@ namespace NuGet.Protocol
                 PackageSaveMode.Defaultv3,
                 PackageExtractionBehavior.XmlDocFileSaveMode,
                 logger,
-                signedPackageVerifier);
+                signedPackageVerifier,
+                SignedPackageVerifierSettings.GetDefault());
 
             var versionFolderPathResolver = new VersionFolderPathResolver(globalPackagesFolder);
 
             await PackageExtractor.InstallFromSourceAsync(
+                source,
                 packageIdentity,
                 stream => packageStream.CopyToAsync(stream, BufferSize, token),
                 versionFolderPathResolver,

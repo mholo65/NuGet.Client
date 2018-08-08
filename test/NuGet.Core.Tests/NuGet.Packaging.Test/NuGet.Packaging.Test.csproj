@@ -10,15 +10,14 @@
 
   <!-- Include internal DER encoding helpers for use in tests -->
   <ItemGroup>
-    <Compile Include="$(NuGetCoreSrcDirectory)NuGet.Packaging\Signing\DerEncoding\*.cs"
-             Exclude="$(NuGetCoreSrcDirectory)NuGet.Packaging\Signing\DerEncoding\DerGeneralizedTime.cs"/>
+    <Compile Include="$(NuGetCoreSrcDirectory)NuGet.Packaging\Signing\DerEncoding\*.cs" Exclude="$(NuGetCoreSrcDirectory)NuGet.Packaging\Signing\DerEncoding\DerGeneralizedTime.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="compiler\resources\*" />
     <EmbeddedResource Include="compiler\resources\*" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <ProjectReference Include="$(TestUtilitiesDirectory)Test.Utility\Test.Utility.csproj" />
   </ItemGroup>

@@ -1,6 +1,8 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using NuGet.PackageManagement.UI;
 using NuGet.PackageManagement.UI.TestContract;
 using NuGet.Packaging.Core;
@@ -56,11 +58,6 @@ namespace NuGet.Tests.Apex
         public void SwitchTabToUpdate()
         {
             _uiproject.ActiveFilter = ItemFilter.UpdatesAvailable;
-        }
-
-        public bool IsPackageInstalled(string packageId, string version)
-        {
-            return _uiproject.IsPackageInstalled(new PackageIdentity(packageId, NuGetVersion.Parse(version)));
         }
 
     }

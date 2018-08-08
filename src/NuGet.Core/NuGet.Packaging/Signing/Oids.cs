@@ -8,6 +8,9 @@ namespace NuGet.Packaging.Signing
         // RFC 5652 "signing-time" attribute https://tools.ietf.org/html/rfc5652#section-11.3
         public const string SigningTime = "1.2.840.113549.1.9.5";
 
+        // RFC 5652 "countersignature" attribute https://tools.ietf.org/html/rfc5652#section-11.4
+        public const string Countersignature = "1.2.840.113549.1.9.6";
+
         // RFC 3161 appendix A (https://tools.ietf.org/html/rfc3161#page-20)
         public const string SignatureTimeStampTokenAttribute = "1.2.840.113549.1.9.16.2.14";
 
@@ -82,5 +85,9 @@ namespace NuGet.Packaging.Signing
 
         // RFC 5280 "id-qt-unotice" https://tools.ietf.org/html/rfc5280#section-4.2.1.4
         public const string IdQtUnotice = "1.3.6.1.5.5.7.2.2";
+
+        public const string NuGetV3ServiceIndexUrl = "1.3.6.1.4.1.311.84.2.1.1.1";
+
+        public const string NuGetPackageOwners = "1.3.6.1.4.1.311.84.2.1.1.2";
     }
 }

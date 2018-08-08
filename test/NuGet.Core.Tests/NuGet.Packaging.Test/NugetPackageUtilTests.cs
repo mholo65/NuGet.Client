@@ -38,12 +38,14 @@ namespace Commands.Test
                    packageSaveMode: PackageSaveMode.Defaultv3,
                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                    logger: logger,
-                   signedPackageVerifier: null);
+                   signedPackageVerifier: null,
+                   signedPackageVerifierSettings: null);
 
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
@@ -86,11 +88,14 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Defaultv3,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: logger,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
@@ -133,7 +138,9 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Defaultv3,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: logger,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 var packageDir = pathResolver.GetInstallPath(package.Id, identity.Version);
@@ -149,6 +156,7 @@ namespace Commands.Test
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
@@ -191,7 +199,9 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Defaultv3,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: logger,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 var packageDir = pathResolver.GetInstallPath(package.Id, identity.Version);
@@ -209,6 +219,7 @@ namespace Commands.Test
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
@@ -253,7 +264,9 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Defaultv3,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: logger,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 var packageDir = pathResolver.GetInstallPath(package.Id, identity.Version);
@@ -261,6 +274,7 @@ namespace Commands.Test
 
                 // Act
                 using (var packageDownloader = new ThrowingPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
@@ -279,6 +293,7 @@ namespace Commands.Test
                 Assert.NotEmpty(Directory.EnumerateFiles(packageDir));
 
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    packagesDir,
                     package.File.FullName,
                     identity,
                     logger))
@@ -318,7 +333,9 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Defaultv3,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: logger,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDir);
 
                 var packageDir = pathResolver.GetInstallPath(package.Id, identity.Version);
@@ -328,6 +345,7 @@ namespace Commands.Test
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
@@ -355,6 +373,7 @@ namespace Commands.Test
                 Assert.NotEmpty(Directory.EnumerateFiles(packageDir));
 
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     package.File.FullName,
                     identity,
                     logger))
@@ -395,11 +414,14 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Defaultv3,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: NullLogger.Instance,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo,
                     packageIdentity,
                     NullLogger.Instance))
@@ -438,11 +460,14 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Nuspec | PackageSaveMode.Nupkg,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: NullLogger.Instance,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo,
                     packageIdentity,
                     NullLogger.Instance))
@@ -485,10 +510,13 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Defaultv3,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: NullLogger.Instance,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo.FullName,
                     packageIdentity,
                     NullLogger.Instance))
@@ -543,11 +571,14 @@ namespace Commands.Test
                     packageSaveMode: PackageSaveMode.Defaultv3,
                     xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                     logger: NullLogger.Instance,
-                    signedPackageVerifier: null);
+                    signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo.FullName,
                     packageIdentity,
                     NullLogger.Instance))
@@ -600,11 +631,14 @@ namespace Commands.Test
                      packageSaveMode: PackageSaveMode.Defaultv3,
                      xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                      logger: NullLogger.Instance,
-                     signedPackageVerifier: null);
+                     signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo.FullName,
                     packageIdentity,
                     NullLogger.Instance))
@@ -642,11 +676,14 @@ namespace Commands.Test
                      packageSaveMode: PackageSaveMode.Nuspec | PackageSaveMode.Nupkg,
                      xmlDocFileSaveMode: XmlDocFileSaveMode.None,
                      logger: NullLogger.Instance,
-                     signedPackageVerifier: null);
+                     signedPackageVerifier: null,
+                    signedPackageVerifierSettings: null);
+
                 var versionFolderPathResolver = new VersionFolderPathResolver(packagesDirectory);
 
                 // Act
                 using (var packageDownloader = new LocalPackageArchiveDownloader(
+                    null,
                     packageFileInfo,
                     packageIdentity,
                     NullLogger.Instance))
@@ -779,7 +816,10 @@ namespace Commands.Test
 
             public ISignedPackageReader SignedPackageReader => _packageReader.Value;
 
+            public string Source { get; }
+
             internal ThrowingPackageArchiveDownloader(
+                string source,
                 string packageFilePath,
                 PackageIdentity packageIdentity,
                 ILogger logger)
@@ -789,6 +829,7 @@ namespace Commands.Test
                 _logger = logger;
                 _packageReader = new Lazy<PackageArchiveReader>(GetPackageReader);
                 _sourceStream = new Lazy<FileStream>(GetSourceStream);
+                Source = source;
             }
 
             public void Dispose()

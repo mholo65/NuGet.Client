@@ -59,6 +59,20 @@ namespace NuGet.PackageManagement.UI
             return result;
         }
 
+        public bool ShowNuGetUpgradeWindow(NuGetProjectUpgradeWindowModel nuGetProjectUpgradeWindowModel)
+        {
+            var result = false;
+
+            UIDispatcher.Invoke(() =>
+            {
+                var upgradeInformationWindow = new NuGetProjectUpgradeWindow(nuGetProjectUpgradeWindowModel);
+
+                result = upgradeInformationWindow.ShowModal() == true;
+            });
+
+            return result;
+        }
+
         private bool WarnAboutDotnetDeprecationImpl(IEnumerable<NuGetProject> projects)
         {
             var window = new DeprecatedFrameworkWindow(UIContext)
@@ -318,7 +332,8 @@ namespace NuGet.PackageManagement.UI
                     ex is FrameworkException ||
                     ex is NuGetProtocolException ||
                     ex is PackagingException ||
-                    ex is InvalidOperationException)
+                    ex is InvalidOperationException ||
+                    ex is PackageReferenceRollbackException)
                 {
                     // for exceptions that are known to be normal error cases, just
                     // display the message.
@@ -327,6 +342,19 @@ namespace NuGet.PackageManagement.UI
                     // write to activity log
                     var activityLogMessage = string.Format(CultureInfo.CurrentCulture, ex.ToString());
                     ActivityLog.LogError(LogEntrySource, activityLogMessage);
+
+                    // Log additional messages to the error list to provide context on why the rollback failed
+                    var rollbackException = ex as PackageReferenceRollbackException;
+                    if (rollbackException != null)
+                    {
+                        foreach (var message in rollbackException.LogMessages)
+                        {
+                            if (message.Level == LogLevel.Error)
+                            {
+                                UILogger.ReportError(message.Message);
+                            }
+                        }
+                    }
                 }
                 else
                 {

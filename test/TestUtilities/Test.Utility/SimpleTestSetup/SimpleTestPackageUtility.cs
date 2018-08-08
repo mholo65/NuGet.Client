@@ -7,11 +7,11 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.Versioning;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using Newtonsoft.Json.Linq;
 using NuGet.Common;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
@@ -26,18 +26,18 @@ namespace NuGet.Test.Utility
         /// <summary>
         /// Creates a net45 package containing lib, build, native, tools, and contentFiles
         /// </summary>
-        public static FileInfo CreateFullPackage(
+        public static async Task<FileInfo> CreateFullPackageAsync(
            string repositoryDir,
            string id,
            string version)
         {
-            return CreateFullPackage(repositoryDir, id, version, new PackageDependency[0]);
+            return await CreateFullPackageAsync(repositoryDir, id, version, new PackageDependency[0]);
         }
 
         /// <summary>
         /// Creates a net45 package containing lib, build, native, tools, and contentFiles
         /// </summary>
-        public static FileInfo CreateFullPackage(
+        public static async Task<FileInfo> CreateFullPackageAsync(
            string repositoryDir,
            string id,
            string version,
@@ -57,10 +57,10 @@ namespace NuGet.Test.Utility
                 Exclude = string.Join(",", d.Include),
             }));
 
-            return CreateFullPackage(repositoryDir, package);
+            return await CreateFullPackageAsync(repositoryDir, package);
         }
 
-        public static FileInfo CreateSymbolPackage(
+        public static async Task<FileInfo> CreateSymbolPackageAsync(
            string repositoryDir,
            string id,
            string version)
@@ -72,19 +72,17 @@ namespace NuGet.Test.Utility
                 IsSymbolPackage = true
             };
 
-            return CreateFullPackage(repositoryDir, package);
+            return await CreateFullPackageAsync(repositoryDir, package);
         }
 
         /// <summary>
         /// Creates a net45 package containing lib, build, native, tools, and contentFiles
         /// </summary>
-        public static FileInfo CreateFullPackage(
+        public static async Task<FileInfo> CreateFullPackageAsync(
            string repositoryDir,
            SimpleTestPackageContext packageContext)
         {
-            var id = packageContext.Id;
-            var version = packageContext.Version;
-            var packageName = packageContext.IsSymbolPackage ? $"{id}.{version.ToString()}.symbols.nupkg" : $"{id}.{version.ToString()}.nupkg";
+            var packageName = packageContext.PackageName;
 
             var packagePath = Path.Combine(repositoryDir, packageName);
             var file = new FileInfo(packagePath);
@@ -93,7 +91,7 @@ namespace NuGet.Test.Utility
 
             using (var stream = file.Open(FileMode.CreateNew, FileAccess.ReadWrite))
             {
-                CreatePackage(stream, packageContext);
+                await CreatePackageAsync(stream, packageContext);
             }
 
             return file;
@@ -102,14 +100,23 @@ namespace NuGet.Test.Utility
         /// <summary>
         /// Write a zip file to a stream.
         /// </summary>
-        public static void CreatePackage(Stream stream, SimpleTestPackageContext packageContext)
+        public static async Task CreatePackageAsync(Stream stream, SimpleTestPackageContext packageContext)
         {
             var id = packageContext.Id;
             var version = packageContext.Version;
             var runtimeJson = packageContext.RuntimeJson;
             var pathResolver = new VersionFolderPathResolver(null);
+            var testLogger = new TestLogger();
+            var tempStream = stream;
+            var isUsingTempStream = false;
 
-            using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+            if (packageContext.IsPrimarySigned)
+            {
+                tempStream = new MemoryStream();
+                isUsingTempStream = true;
+            }
+
+            using (var zip = new ZipArchive(tempStream, ZipArchiveMode.Create, leaveOpen: true))
             {
                 if (packageContext.Files.Any())
                 {
@@ -134,20 +141,25 @@ namespace NuGet.Test.Utility
                     zip.AddEntry("runtime.json", runtimeJson, Encoding.UTF8);
                 }
 
-                var nuspecXml = packageContext.Nuspec?.ToString() ?? $@"<?xml version=""1.0"" encoding=""utf-8""?>
+                var frameworkAssembliesAndContentFiles = packageContext.UseDefaultRuntimeAssemblies ?
+                          $@"<frameworkAssemblies>
+                                <frameworkAssembly assemblyName=""System.Runtime""/>
+                            </frameworkAssemblies>
+                           <contentFiles>
+                               <files include=""cs/net45/config/config.xml"" buildAction=""none"" />
+                               <files include=""cs/net45/config/config.xml"" copyToOutput=""true"" flatten=""false"" />
+                               <files include=""cs/net45/images/image.jpg"" buildAction=""embeddedresource"" />
+                           </contentFiles>" :
+                           string.Empty;
+
+                var nuspecXml = packageContext.Nuspec?.ToString() ??
+                    $@"<?xml version=""1.0"" encoding=""utf-8""?>
                         <package>
                         <metadata>
                             <id>{id}</id>
                             <version>{version.ToString()}</version>
                             <title />
-                            <frameworkAssemblies>
-                                <frameworkAssembly assemblyName=""System.Runtime"" />
-                            </frameworkAssemblies>
-                            <contentFiles>
-                                <files include=""cs/net45/config/config.xml"" buildAction=""none"" />
-                                <files include=""cs/net45/config/config.xml"" copyToOutput=""true"" flatten=""false"" />
-                                <files include=""cs/net45/images/image.jpg"" buildAction=""embeddedresource"" />
-                            </contentFiles>
+                            {frameworkAssembliesAndContentFiles}
                         </metadata>
                         </package>";
 
@@ -218,30 +230,105 @@ namespace NuGet.Test.Utility
                     }
                 }
 
-                if (packageContext.Signatures.Count > 0)
-                {
-                    throw new NotImplementedException();
-                }
-
                 zip.AddEntry($"{id}.nuspec", xml.ToString(), Encoding.UTF8);
+            }
+
+            if (isUsingTempStream)
+            {
+#if IS_DESKTOP
+                using (var signPackage = new SignedPackageArchive(tempStream, stream))
+                {
+                    using (var request = GetPrimarySignRequest(packageContext))
+                    {
+                        await AddSignatureToPackageAsync(packageContext, signPackage, request, testLogger);
+                    }
+
+                    if (packageContext.IsRepositoryCounterSigned)
+                    {
+                        using (var request = new RepositorySignPackageRequest(new X509Certificate2(packageContext.RepositoryCountersignatureCertificate),
+                                                                                HashAlgorithmName.SHA256,
+                                                                                HashAlgorithmName.SHA256,
+                                                                                packageContext.V3ServiceIndexUrl,
+                                                                                packageContext.PackageOwners))
+                        {
+                            await AddRepositoryCountersignatureToSignedPackageAsync(packageContext, signPackage, request, testLogger);
+                        }
+                    }
+                }
+#endif
+
+                tempStream.Dispose();
             }
 
             // Reset position
             stream.Position = 0;
         }
 
+#if IS_DESKTOP
+        private static SignPackageRequest GetPrimarySignRequest(SimpleTestPackageContext packageContext)
+        {
+            if (packageContext.V3ServiceIndexUrl != null)
+            {
+                return new RepositorySignPackageRequest(
+                    new X509Certificate2(packageContext.PrimarySignatureCertificate),
+                    HashAlgorithmName.SHA256,
+                    HashAlgorithmName.SHA256,
+                    packageContext.V3ServiceIndexUrl,
+                    packageContext.PackageOwners);
+            }
+
+            return new AuthorSignPackageRequest(
+                new X509Certificate2(packageContext.PrimarySignatureCertificate),
+                HashAlgorithmName.SHA256);
+        }
+
+        private static async Task AddSignatureToPackageAsync(SimpleTestPackageContext packageContext, ISignedPackage package, SignPackageRequest request, ILogger logger)
+        {
+            var testSignatureProvider = new X509SignatureProvider(packageContext.PrimaryTimestampProvider);
+
+            var zipArchiveHash = await package.GetArchiveHashAsync(request.SignatureHashAlgorithm, CancellationToken.None);
+            var base64ZipArchiveHash = Convert.ToBase64String(zipArchiveHash);
+            var signatureContent = new SignatureContent(SigningSpecifications.V1, request.SignatureHashAlgorithm, base64ZipArchiveHash);
+
+            var signature = await testSignatureProvider.CreatePrimarySignatureAsync(request, signatureContent, logger, CancellationToken.None);
+
+            using (var stream = new MemoryStream(signature.GetBytes()))
+            {
+                await package.AddSignatureAsync(stream, CancellationToken.None);
+            }
+        }
+
+        private static async Task AddRepositoryCountersignatureToSignedPackageAsync(SimpleTestPackageContext packageContext, ISignedPackage package, RepositorySignPackageRequest request, ILogger logger)
+        {
+            var primarySignature = await package.GetPrimarySignatureAsync(CancellationToken.None);
+
+            if (primarySignature != null)
+            {
+                var testSignatureProvider = new X509SignatureProvider(packageContext.CounterTimestampProvider);
+
+                var signature = await testSignatureProvider.CreateRepositoryCountersignatureAsync(request, primarySignature, logger, CancellationToken.None);
+
+                using (var stream = new MemoryStream(signature.GetBytes()))
+                {
+
+                    await package.AddSignatureAsync(stream, CancellationToken.None);
+                }
+            }
+        }
+#endif
+
         /// <summary>
         /// Create packages.
         /// </summary>
-        public static void CreatePackages(string repositoryPath, params SimpleTestPackageContext[] package)
+        public static async Task CreatePackagesAsync(string repositoryPath, params SimpleTestPackageContext[] package)
         {
-            CreatePackages(package.ToList(), repositoryPath);
+            await CreatePackagesAsync(package.ToList(), repositoryPath);
         }
 
         /// <summary>
         /// Create all packages in the list, including dependencies.
         /// </summary>
-        public static void CreatePackages(List<SimpleTestPackageContext> packages, string repositoryPath)
+        public static async Task CreatePackagesAsync(List<SimpleTestPackageContext> packages, string repositoryPath)
         {
             var done = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var toCreate = new Stack<SimpleTestPackageContext>(packages);
@@ -252,7 +339,7 @@ namespace NuGet.Test.Utility
 
                 if (done.Add($"{package.Id}|{package.Version.ToString()}"))
                 {
-                    CreateFullPackage(
+                    await CreateFullPackageAsync(
                         repositoryPath,
                         package);
 
@@ -267,7 +354,7 @@ namespace NuGet.Test.Utility
         /// <summary>
         /// Create an unzipped repository folder of nupkgs
         /// </summary>
-        public static void CreateFolderFeedUnzip(string root, params PackageIdentity[] packages)
+        public static async Task CreateFolderFeedUnzipAsync(string root, params PackageIdentity[] packages)
         {
             var contexts = packages.Select(package => new SimpleTestPackageContext(package)).ToList();
 
@@ -283,7 +370,7 @@ namespace NuGet.Test.Utility
 
                 using (var tempRoot = TestDirectory.Create())
                 {
-                    CreatePackages(tempRoot, context);
+                    await CreatePackagesAsync(tempRoot, context);
 
                     var input = Directory.GetFiles(tempRoot).Single();
 
@@ -312,64 +399,64 @@ namespace NuGet.Test.Utility
         /// <summary>
         /// Create a v2 folder of nupkgs
         /// </summary>
-        public static void CreateFolderFeedV2(string root, params PackageIdentity[] packages)
+        public static async Task CreateFolderFeedV2Async(string root, params PackageIdentity[] packages)
         {
             var contexts = packages.Select(package => new SimpleTestPackageContext(package)).ToList();
 
-            CreatePackages(contexts, root);
+            await CreatePackagesAsync(contexts, root);
         }
 
         /// <summary>
         /// Create a v3 folder of nupkgs
         /// </summary>
-        public static Task CreateFolderFeedV3(string root, params PackageIdentity[] packages)
+        public static async Task CreateFolderFeedV3Async(string root, params PackageIdentity[] packages)
         {
-            return CreateFolderFeedV3(root, PackageSaveMode.Nupkg | PackageSaveMode.Nuspec, packages);
+            await CreateFolderFeedV3Async(root, PackageSaveMode.Nupkg | PackageSaveMode.Nuspec, packages);
         }
 
         /// <summary>
         /// Create a v3 folder of nupkgs
         /// </summary>
-        public static async Task CreateFolderFeedV3(string root, PackageSaveMode saveMode, params PackageIdentity[] packages)
+        public static async Task CreateFolderFeedV3Async(string root, PackageSaveMode saveMode, params PackageIdentity[] packages)
         {
             var contexts = packages.Select(p => new SimpleTestPackageContext(p)).ToArray();
 
-            await CreateFolderFeedV3(root, saveMode, contexts);
+            await CreateFolderFeedV3Async(root, saveMode, contexts);
         }
 
         /// <summary>
         /// Create a v3 folder of nupkgs.
         /// Does not write out extracted files.
         /// </summary>
-        public static async Task CreateFolderFeedV3(string root, params SimpleTestPackageContext[] contexts)
+        public static async Task CreateFolderFeedV3Async(string root, params SimpleTestPackageContext[] contexts)
         {
             using (var tempRoot = TestDirectory.Create())
             {
-                CreatePackages(tempRoot, contexts);
+                await CreatePackagesAsync(tempRoot, contexts);
 
                 var saveMode = PackageSaveMode.Nupkg | PackageSaveMode.Nuspec;
 
-                await CreateFolderFeedV3(root, saveMode, Directory.GetFiles(tempRoot));
+                await CreateFolderFeedV3Async(root, saveMode, Directory.GetFiles(tempRoot));
             }
         }
 
         /// <summary>
         /// Create a v3 folder of nupkgs
         /// </summary>
-        public static async Task CreateFolderFeedV3(string root, PackageSaveMode saveMode, params SimpleTestPackageContext[] contexts)
+        public static async Task CreateFolderFeedV3Async(string root, PackageSaveMode saveMode, params SimpleTestPackageContext[] contexts)
         {
             using (var tempRoot = TestDirectory.Create())
             {
-                CreatePackages(tempRoot, contexts);
+                await CreatePackagesAsync(tempRoot, contexts);
 
-                await CreateFolderFeedV3(root, saveMode, Directory.GetFiles(tempRoot));
+                await CreateFolderFeedV3Async(root, saveMode, Directory.GetFiles(tempRoot));
             }
         }
 
         /// <summary>
         /// Create a v3 folder of nupkgs
         /// </summary>
-        public static async Task CreateFolderFeedV3(string root, PackageSaveMode saveMode, params string[] nupkgPaths)
+        public static async Task CreateFolderFeedV3Async(string root, PackageSaveMode saveMode, params string[] nupkgPaths)
         {
             var pathResolver = new VersionFolderPathResolver(root);
 
@@ -387,6 +474,7 @@ namespace NuGet.Test.Utility
                     using (var fileStream = File.OpenRead(file))
                     {
                         await PackageExtractor.InstallFromSourceAsync(
+                            null,
                             identity,
                             (stream) => fileStream.CopyToAsync(stream, 4096, CancellationToken.None),
                             new VersionFolderPathResolver(root),
@@ -394,7 +482,8 @@ namespace NuGet.Test.Utility
                                 saveMode,
                                 XmlDocFileSaveMode.None,
                                 NullLogger.Instance,
-                                signedPackageVerifier: null),
+                                signedPackageVerifier: null,
+                                signedPackageVerifierSettings: null),
                             CancellationToken.None);
                     }
                 }
@@ -418,7 +507,7 @@ namespace NuGet.Test.Utility
         {
             using (var tempRoot = TestDirectory.Create())
             {
-                CreatePackages(tempRoot, contexts);
+                await CreatePackagesAsync(tempRoot, contexts);
 
                 await CreateFolderFeedPackagesConfigAsync(root, Directory.GetFiles(tempRoot));
             }
@@ -434,13 +523,14 @@ namespace NuGet.Test.Utility
                         PackageSaveMode.Defaultv2,
                         PackageExtractionBehavior.XmlDocFileSaveMode,
                         NullLogger.Instance,
-                        signedPackageVerifier: null);
+                        signedPackageVerifier: null,
+                        signedPackageVerifierSettings: null);
 
             foreach (var path in nupkgPaths)
             {
                 using (var stream = File.OpenRead(path))
                 {
-                    await PackageExtractor.ExtractPackageAsync(stream, resolver, context, CancellationToken.None);
+                    await PackageExtractor.ExtractPackageAsync(string.Empty, stream, resolver, context, CancellationToken.None);
                 }
             }
         }
@@ -483,9 +573,11 @@ namespace NuGet.Test.Utility
 
         private static IPackageFile CreatePackageFile(string name)
         {
-            var file = new InMemoryFile();
-            file.Path = name;
-            file.Stream = new MemoryStream();
+            var file = new InMemoryFile
+            {
+                Path = name,
+                Stream = new MemoryStream()
+            };
 
             string effectivePath;
             var fx = FrameworkNameUtility.ParseFrameworkNameFromFilePath(name, out effectivePath);
@@ -513,13 +605,7 @@ namespace NuGet.Test.Utility
                 return Stream;
             }
 
-            public DateTimeOffset LastWriteTime
-            {
-                get
-                {
-                    return _lastWriteTime;
-                }
-            }
+            public DateTimeOffset LastWriteTime => _lastWriteTime;
         }
     }
 }

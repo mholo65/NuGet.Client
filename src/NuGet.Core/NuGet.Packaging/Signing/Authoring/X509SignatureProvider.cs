@@ -3,7 +3,6 @@
 
 using System;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +10,7 @@ using NuGet.Common;
 
 #if IS_DESKTOP
 using System.Security.Cryptography.Pkcs;
+using System.Security.Cryptography.X509Certificates;
 #endif
 
 namespace NuGet.Packaging.Signing
@@ -34,7 +34,7 @@ namespace NuGet.Packaging.Signing
         /// <summary>
         /// Sign the package stream hash with an X509Certificate2.
         /// </summary>
-        public Task<Signature> CreateSignatureAsync(SignPackageRequest request, SignatureContent signatureContent, ILogger logger, CancellationToken token)
+        public Task<PrimarySignature> CreatePrimarySignatureAsync(SignPackageRequest request, SignatureContent signatureContent, ILogger logger, CancellationToken token)
         {
             if (request == null)
             {
@@ -51,7 +51,7 @@ namespace NuGet.Packaging.Signing
                 throw new ArgumentNullException(nameof(logger));
             }
 
-            var signature = CreateSignature(request, signatureContent, logger);
+            var signature = CreatePrimarySignature(request, signatureContent, logger);
 
             if (_timestampProvider == null)
             {
@@ -59,21 +59,79 @@ namespace NuGet.Packaging.Signing
             }
             else
             {
-                return TimestampSignature(request, logger, signature, token);
+                return TimestampPrimarySignatureAsync(request, logger, signature, token);
+            }
+        }
+
+        /// <summary>
+        /// Countersign the primary signature with a X509Certificate2.
+        /// </summary>
+        public Task<PrimarySignature> CreateRepositoryCountersignatureAsync(RepositorySignPackageRequest request, PrimarySignature primarySignature, ILogger logger, CancellationToken token)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            if (primarySignature == null)
+            {
+                throw new ArgumentNullException(nameof(primarySignature));
+            }
+
+            if (logger == null)
+            {
+                throw new ArgumentNullException(nameof(logger));
+            }
+
+            token.ThrowIfCancellationRequested();
+
+            var signature = CreateRepositoryCountersignature(request, primarySignature, logger);
+
+            if (_timestampProvider == null)
+            {
+                return Task.FromResult(signature);
+            }
+            else
+            {
+                return TimestampRepositoryCountersignatureAsync(request, logger, signature, token);
             }
         }
 
 #if IS_DESKTOP
-        private Signature CreateSignature(SignPackageRequest request, SignatureContent signatureContent, ILogger logger)
+        private static PrimarySignature CreatePrimarySignature(SignPackageRequest request, SignatureContent signatureContent, ILogger logger)
         {
-            var cmsSigner = CreateCmsSigner(request, logger);
+            var cmsSigner = SigningUtility.CreateCmsSigner(request, logger);
 
             if (request.PrivateKey != null)
             {
-                return CreateSignature(cmsSigner, signatureContent, request.PrivateKey);
+                return CreatePrimarySignature(cmsSigner, signatureContent.GetBytes(), request.PrivateKey);
             }
 
-            var contentInfo = new ContentInfo(signatureContent.GetBytes());
+            return CreatePrimarySignature(cmsSigner, request, signatureContent.GetBytes());
+        }
+
+        private static PrimarySignature CreateRepositoryCountersignature(SignPackageRequest request, PrimarySignature primarySignature, ILogger logger)
+        {
+            var cmsSigner = SigningUtility.CreateCmsSigner(request, logger);
+
+            if (request.PrivateKey != null)
+            {
+                return CreateRepositoryCountersignature(cmsSigner, primarySignature, request.PrivateKey);
+            }
+
+            return CreateRepositoryCountersignature(cmsSigner, request, primarySignature);
+        }
+
+        private static PrimarySignature CreatePrimarySignature(CmsSigner cmsSigner, byte[] signingData, CngKey privateKey)
+        {
+            var cms = NativeUtilities.NativeSign(cmsSigner, signingData, privateKey);
+
+            return PrimarySignature.Load(cms);
+        }
+
+        private static PrimarySignature CreatePrimarySignature(CmsSigner cmsSigner, SignPackageRequest request, byte[] signingData)
+        {
+            var contentInfo = new ContentInfo(signingData);
             var cms = new SignedCms(contentInfo);
 
             try
@@ -89,76 +147,93 @@ namespace NuGet.Packaging.Signing
                 throw new SignatureException(NuGetLogCode.NU3001, exceptionBuilder.ToString());
             }
 
-            return Signature.Load(cms);
+            return PrimarySignature.Load(cms);
         }
 
-        private static CmsSigner CreateCmsSigner(SignPackageRequest request, ILogger logger)
+        private static PrimarySignature CreateRepositoryCountersignature(CmsSigner cmsSigner, PrimarySignature primarySignature, CngKey privateKey)
         {
-            // Subject Key Identifier (SKI) is smaller and less prone to accidental matching than issuer and serial
-            // number.  However, to ensure cross-platform verification, SKI should only be used if the certificate
-            // has the SKI extension attribute.
-            CmsSigner signer;
-
-            if (request.Certificate.Extensions[Oids.SubjectKeyIdentifier] == null)
+            using (var primarySignatureNativeCms = NativeCms.Decode(primarySignature.GetBytes()))
             {
-                signer = new CmsSigner(SubjectIdentifierType.IssuerAndSerialNumber, request.Certificate);
+                primarySignatureNativeCms.AddCountersignature(cmsSigner, privateKey);
+
+                var bytes = primarySignatureNativeCms.Encode();
+                var updatedCms = new SignedCms();
+
+                updatedCms.Decode(bytes);
+
+                return PrimarySignature.Load(updatedCms);
             }
-            else
-            {
-                signer = new CmsSigner(SubjectIdentifierType.SubjectKeyIdentifier, request.Certificate);
-            }
-
-            request.BuildSigningCertificateChainOnce(logger);
-
-            var chain = request.Chain;
-
-            foreach (var certificate in chain)
-            {
-                signer.Certificates.Add(certificate);
-            }
-
-            var attributes = SigningUtility.CreateSignedAttributes(request, chain);
-
-            foreach (var attribute in attributes)
-            {
-                signer.SignedAttributes.Add(attribute);
-            }
-
-            // We built the chain ourselves and added certificates.
-            // Passing any other value here would trigger another chain build
-            // and possibly add duplicate certs to the collection.
-            signer.IncludeOption = X509IncludeOption.None;
-            signer.DigestAlgorithm = request.SignatureHashAlgorithm.ConvertToOid();
-
-            return signer;
         }
 
-        private Signature CreateSignature(CmsSigner cmsSigner, SignatureContent signatureContent, CngKey privateKey)
+        private static PrimarySignature CreateRepositoryCountersignature(CmsSigner cmsSigner, SignPackageRequest request, PrimarySignature primarySignature)
         {
-            var cms = NativeUtilities.NativeSign(cmsSigner, signatureContent.GetBytes(), privateKey);
+            var cms = new SignedCms();
+            cms.Decode(primarySignature.GetBytes());
 
-            return Signature.Load(cms);
+            try
+            {
+                cms.SignerInfos[0].ComputeCounterSignature(cmsSigner);
+            }
+            catch (CryptographicException ex) when (ex.HResult == INVALID_PROVIDER_TYPE_HRESULT)
+            {
+                var exceptionBuilder = new StringBuilder();
+                exceptionBuilder.AppendLine(Strings.SignFailureCertificateInvalidProviderType);
+                exceptionBuilder.AppendLine(CertificateUtility.X509Certificate2ToString(request.Certificate, Common.HashAlgorithmName.SHA256));
+
+                throw new SignatureException(NuGetLogCode.NU3001, exceptionBuilder.ToString());
+            }
+
+            return PrimarySignature.Load(cms);
         }
 
-        private Task<Signature> TimestampSignature(SignPackageRequest request, ILogger logger, Signature signature, CancellationToken token)
+        private Task<PrimarySignature> TimestampPrimarySignatureAsync(SignPackageRequest request, ILogger logger, PrimarySignature signature, CancellationToken token)
         {
-            var timestampRequest = new TimestampRequest
-            {
-                SignatureValue = signature.GetBytes(),
-                SigningSpec = SigningSpecifications.V1,
-                TimestampHashAlgorithm = request.TimestampHashAlgorithm
-            };
+            var signatureValue = signature.GetSignatureValue();
+            var messageHash = request.TimestampHashAlgorithm.ComputeHash(signatureValue);
 
-            return _timestampProvider.TimestampSignatureAsync(timestampRequest, logger, token);
+            var timestampRequest = new TimestampRequest(
+                signingSpecifications: SigningSpecifications.V1,
+                hashedMessage: messageHash,
+                hashAlgorithm: request.TimestampHashAlgorithm,
+                target: SignaturePlacement.PrimarySignature
+            );
+
+            return _timestampProvider.TimestampSignatureAsync(signature, timestampRequest, logger, token);
+        }
+
+        private Task<PrimarySignature> TimestampRepositoryCountersignatureAsync(SignPackageRequest request, ILogger logger, PrimarySignature primarySignature, CancellationToken token)
+        {
+            var repositoryCountersignature = RepositoryCountersignature.GetRepositoryCountersignature(primarySignature);
+            var signatureValue = repositoryCountersignature.GetSignatureValue();
+            var messageHash = request.TimestampHashAlgorithm.ComputeHash(signatureValue);
+
+            var timestampRequest = new TimestampRequest(
+                signingSpecifications: SigningSpecifications.V1,
+                hashedMessage: messageHash,
+                hashAlgorithm: request.TimestampHashAlgorithm,
+                target: SignaturePlacement.Countersignature
+            );
+
+            return _timestampProvider.TimestampSignatureAsync(primarySignature, timestampRequest, logger, token);
         }
 
 #else
-        private Signature CreateSignature(SignPackageRequest request, SignatureContent signatureContent, ILogger logger)
+        private static PrimarySignature CreatePrimarySignature(SignPackageRequest request, SignatureContent signatureContent, ILogger logger)
         {
             throw new NotSupportedException();
         }
 
-        private Task<Signature> TimestampSignature(SignPackageRequest request, ILogger logger, Signature signature, CancellationToken token)
+        private Task<PrimarySignature> TimestampPrimarySignatureAsync(SignPackageRequest request, ILogger logger, PrimarySignature signature, CancellationToken token)
+        {
+            throw new NotSupportedException();
+        }
+
+        private static PrimarySignature CreateRepositoryCountersignature(SignPackageRequest request, PrimarySignature signature, ILogger logger)
+        {
+            throw new NotSupportedException();
+        }
+
+        private Task<PrimarySignature> TimestampRepositoryCountersignatureAsync(SignPackageRequest request, ILogger logger, PrimarySignature signature, CancellationToken token)
         {
             throw new NotSupportedException();
         }

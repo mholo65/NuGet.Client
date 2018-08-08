@@ -71,6 +71,15 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to author primary signature.
+        /// </summary>
+        internal static string AuthorPrimarySignatureFriendlyName {
+            get {
+                return ResourceManager.GetString("AuthorPrimarySignatureFriendlyName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to A complete certificate chain could not be built for the signing certificate..
         /// </summary>
         internal static string CertificateChainBuildFailed {
@@ -179,20 +188,74 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to No certificate matching the provided {0} fingerprint(s) was found in the signature..
+        ///   Looks up a localized string similar to A list of trusted signers is required by the client but none was found..
         /// </summary>
-        internal static string Error_NoMatchingCertificate {
+        internal static string Error_NoClientAllowList {
             get {
-                return ResourceManager.GetString("Error_NoMatchingCertificate", resourceCulture);
+                return ResourceManager.GetString("Error_NoClientAllowList", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The package signature contains multiple primary signatures..
+        ///   Looks up a localized string similar to The package signature certificate fingerprint does not match any certificate fingerprint in client allow list..
+        /// </summary>
+        internal static string Error_NoMatchingClientCertificate {
+            get {
+                return ResourceManager.GetString("Error_NoMatchingClientCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The package signature certificate fingerprint does not match any certificate fingerprint in repository allow list..
+        /// </summary>
+        internal static string Error_NoMatchingRepositoryCertificate {
+            get {
+                return ResourceManager.GetString("Error_NoMatchingRepositoryCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to A repository announced that their packages should be signed but an empty list of trusted certificates was found..
+        /// </summary>
+        internal static string Error_NoRepoAllowList {
+            get {
+                return ResourceManager.GetString("Error_NoRepoAllowList", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The package signature file does not contain exactly one primary signature..
         /// </summary>
         internal static string Error_NotOnePrimarySignature {
             get {
                 return ResourceManager.GetString("Error_NotOnePrimarySignature", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The package signature contains multiple repository countersignatures..
+        /// </summary>
+        internal static string Error_NotOneRepositoryCounterSignature {
+            get {
+                return ResourceManager.GetString("Error_NotOneRepositoryCounterSignature", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to A repository primary signature must not have a repository countersignature..
+        /// </summary>
+        internal static string Error_RepositorySignatureMustNotHaveARepositoryCountersignature {
+            get {
+                return ResourceManager.GetString("Error_RepositorySignatureMustNotHaveARepositoryCountersignature", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Cannot target author signatures that are countersignatures..
+        /// </summary>
+        internal static string ErrorAuthorTargetCannotBeACountersignature {
+            get {
+                return ResourceManager.GetString("ErrorAuthorTargetCannotBeACountersignature", resourceCulture);
             }
         }
         
@@ -215,15 +278,6 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The lifetime signing EKU is not supported..
-        /// </summary>
-        internal static string ErrorCertificateHasLifetimeSigningEKU {
-            get {
-                return ResourceManager.GetString("ErrorCertificateHasLifetimeSigningEKU", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to There are duplicate packages: {0}.
         /// </summary>
         internal static string ErrorDuplicatePackages {
@@ -238,15 +292,6 @@ namespace NuGet.Packaging {
         internal static string ErrorInvalidAllowedVersions {
             get {
                 return ResourceManager.GetString("ErrorInvalidAllowedVersions", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Certificate chain validation failed with error(s): {0}.
-        /// </summary>
-        internal static string ErrorInvalidCertificateChain {
-            get {
-                return ResourceManager.GetString("ErrorInvalidCertificateChain", resourceCulture);
             }
         }
         
@@ -314,16 +359,7 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The primary signature does not have a signing certificate..
-        /// </summary>
-        internal static string ErrorNoCertificate {
-            get {
-                return ResourceManager.GetString("ErrorNoCertificate", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The primary signature should be timestamped to enable long-term signature validity after the certificate has expired..
+        ///   Looks up a localized string similar to The signature should be timestamped to enable long-term signature validity after the certificate has expired..
         /// </summary>
         internal static string ErrorNoTimestamp {
             get {
@@ -350,20 +386,11 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The package signature is invalid..
+        ///   Looks up a localized string similar to The package signature is invalid or cannot be verified on this platform..
         /// </summary>
         internal static string ErrorPackageSignatureInvalid {
             get {
                 return ResourceManager.GetString("ErrorPackageSignatureInvalid", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Primary signature validation failed..
-        /// </summary>
-        internal static string ErrorSignatureVerificationFailed {
-            get {
-                return ResourceManager.GetString("ErrorSignatureVerificationFailed", resourceCulture);
             }
         }
         
@@ -382,6 +409,24 @@ namespace NuGet.Packaging {
         internal static string ErrorZip64NotSupported {
             get {
                 return ResourceManager.GetString("ErrorZip64NotSupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Exactly one {0} attribute is required..
+        /// </summary>
+        internal static string ExactlyOneAttributeRequired {
+            get {
+                return ResourceManager.GetString("ExactlyOneAttributeRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} attribute must have exactly one attribute value..
+        /// </summary>
+        internal static string ExactlyOneAttributeValueRequired {
+            get {
+                return ResourceManager.GetString("ExactlyOneAttributeValueRequired", resourceCulture);
             }
         }
         
@@ -476,7 +521,16 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The package signature file entry is invalid..
+        ///   Looks up a localized string similar to The package contains an invalid package signature file..
+        /// </summary>
+        internal static string InvalidPackageSignatureFile {
+            get {
+                return ResourceManager.GetString("InvalidPackageSignatureFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The package signature file entry is invalid. {0}.
         /// </summary>
         internal static string InvalidPackageSignatureFileEntry {
             get {
@@ -512,6 +566,15 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The repository countersignature is invalid..
+        /// </summary>
+        internal static string InvalidRepositoryCountersignature {
+            get {
+                return ResourceManager.GetString("InvalidRepositoryCountersignature", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The package signature content is invalid..
         /// </summary>
         internal static string InvalidSignatureContent {
@@ -526,6 +589,15 @@ namespace NuGet.Packaging {
         internal static string InvalidTimestampSignature {
             get {
                 return ResourceManager.GetString("InvalidTimestampSignature", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The URL value is invalid..
+        /// </summary>
+        internal static string InvalidUrl {
+            get {
+                return ResourceManager.GetString("InvalidUrl", resourceCulture);
             }
         }
         
@@ -557,11 +629,11 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Multiple instances of attribute &apos;{0}&apos; were found..
+        ///   Looks up a localized string similar to Multiple {0} attributes are not allowed..
         /// </summary>
-        internal static string MultipleAttributeInstanceFound {
+        internal static string MultipleAttributesDisallowed {
             get {
-                return ResourceManager.GetString("MultipleAttributeInstanceFound", resourceCulture);
+                return ResourceManager.GetString("MultipleAttributesDisallowed", resourceCulture);
             }
         }
         
@@ -575,11 +647,83 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The package contains multiple package signature files..
+        /// </summary>
+        internal static string MultiplePackageSignatureFiles {
+            get {
+                return ResourceManager.GetString("MultiplePackageSignatureFiles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to &apos;{0}&apos; must contain an absolute path &apos;{1}&apos;..
         /// </summary>
         internal static string MustContainAbsolutePath {
             get {
                 return ResourceManager.GetString("MustContainAbsolutePath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The package does not contain a valid package signature file..
+        /// </summary>
+        internal static string NoPackageSignatureFile {
+            get {
+                return ResourceManager.GetString("NoPackageSignatureFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to nuget-package-owners: {0}.
+        /// </summary>
+        internal static string NuGetPackageOwners {
+            get {
+                return ResourceManager.GetString("NuGetPackageOwners", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The nuget-package-owners attribute is invalid..
+        /// </summary>
+        internal static string NuGetPackageOwnersInvalid {
+            get {
+                return ResourceManager.GetString("NuGetPackageOwnersInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to One or more package owner values are invalid..
+        /// </summary>
+        internal static string NuGetPackageOwnersInvalidValue {
+            get {
+                return ResourceManager.GetString("NuGetPackageOwnersInvalidValue", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to nuget-v3-service-index-url: {0}.
+        /// </summary>
+        internal static string NuGetV3ServiceIndexUrl {
+            get {
+                return ResourceManager.GetString("NuGetV3ServiceIndexUrl", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The nuget-v3-service-index-url attribute is invalid..
+        /// </summary>
+        internal static string NuGetV3ServiceIndexUrlInvalid {
+            get {
+                return ResourceManager.GetString("NuGetV3ServiceIndexUrlInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The nuget-v3-service-index-url attribute value is invalid..
+        /// </summary>
+        internal static string NuGetV3ServiceIndexUrlInvalidValue {
+            get {
+                return ResourceManager.GetString("NuGetV3ServiceIndexUrlInvalidValue", resourceCulture);
             }
         }
         
@@ -629,11 +773,65 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to primary signature.
+        /// </summary>
+        internal static string PrimarySignatureFriendlyName {
+            get {
+                return ResourceManager.GetString("PrimarySignatureFriendlyName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The primary signature does not have a timestamp..
         /// </summary>
         internal static string PrimarySignatureHasNoTimestamp {
             get {
                 return ResourceManager.GetString("PrimarySignatureHasNoTimestamp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Arguments {0} and {1} were out of bounds for the array..
+        /// </summary>
+        internal static string RangeOutOfBoundsForArray {
+            get {
+                return ResourceManager.GetString("RangeOutOfBoundsForArray", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to repository countersignature.
+        /// </summary>
+        internal static string RepositoryCountersignatureFriendlyName {
+            get {
+                return ResourceManager.GetString("RepositoryCountersignatureFriendlyName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The repository countersignature does not have a signing certificate..
+        /// </summary>
+        internal static string RepositoryCountersignatureHasNoCertificate {
+            get {
+                return ResourceManager.GetString("RepositoryCountersignatureHasNoCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The repository countersignature does not have a timestamp..
+        /// </summary>
+        internal static string RepositoryCountersignatureHasNoTimestamp {
+            get {
+                return ResourceManager.GetString("RepositoryCountersignatureHasNoTimestamp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to repository primary signature.
+        /// </summary>
+        internal static string RepositoryPrimarySignatureFriendlyName {
+            get {
+                return ResourceManager.GetString("RepositoryPrimarySignatureFriendlyName", resourceCulture);
             }
         }
         
@@ -665,6 +863,15 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to signature.
+        /// </summary>
+        internal static string SignatureFriendlyName {
+            get {
+                return ResourceManager.GetString("SignatureFriendlyName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Signature Hash Algorithm: {0}.
         /// </summary>
         internal static string SignatureHashAlgorithm {
@@ -683,24 +890,6 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The primary signature validity period has expired..
-        /// </summary>
-        internal static string SignatureNotTimeValid {
-            get {
-                return ResourceManager.GetString("SignatureNotTimeValid", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The signing certificate is not yet valid..
-        /// </summary>
-        internal static string SignatureNotYetValid {
-            get {
-                return ResourceManager.GetString("SignatureNotYetValid", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to The package integrity check failed..
         /// </summary>
         internal static string SignaturePackageIntegrityFailure {
@@ -715,6 +904,15 @@ namespace NuGet.Packaging {
         internal static string SignatureType {
             get {
                 return ResourceManager.GetString("SignatureType", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The package already contains a signature. Please remove the existing signature before adding a new signature..
+        /// </summary>
+        internal static string SignedPackageAlreadySigned {
+            get {
+                return ResourceManager.GetString("SignedPackageAlreadySigned", resourceCulture);
             }
         }
         
@@ -755,11 +953,11 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The package already contains a signature. Please remove the existing signature before adding a new signature..
+        ///   Looks up a localized string similar to The package already contains a repository countersignature. Please remove the existing signature before adding a new repository countersignature..
         /// </summary>
-        internal static string SignedPackagePackageAlreadySigned {
+        internal static string SignedPackagePackageAlreadyCountersigned {
             get {
-                return ResourceManager.GetString("SignedPackagePackageAlreadySigned", resourceCulture);
+                return ResourceManager.GetString("SignedPackagePackageAlreadyCountersigned", resourceCulture);
             }
         }
         
@@ -773,11 +971,74 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The timestamp certificate does not meet a minimum public key length requirement..
+        /// </summary>
+        internal static string SignError_TimestampCertificateFailsPublicKeyLengthRequirement {
+            get {
+                return ResourceManager.GetString("SignError_TimestampCertificateFailsPublicKeyLengthRequirement", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The timestamp integrity check failed..
+        /// </summary>
+        internal static string SignError_TimestampIntegrityCheckFailed {
+            get {
+                return ResourceManager.GetString("SignError_TimestampIntegrityCheckFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The timestamp does not have a signing certificate..
+        /// </summary>
+        internal static string SignError_TimestampNoCertificate {
+            get {
+                return ResourceManager.GetString("SignError_TimestampNoCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The timestamp signing certificate is not yet valid..
+        /// </summary>
+        internal static string SignError_TimestampNotYetValid {
+            get {
+                return ResourceManager.GetString("SignError_TimestampNotYetValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The timestamp signature validation failed..
+        /// </summary>
+        internal static string SignError_TimestampSignatureValidationFailed {
+            get {
+                return ResourceManager.GetString("SignError_TimestampSignatureValidationFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The timestamp certificate has an unsupported signature algorithm..
+        /// </summary>
+        internal static string SignError_TimestampUnsupportedSignatureAlgorithm {
+            get {
+                return ResourceManager.GetString("SignError_TimestampUnsupportedSignatureAlgorithm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The following certificate cannot be used for package signing as the private key provider is unsupported:.
         /// </summary>
         internal static string SignFailureCertificateInvalidProviderType {
             get {
                 return ResourceManager.GetString("SignFailureCertificateInvalidProviderType", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} and {1} should be different. Package signing cannot be done in place..
+        /// </summary>
+        internal static string SigningCannotBeDoneInPlace {
+            get {
+                return ResourceManager.GetString("SigningCannotBeDoneInPlace", resourceCulture);
             }
         }
         
@@ -800,24 +1061,6 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The signing certificate does not meet a minimum public key length requirement..
-        /// </summary>
-        internal static string SigningCertificateFailsPublicKeyLengthRequirement {
-            get {
-                return ResourceManager.GetString("SigningCertificateFailsPublicKeyLengthRequirement", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The signing certificate has an unsupported signature algorithm..
-        /// </summary>
-        internal static string SigningCertificateHasUnsupportedSignatureAlgorithm {
-            get {
-                return ResourceManager.GetString("SigningCertificateHasUnsupportedSignatureAlgorithm", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to The signing-certificate attribute is invalid..
         /// </summary>
         internal static string SigningCertificateInvalid {
@@ -827,38 +1070,11 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Multiple signing-certificate attributes are not allowed..
-        /// </summary>
-        internal static string SigningCertificateMultipleAttributes {
-            get {
-                return ResourceManager.GetString("SigningCertificateMultipleAttributes", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Multiple signing-certificate attribute values are not allowed..
-        /// </summary>
-        internal static string SigningCertificateMultipleAttributeValues {
-            get {
-                return ResourceManager.GetString("SigningCertificateMultipleAttributeValues", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Either the signing-certificate or signing-certificate-v2 attribute must be present..
         /// </summary>
         internal static string SigningCertificateV1OrV2AttributeMustBePresent {
             get {
                 return ResourceManager.GetString("SigningCertificateV1OrV2AttributeMustBePresent", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The signing-certificate-v2 attribute must be present..
-        /// </summary>
-        internal static string SigningCertificateV2AttributeMustBePresent {
-            get {
-                return ResourceManager.GetString("SigningCertificateV2AttributeMustBePresent", resourceCulture);
             }
         }
         
@@ -881,20 +1097,11 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Multiple signing-certificate-v2 attributes are not allowed..
+        ///   Looks up a localized string similar to The signing-certificate-v2 attribute does not have exactly one attribute value..
         /// </summary>
-        internal static string SigningCertificateV2MultipleAttributes {
+        internal static string SigningCertificateV2NotExactlyOneAttributeValue {
             get {
-                return ResourceManager.GetString("SigningCertificateV2MultipleAttributes", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Multiple signing-certificate-v2 attribute values are not allowed..
-        /// </summary>
-        internal static string SigningCertificateV2MultipleAttributeValues {
-            get {
-                return ResourceManager.GetString("SigningCertificateV2MultipleAttributeValues", resourceCulture);
+                return ResourceManager.GetString("SigningCertificateV2NotExactlyOneAttributeValue", resourceCulture);
             }
         }
         
@@ -908,20 +1115,65 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The signing certificate does not meet a minimum public key length requirement..
+        /// </summary>
+        internal static string SigningError_CertificateFailsPublicKeyLengthRequirement {
+            get {
+                return ResourceManager.GetString("SigningError_CertificateFailsPublicKeyLengthRequirement", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The lifetime signing EKU in the signing certificate is not supported..
+        /// </summary>
+        internal static string SigningError_CertificateHasLifetimeSigningEKU {
+            get {
+                return ResourceManager.GetString("SigningError_CertificateHasLifetimeSigningEKU", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The signing certificate has an unsupported signature algorithm..
+        /// </summary>
+        internal static string SigningError_CertificateHasUnsupportedSignatureAlgorithm {
+            get {
+                return ResourceManager.GetString("SigningError_CertificateHasUnsupportedSignatureAlgorithm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The signing certificate is not yet valid..
+        /// </summary>
+        internal static string SigningError_NotYetValid {
+            get {
+                return ResourceManager.GetString("SigningError_NotYetValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The stream must be readable..
+        /// </summary>
+        internal static string StreamMustBeReadable {
+            get {
+                return ResourceManager.GetString("StreamMustBeReadable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The stream must be seekable..
+        /// </summary>
+        internal static string StreamMustBeSeekable {
+            get {
+                return ResourceManager.GetString("StreamMustBeSeekable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to String argument &apos;{0}&apos; cannot be null or empty.
         /// </summary>
         internal static string StringCannotBeNullOrEmpty {
             get {
                 return ResourceManager.GetString("StringCannotBeNullOrEmpty", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The timestamp certificate does not meet a minimum public key length requirement..
-        /// </summary>
-        internal static string TimestampCertificateFailsPublicKeyLengthRequirement {
-            get {
-                return ResourceManager.GetString("TimestampCertificateFailsPublicKeyLengthRequirement", resourceCulture);
             }
         }
         
@@ -953,74 +1205,11 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The timestamp integrity check failed..
-        /// </summary>
-        internal static string TimestampIntegrityCheckFailed {
-            get {
-                return ResourceManager.GetString("TimestampIntegrityCheckFailed", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The signature contains an invalid timestamp..
-        /// </summary>
-        internal static string TimestampInvalid {
-            get {
-                return ResourceManager.GetString("TimestampInvalid", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The timestamp&apos;s message imprint uses an unsupported hash algorithm..
-        /// </summary>
-        internal static string TimestampMessageImprintUnsupportedHashAlgorithm {
-            get {
-                return ResourceManager.GetString("TimestampMessageImprintUnsupportedHashAlgorithm", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The timestamp signature does not have a signing certificate..
-        /// </summary>
-        internal static string TimestampNoCertificate {
-            get {
-                return ResourceManager.GetString("TimestampNoCertificate", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The timestamp signing certificate is not yet valid..
-        /// </summary>
-        internal static string TimestampNotYetValid {
-            get {
-                return ResourceManager.GetString("TimestampNotYetValid", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Timestamp service&apos;s response does not meet the NuGet package signature specification: &apos;{0}&apos;..
         /// </summary>
         internal static string TimestampResponseExceptionGeneral {
             get {
                 return ResourceManager.GetString("TimestampResponseExceptionGeneral", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Timestamp signature validation failed..
-        /// </summary>
-        internal static string TimestampSignatureValidationFailed {
-            get {
-                return ResourceManager.GetString("TimestampSignatureValidationFailed", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The timestamp certificate has an unsupported signature algorithm..
-        /// </summary>
-        internal static string TimestampUnsupportedSignatureAlgorithm {
-            get {
-                return ResourceManager.GetString("TimestampUnsupportedSignatureAlgorithm", resourceCulture);
             }
         }
         
@@ -1061,6 +1250,24 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to An unexpected error occurred while verifying a package signature..
+        /// </summary>
+        internal static string UnexpectedPackageSignatureVerificationError {
+            get {
+                return ResourceManager.GetString("UnexpectedPackageSignatureVerificationError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The primary signature and repository countersignature are unrelated..
+        /// </summary>
+        internal static string UnrelatedSignatures {
+            get {
+                return ResourceManager.GetString("UnrelatedSignatures", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The ASN.1 data is unsupported..
         /// </summary>
         internal static string UnsupportedAsn1 {
@@ -1079,20 +1286,182 @@ namespace NuGet.Packaging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Verifying signature with author certificate: {0}.
+        ///   Looks up a localized string similar to Verifying the {0} with certificate: {1}.
         /// </summary>
-        internal static string VerificationAuthorCertDisplay {
+        internal static string VerificationCertDisplay {
             get {
-                return ResourceManager.GetString("VerificationAuthorCertDisplay", resourceCulture);
+                return ResourceManager.GetString("VerificationCertDisplay", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Verifying timestamp with timestamping service certificate: {0}.
+        ///   Looks up a localized string similar to Verifying {0}&apos;s timestamp with timestamping service certificate: {1}.
         /// </summary>
         internal static string VerificationTimestamperCertDisplay {
             get {
                 return ResourceManager.GetString("VerificationTimestamperCertDisplay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} does not have a signing certificate..
+        /// </summary>
+        internal static string Verify_ErrorNoCertificate {
+            get {
+                return ResourceManager.GetString("Verify_ErrorNoCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} found a chain building issue: {1}.
+        /// </summary>
+        internal static string VerifyChainBuildingIssue {
+            get {
+                return ResourceManager.GetString("VerifyChainBuildingIssue", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s certificate does not meet a minimum public key length requirement..
+        /// </summary>
+        internal static string VerifyError_CertificateFailsPublicKeyLengthRequirement {
+            get {
+                return ResourceManager.GetString("VerifyError_CertificateFailsPublicKeyLengthRequirement", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The lifetime signing EKU in the {0}&apos;s certificate is not supported..
+        /// </summary>
+        internal static string VerifyError_CertificateHasLifetimeSigningEKU {
+            get {
+                return ResourceManager.GetString("VerifyError_CertificateHasLifetimeSigningEKU", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s certificate has an unsupported signature algorithm..
+        /// </summary>
+        internal static string VerifyError_CertificateHasUnsupportedSignatureAlgorithm {
+            get {
+                return ResourceManager.GetString("VerifyError_CertificateHasUnsupportedSignatureAlgorithm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s certificate is not yet valid..
+        /// </summary>
+        internal static string VerifyError_CertificateNotYetValid {
+            get {
+                return ResourceManager.GetString("VerifyError_CertificateNotYetValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s certificate chain validation failed with error(s): {1}.
+        /// </summary>
+        internal static string VerifyError_InvalidCertificateChain {
+            get {
+                return ResourceManager.GetString("VerifyError_InvalidCertificateChain", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} validity period has expired..
+        /// </summary>
+        internal static string VerifyError_SignatureNotTimeValid {
+            get {
+                return ResourceManager.GetString("VerifyError_SignatureNotTimeValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} validation failed..
+        /// </summary>
+        internal static string VerifyError_SignatureVerificationFailed {
+            get {
+                return ResourceManager.GetString("VerifyError_SignatureVerificationFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s timestamp certificate does not meet a minimum public key length requirement..
+        /// </summary>
+        internal static string VerifyError_TimestampCertificateFailsPublicKeyLengthRequirement {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampCertificateFailsPublicKeyLengthRequirement", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s timestamp integrity check failed..
+        /// </summary>
+        internal static string VerifyError_TimestampIntegrityCheckFailed {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampIntegrityCheckFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} contains an invalid timestamp..
+        /// </summary>
+        internal static string VerifyError_TimestampInvalid {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} timestamp&apos;s message imprint uses an unsupported hash algorithm..
+        /// </summary>
+        internal static string VerifyError_TimestampMessageImprintUnsupportedHashAlgorithm {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampMessageImprintUnsupportedHashAlgorithm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s timestamp does not have a signing certificate..
+        /// </summary>
+        internal static string VerifyError_TimestampNoCertificate {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampNoCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s timestamp signing certificate is not yet valid..
+        /// </summary>
+        internal static string VerifyError_TimestampNotYetValid {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampNotYetValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s timestamp signature validation failed..
+        /// </summary>
+        internal static string VerifyError_TimestampSignatureValidationFailed {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampSignatureValidationFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s timestamp certificate has an unsupported signature algorithm..
+        /// </summary>
+        internal static string VerifyError_TimestampUnsupportedSignatureAlgorithm {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampUnsupportedSignatureAlgorithm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The {0}&apos;s timestamp found a chain building issue: {1}.
+        /// </summary>
+        internal static string VerifyError_TimestampVerifyChainBuildingIssue {
+            get {
+                return ResourceManager.GetString("VerifyError_TimestampVerifyChainBuildingIssue", resourceCulture);
             }
         }
     }

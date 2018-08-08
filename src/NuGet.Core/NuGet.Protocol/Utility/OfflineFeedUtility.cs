@@ -195,22 +195,22 @@ namespace NuGet.Protocol.Core.Types
                             ? PackageSaveMode.Defaultv3
                             : PackageSaveMode.Nuspec | PackageSaveMode.Nupkg;
 
-                        var signedPackageVerifier = new PackageSignatureVerifier(
-                            SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
-                            SignedPackageVerifierSettings.Default);
+                        var signedPackageVerifier = new PackageSignatureVerifier(SignatureVerificationProviderFactory.GetSignatureVerificationProviders());
 
                         var packageExtractionContext = new PackageExtractionContext(
                             packageSaveMode,
                             PackageExtractionBehavior.XmlDocFileSaveMode,
                             logger,
-                            signedPackageVerifier);
+                            signedPackageVerifier,
+                            SignedPackageVerifierSettings.GetDefault());
 
                         var versionFolderPathResolver = new VersionFolderPathResolver(source);
 
                         using (var packageDownloader = new LocalPackageArchiveDownloader(
-                            packagePath,
-                            packageIdentity,
-                            logger))
+                            source: null,
+                            packageFilePath: packagePath,
+                            packageIdentity: packageIdentity,
+                            logger: logger))
                         {
                             // Set Empty parentId here.
                             await PackageExtractor.InstallFromSourceAsync(
@@ -219,7 +219,7 @@ namespace NuGet.Protocol.Core.Types
                                 versionFolderPathResolver,
                                 packageExtractionContext,
                                 token,
-                                Guid.Empty);
+                                parentId: Guid.Empty);
                         }
 
                         var message = string.Format(

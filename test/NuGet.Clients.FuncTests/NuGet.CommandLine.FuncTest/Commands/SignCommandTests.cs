@@ -3,10 +3,12 @@
 
 using System;
 using System.IO;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using FluentAssertions;
 using NuGet.Common;
+using NuGet.Packaging.Signing;
 using NuGet.Test.Utility;
 using Test.Utility.Signing;
 using Xunit;
@@ -17,7 +19,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
     /// Tests Sign command
     /// These tests require admin privilege as the certs need to be added to the root store location
     /// </summary>
-    [Collection("Sign Command Test Collection")]
+    [Collection(SignCommandTestCollection.Name)]
     public class SignCommandTests
     {
         private const string _packageAlreadySignedError = "NU3001: The package already contains a signature. Please remove the existing signature before adding a new signature.";
@@ -38,11 +40,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackage()
+        public async Task SignCommand_SignPackageAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -67,13 +71,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithInvalidEkuFails()
+        public async Task SignCommand_SignPackageWithInvalidEkuFailsAsync()
         {
             // Arrange
             var invalidEkuCert = _testFixture.TrustedTestCertificateWithInvalidEku;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -98,13 +103,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithExpiredCertificateFails()
+        public async Task SignCommand_SignPackageWithExpiredCertificateFailsAsync()
         {
             // Arrange
             var expiredCert = _testFixture.TrustedTestCertificateExpired;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -130,13 +136,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithNotYetValidCertificateFails()
+        public async Task SignCommand_SignPackageWithNotYetValidCertificateFailsAsync()
         {
             // Arrange
             var cert = _testFixture.TrustedTestCertificateNotYetValid;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -162,13 +169,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public async Task SignCommand_SignPackageWithTimestamping()
+        public async Task SignCommand_SignPackageWithTimestampingAsync()
         {
             // Arrange
             var timestampService = await _testFixture.GetDefaultTrustedTimestampServiceAsync();
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -193,13 +201,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithValidCertChain()
+        public async Task SignCommand_SignPackageWithValidCertChainAsync()
         {
             // Arrange
             var cert = _testFixture.TrustedTestCertificateChain.Leaf;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -224,13 +233,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithRevokedLeafCertChain()
+        public async Task SignCommand_SignPackageWithRevokedLeafCertChainAsync()
         {
             // Arrange
             var cert = _testFixture.RevokedTestCertificateWithChain;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -255,13 +265,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithUnknownRevocationCertChain()
+        public async Task SignCommand_SignPackageWithUnknownRevocationCertChainAsync()
         {
             // Arrange
             var cert = _testFixture.RevocationUnknownTestCertificateWithChain;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -288,12 +299,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithOutputDirectory()
+        public async Task SignCommand_SignPackageWithOutputDirectoryAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
             using (var outputDir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packageFileName = Guid.NewGuid().ToString();
                 var packagePath = Path.Combine(dir, packageFileName);
@@ -321,11 +334,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_ResignPackageWithoutOverwriteFails()
+        public async Task SignCommand_ResignPackageWithoutOverwriteFailsAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -358,11 +373,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_ResignPackageWithOverwriteSuccess()
+        public async Task SignCommand_ResignPackageWithOverwriteSuccessAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -395,11 +412,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithOverwriteSuccess()
+        public async Task SignCommand_SignPackageWithOverwriteSuccessAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -424,11 +443,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithPfxFileSuccess()
+        public async Task SignCommand_SignPackageWithPfxFileSuccessAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
                 var pfxPath = Path.Combine(dir, Guid.NewGuid().ToString());
@@ -463,11 +484,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithPfxFileInteractiveSuccess()
+        public async Task SignCommand_SignPackageWithPfxFileInteractiveSuccessAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
                 var pfxPath = Path.Combine(dir, Guid.NewGuid().ToString());
@@ -506,11 +529,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithPfxFileInteractiveInvalidPasswordFails()
+        public async Task SignCommand_SignPackageWithPfxFileInteractiveInvalidPasswordFailsAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
                 var pfxPath = Path.Combine(dir, Guid.NewGuid().ToString());
@@ -549,11 +574,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithPfxFileWithoutPasswordAndWithNonInteractiveFails()
+        public async Task SignCommand_SignPackageWithPfxFileWithoutPasswordAndWithNonInteractiveFailsAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
                 var pfxPath = Path.Combine(dir, Guid.NewGuid().ToString());
@@ -588,11 +615,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithPfxFileWithNonInteractiveAndStdInPasswordFails()
+        public async Task SignCommand_SignPackageWithPfxFileWithNonInteractiveAndStdInPasswordFailsAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
+
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
                 var pfxPath = Path.Combine(dir, Guid.NewGuid().ToString());
@@ -631,12 +660,12 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void SignCommand_SignPackageWithUntrustedSelfIssuedCertificateInCertificateStore()
+        public async Task SignCommand_SignPackageWithUntrustedSelfIssuedCertificateInCertificateStoreAsync()
         {
             using (var directory = TestDirectory.Create())
             {
                 var packageContext = new SimpleTestPackageContext();
-                var packageFile = packageContext.CreateAsFile(directory, fileName: Guid.NewGuid().ToString());
+                var packageFile = await packageContext.CreateAsFileAsync(directory, fileName: Guid.NewGuid().ToString());
 
                 using (var certificate = _testFixture.UntrustedSelfIssuedCertificateInCertificateStore)
                 {
@@ -648,6 +677,38 @@ namespace NuGet.CommandLine.FuncTest.Commands
 
                     Assert.True(result.Success);
                     Assert.Contains(_noTimestamperWarningCode, result.AllOutput);
+                }
+            }
+        }
+
+        [CIOnlyFact]
+        public async Task SignCommand_SignPackageWithUnsuportedTimestampHashAlgorithm_ShouldNotModifyPackageAsync()
+        {
+            var testServer = await _testFixture.GetSigningTestServerAsync();
+            var certificateAuthority = await _testFixture.GetDefaultTrustedCertificateAuthorityAsync();
+            var options = new TimestampServiceOptions() { SignatureHashAlgorithm = new Oid(Oids.Sha1) };
+            var timestampService = TimestampService.Create(certificateAuthority, options);
+
+            using (testServer.RegisterResponder(timestampService))
+            using (var directory = TestDirectory.Create())
+            {
+                var packageContext = new SimpleTestPackageContext();
+                var packageFile = await packageContext.CreateAsFileAsync(directory, fileName: Guid.NewGuid().ToString());
+                var originalFile = File.ReadAllBytes(packageFile.FullName);
+
+                using (var certificate = _testFixture.UntrustedSelfIssuedCertificateInCertificateStore)
+                {
+                    var result = CommandRunner.Run(
+                        _nugetExePath,
+                        directory,
+                        $"sign {packageFile.FullName} -CertificateFingerprint {certificate.Thumbprint} -Timestamper {timestampService.Url}",
+                        waitForExit: true);
+
+                    Assert.False(result.Success);
+                    Assert.Contains("The timestamp certificate has an unsupported signature algorithm.", result.AllOutput);
+
+                    var resultingFile = File.ReadAllBytes(packageFile.FullName);
+                    Assert.Equal(resultingFile, originalFile);
                 }
             }
         }

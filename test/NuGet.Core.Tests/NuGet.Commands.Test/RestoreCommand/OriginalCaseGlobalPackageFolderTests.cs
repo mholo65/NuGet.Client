@@ -26,7 +26,7 @@ namespace NuGet.Commands.Test
     public class OriginalCaseGlobalPackageFolderTests
     {
         [Fact]
-        public async Task CopyPackagesToOriginalCaseAsync_WhenPackageMustComeFromProvider_ConvertsPackages()
+        public async Task CopyPackagesToOriginalCaseAsync_WhenPackageMustComeFromProvider_ConvertsPackagesAsync()
         {
             // Arrange
             using (var workingDirectory = TestDirectory.Create())
@@ -36,13 +36,13 @@ namespace NuGet.Commands.Test
 
                 // Add the package to the source.
                 var identity = new PackageIdentity("PackageA", NuGetVersion.Parse("1.0.0-Beta"));
-                var packagePath = SimpleTestPackageUtility.CreateFullPackage(
+                var packagePath = await SimpleTestPackageUtility.CreateFullPackageAsync(
                     sourceDirectory,
                     identity.Id,
                     identity.Version.ToString());
 
                 var logger = new TestLogger();
-                var graph = GetRestoreTargetGraph(identity, packagePath, logger);
+                var graph = GetRestoreTargetGraph(sourceDirectory,identity, packagePath, logger);
 
                 var request = GetRestoreRequest(packagesDirectory, logger);
                 var resolver = new VersionFolderPathResolver(packagesDirectory, isLowercase: false);
@@ -61,7 +61,7 @@ namespace NuGet.Commands.Test
         }
 
         [Fact]
-        public async Task CopyPackagesToOriginalCaseAsync_WhenPackageComesFromLocalFolder_ConvertsPackages()
+        public async Task CopyPackagesToOriginalCaseAsync_WhenPackageComesFromLocalFolder_ConvertsPackagesAsync()
         {
             // Arrange
             using (var workingDirectory = TestDirectory.Create())
@@ -72,17 +72,17 @@ namespace NuGet.Commands.Test
 
                 // Add a different package to the source.
                 var identityA = new PackageIdentity("PackageA", NuGetVersion.Parse("1.0.0-Beta"));
-                var packagePath = SimpleTestPackageUtility.CreateFullPackage(
+                var packagePath = await SimpleTestPackageUtility.CreateFullPackageAsync(
                     sourceDirectory,
                     identityA.Id,
                     identityA.Version.ToString());
 
                 var logger = new TestLogger();
                 var identityB = new PackageIdentity("PackageB", NuGetVersion.Parse("2.0.0-Beta"));
-                var graph = GetRestoreTargetGraph(identityB, packagePath, logger);
+                var graph = GetRestoreTargetGraph(sourceDirectory, identityB, packagePath, logger);
 
                 // Add the package to the fallback directory.
-                await SimpleTestPackageUtility.CreateFolderFeedV3(fallbackDirectory, identityB);
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(fallbackDirectory, identityB);
 
                 var request = GetRestoreRequest(packagesDirectory, logger, fallbackDirectory);
                 var resolver = new VersionFolderPathResolver(packagesDirectory, isLowercase: false);
@@ -102,7 +102,7 @@ namespace NuGet.Commands.Test
         }
 
         [Fact]
-        public async Task CopyPackagesToOriginalCaseAsync_DoesNothingIfPackageIsAlreadyInstalled()
+        public async Task CopyPackagesToOriginalCaseAsync_DoesNothingIfPackageIsAlreadyInstalledAsync()
         {
             // Arrange
             using (var workingDirectory = TestDirectory.Create())
@@ -111,13 +111,13 @@ namespace NuGet.Commands.Test
                 var sourceDirectory = Path.Combine(workingDirectory, "source");
 
                 var identity = new PackageIdentity("PackageA", NuGetVersion.Parse("1.0.0-Beta"));
-                var packagePath = SimpleTestPackageUtility.CreateFullPackage(
+                var packagePath = await SimpleTestPackageUtility.CreateFullPackageAsync(
                     sourceDirectory,
                     identity.Id,
                     identity.Version.ToString());
 
                 var logger = new TestLogger();
-                var graph = GetRestoreTargetGraph(identity, packagePath, logger);
+                var graph = GetRestoreTargetGraph(sourceDirectory, identity, packagePath, logger);
 
                 var request = GetRestoreRequest(packagesDirectory, logger);
                 var resolver = new VersionFolderPathResolver(packagesDirectory, isLowercase: false);
@@ -142,7 +142,7 @@ namespace NuGet.Commands.Test
         }
 
         [Fact]
-        public async Task CopyPackagesToOriginalCaseAsync_OnlyInstallsPackagesOnce()
+        public async Task CopyPackagesToOriginalCaseAsync_OnlyInstallsPackagesOnceAsync()
         {
             // Arrange
             using (var workingDirectory = TestDirectory.Create())
@@ -151,14 +151,14 @@ namespace NuGet.Commands.Test
                 var sourceDirectory = Path.Combine(workingDirectory, "source");
 
                 var identity = new PackageIdentity("PackageA", NuGetVersion.Parse("1.0.0-Beta"));
-                var packagePath = SimpleTestPackageUtility.CreateFullPackage(
+                var packagePath = await SimpleTestPackageUtility.CreateFullPackageAsync(
                     sourceDirectory,
                     identity.Id,
                     identity.Version.ToString());
 
                 var logger = new TestLogger();
-                var graphA = GetRestoreTargetGraph(identity, packagePath, logger);
-                var graphB = GetRestoreTargetGraph(identity, packagePath, logger);
+                var graphA = GetRestoreTargetGraph(sourceDirectory, identity, packagePath, logger);
+                var graphB = GetRestoreTargetGraph(sourceDirectory, identity, packagePath, logger);
 
                 var request = GetRestoreRequest(packagesDirectory, logger);
                 var resolver = new VersionFolderPathResolver(packagesDirectory, isLowercase: false);
@@ -225,6 +225,7 @@ namespace NuGet.Commands.Test
         }
 
         private static RestoreTargetGraph GetRestoreTargetGraph(
+            string source,
             PackageIdentity identity,
             FileInfo packagePath,
             TestLogger logger)
@@ -245,6 +246,7 @@ namespace NuGet.Commands.Test
                     (callbackIdentity, sourceCacheContext, callbackLogger, cancellationToken) =>
                     {
                         packageDependency = new LocalPackageArchiveDownloader(
+                            source,
                             packagePath.FullName,
                             callbackIdentity,
                             callbackLogger);

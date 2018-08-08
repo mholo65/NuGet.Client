@@ -3,11 +3,10 @@
 
   <PropertyGroup>
     <Description>NuGet's implementation for reading nupkg package and nuspec package specification files.</Description>
-    <TargetFrameworks>netstandard1.3;net46</TargetFrameworks>
-    <TargetFrameworks Condition="'$(IsBuildOnlyXPLATProjects)' == 'true'">netstandard1.3</TargetFrameworks>
+    <TargetFrameworks>netstandard1.6;net46</TargetFrameworks>
+    <TargetFrameworks Condition="'$(IsBuildOnlyXPLATProjects)' == 'true'">netstandard1.6</TargetFrameworks>
     <TargetFramework />
     <NoWarn>$(NoWarn);CS1591;CS1574;CS1573;CS1572</NoWarn>
-    <NetStandardImplicitPackageVersion Condition=" '$(TargetFramework)' == 'netstandard1.3' ">$(NetStandardPackageVersion)</NetStandardImplicitPackageVersion>
     <PackProject>true</PackProject>
     <Shipping>true</Shipping>
     <IncludeInVSIX>true</IncludeInVSIX>
@@ -24,7 +23,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NuGet.Common\NuGet.Common.csproj" />
     <ProjectReference Include="..\NuGet.Packaging.Core\NuGet.Packaging.Core.csproj" />
   </ItemGroup>
 
@@ -44,9 +42,7 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(IsCore)' == 'true' ">
-    <PackageReference Include="System.ObjectModel" Version="4.0.12" />
-    <PackageReference Include="System.Dynamic.Runtime" Version="4.0.11" />
-    <PackageReference Include="System.IO.Compression" Version="4.1.0" />
+    <PackageReference Include="System.Dynamic.Runtime" Version="4.3.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -60,9 +56,18 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Strings.resx</DependentUpon>
     </Compile>
+    <Compile Update="Rules\AnalysisResources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>AnalysisResources.resx</DependentUpon>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Update="Rules\AnalysisResources.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>AnalysisResources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
     <EmbeddedResource Update="Signing\DerEncoding\SR.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>SR.Designer.cs</LastGenOutput>
@@ -70,6 +75,10 @@
     <EmbeddedResource Update="Strings.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Strings.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Rules\AnalysisResoruces.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>AnalysisResources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
   

@@ -12,18 +12,19 @@ namespace NuGet.PackageManagement.Telemetry
             string nuGetVersion,
             string projectId,
             NuGetProjectType nuGetProjectType,
-            int installedPackageCount) :
+            bool isPRUpgradable) :
             base(ProjectInformationEventName, new Dictionary<string, object>
                 {
-                    { nameof(InstalledPackageCount), installedPackageCount },
                     { nameof(NuGetProjectType), nuGetProjectType },
                     { nameof(NuGetVersion), nuGetVersion },
-                    { nameof(ProjectId), projectId.ToString() }
+                    { nameof(ProjectId), projectId.ToString() },
+                    { IsPRUpgradable, isPRUpgradable }
                 })
         {
         }
 
         public const string ProjectInformationEventName = "ProjectInformation";
+        public const string IsPRUpgradable = "IsPRUpgradable";
 
         /// <summary>
         /// The version of NuGet that emitted this event.
@@ -41,8 +42,8 @@ namespace NuGet.PackageManagement.Telemetry
         public NuGetProjectType NuGetProjectType => (NuGetProjectType)base[nameof(NuGetProjectType)];
 
         /// <summary>
-        /// The number of NuGet packages installed to this project.
+        /// True, if project can be upgraded to PackageReference.
         /// </summary>
-        public int InstalledPackageCount => (int)base[nameof(InstalledPackageCount)];
+        public bool IsProjectPRUpgradable => (bool)base[IsPRUpgradable];
     }
 }

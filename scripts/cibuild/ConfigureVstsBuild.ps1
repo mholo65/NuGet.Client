@@ -1,17 +1,22 @@
 <#
 .SYNOPSIS
 Sets build variables during a VSTS build dynamically.
+
 .DESCRIPTION
 This script is used to dynamically set some build variables during VSTS build.
 Specifically, this script reads the buildcounter.txt file in the $(DropRoot) to
 determine the build number of the artifacts, also it sets the $(NupkgOutputDir)
 based on whether $(BuildRTM) is true or false.
+
 .PARAMETER BuildCounterFile
 Path to the file in the drop root which stores the current build counter.
+
 .PARAMETER BuildInfoJsonFile
 Path to the buildInfo.json file that is generated for every build in the output folder.
+
 .PARAMETER BuildRTM
 True/false depending on whether nupkgs are being with or without the release labels.
+
 #>
 
 param
@@ -23,7 +28,9 @@ param
     [string]$BuildInfoJsonFile,
 
     [Parameter(Mandatory=$True)]
-    [string]$BuildRTM
+    [string]$BuildRTM,
+    
+    [switch]$SkipUpdateBuildNumber
 )
 
 Function Get-Version {
@@ -59,6 +66,7 @@ Function Update-VsixVersion {
     # Evaluate the new version
     $newVersion = Get-Version $ReleaseProductVersion $buildNumber
     Write-Host "Updating the VSIX version [$oldVersion] => [$newVersion]"
+    Write-Host "##vso[task.setvariable variable=VsixBuildNumber;]$newVersion"
     # setting the revision to the new version
     $root.Metadata.Identity.Version = "$newVersion"
 
@@ -120,46 +128,58 @@ if ($BuildRTM -eq 'true')
     # Set the $(NupkgOutputDir) build variable in VSTS build
     Write-Host "##vso[task.setvariable variable=NupkgOutputDir;]ReleaseNupkgs"
     Write-Host "##vso[task.setvariable variable=VsixPublishDir;]VS15-RTM"
-    $numberOfTries = 0
-    do{
-        Write-Host "Waiting for buildinfo.json to be generated..."
-        $numberOfTries++
-        Start-Sleep -s 15
-    }
-    until ((Test-Path $BuildInfoJsonFile) -or ($numberOfTries -gt 50))
-    $json = (Get-Content $BuildInfoJsonFile -Raw) | ConvertFrom-Json
-    $currentBuild = [System.Decimal]::Parse($json.BuildNumber)
-    # Set the $(Revision) build variable in VSTS build
-    Write-Host "##vso[task.setvariable variable=Revision;]$currentBuild"
-    Write-Host "##vso[build.updatebuildnumber]$currentBuild" 
-    Write-Host "##vso[task.setvariable variable=BuildNumber;isOutput=true]$currentBuild"
-    $oldBuildOutputDirectory = Split-Path -Path $BuildInfoJsonFile
-    $branchDirectory = Split-Path -Path $oldBuildOutputDirectory
-    $newBuildOutputFolder =  Join-Path $branchDirectory $currentBuild
-    if(Test-Path $newBuildOutputFolder)
+    # Only for backward compatibility with orchestrated builds
+    if(-not $SkipUpdateBuildNumber)
     {
-        Move-Item -Path $BuildInfoJsonFile -Destination $newBuildOutputFolder
-        Remove-Item -Path $oldBuildOutputDirectory -Force
-    }
-    else
-    {
-        Rename-Item $oldBuildOutputDirectory $currentBuild
-    }
-    
+        $numberOfTries = 0
+        do{
+            Write-Host "Waiting for buildinfo.json to be generated..."
+            $numberOfTries++
+            Start-Sleep -s 15
+        }
+        until ((Test-Path $BuildInfoJsonFile) -or ($numberOfTries -gt 50))
+        $json = (Get-Content $BuildInfoJsonFile -Raw) | ConvertFrom-Json
+        $currentBuild = [System.Decimal]::Parse($json.BuildNumber)
+        # Set the $(Revision) build variable in VSTS build
+        Write-Host "##vso[task.setvariable variable=Revision;]$currentBuild"
+        Write-Host "##vso[build.updatebuildnumber]$currentBuild" 
+        $oldBuildOutputDirectory = Split-Path -Path $BuildInfoJsonFile
+        $branchDirectory = Split-Path -Path $oldBuildOutputDirectory
+        $newBuildOutputFolder =  Join-Path $branchDirectory $currentBuild
+        if(Test-Path $newBuildOutputFolder)
+        {
+            Move-Item -Path $BuildInfoJsonFile -Destination $newBuildOutputFolder
+            Remove-Item -Path $oldBuildOutputDirectory -Force
+        }
+        else
+        {
+            Rename-Item $oldBuildOutputDirectory $currentBuild
+        }   
+    }    
 }
 else
 {
-    $revision = Get-Content $BuildCounterFile
-    $newBuildCounter = [System.Decimal]::Parse($revision)
-    $newBuildCounter++
-    Set-Content $BuildCounterFile $newBuildCounter
-    # Set the $(Revision) build variable in VSTS build
-    Write-Host "##vso[task.setvariable variable=Revision;]$newBuildCounter"
-    Write-Host "##vso[build.updatebuildnumber]$newBuildCounter"
-    Write-Host "##vso[task.setvariable variable=BuildNumber;isOutput=true]$newBuildCounter"
+    # Only for backward compatibility with orchestrated builds
+    if(-not $SkipUpdateBuildNumber)
+    {
+        $revision = Get-Content $BuildCounterFile
+        $newBuildCounter = [System.Decimal]::Parse($revision)
+        $newBuildCounter++
+        Set-Content $BuildCounterFile $newBuildCounter
+        # Set the $(Revision) build variable in VSTS build
+        Write-Host "##vso[task.setvariable variable=Revision;]$newBuildCounter"
+        Write-Host "##vso[build.updatebuildnumber]$newBuildCounter"
+        Write-Host "##vso[task.setvariable variable=BuildNumber;isOutput=true]$newBuildCounter"
+    }
+    else
+    {
+        $newBuildCounter = $env:BUILD_BUILDNUMBER        
+    }
+
     $VsTargetBranch = & $msbuildExe $env:BUILD_REPOSITORY_LOCALPATH\build\config.props /v:m /nologo /t:GetVsTargetBranch
     $CliTargetBranch = & $msbuildExe $env:BUILD_REPOSITORY_LOCALPATH\build\config.props /v:m /nologo /t:GetCliTargetBranch
     $SdkTargetBranch = & $msbuildExe $env:BUILD_REPOSITORY_LOCALPATH\build\config.props /v:m /nologo /t:GetSdkTargetBranch
+    Write-Host $VsTargetBranch
     $jsonRepresentation = @{
         BuildNumber = $newBuildCounter
         CommitHash = $env:BUILD_SOURCEVERSION

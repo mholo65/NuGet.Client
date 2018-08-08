@@ -21,7 +21,7 @@ Source code: https://github.com/aelij/NuGet.Client/tree/netstandard</Description
   </ItemGroup>
   
   <ItemGroup Condition=" '$(TargetFramework)' == 'net46' ">
-    <PackageReference Include="Microsoft.Web.Xdt" Version="2.1.1" />
+    <PackageReference Include="Microsoft.Web.Xdt" Version="2.1.2" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="Microsoft.Build" />
     <Reference Include="System.IO.Compression" />

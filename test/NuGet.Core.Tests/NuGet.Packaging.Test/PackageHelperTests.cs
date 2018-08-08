@@ -208,6 +208,7 @@ namespace NuGet.Packaging.Test
             using (var test = PackageHelperTest.Create(TestPackagesCore.GetPackageContentReaderTestPackage()))
             {
                 await PackageExtractor.ExtractPackageAsync(
+                    test.Root,
                     test.Reader,
                     test.GetPackageStream(),
                     test.Resolver,
@@ -215,7 +216,8 @@ namespace NuGet.Packaging.Test
                         PackageSaveMode.Defaultv2,
                         PackageExtractionBehavior.XmlDocFileSaveMode,
                         NullLogger.Instance,
-                        signedPackageVerifier: null),
+                        signedPackageVerifier: null,
+                        signedPackageVerifierSettings: null),
                     CancellationToken.None);
 
                 var packageIdentity = test.Reader.GetIdentity();
@@ -338,6 +340,7 @@ namespace NuGet.Packaging.Test
                     using (var packageStream = File.OpenRead(packageFileInfo.FullName))
                     {
                         await PackageExtractor.ExtractPackageAsync(
+                            test.Root,
                             packageReader,
                             packageStream,
                             packagePathResolver,
@@ -345,7 +348,8 @@ namespace NuGet.Packaging.Test
                                 PackageSaveMode.Defaultv2,
                                 PackageExtractionBehavior.XmlDocFileSaveMode,
                                 NullLogger.Instance,
-                                signedPackageVerifier: null),
+                                signedPackageVerifier: null,
+                                signedPackageVerifierSettings: null),
                             CancellationToken.None);
                     }
 
@@ -390,14 +394,15 @@ namespace NuGet.Packaging.Test
                 using (var packageStream = File.OpenRead(packageFileInfo.FullName))
                 {
                     await PackageExtractor.ExtractPackageAsync(
-                        packageReader,
+                        testDirectory.Path,
                         packageStream,
                         packagePathResolver,
                         new PackageExtractionContext(
                             PackageSaveMode.Defaultv2,
                             PackageExtractionBehavior.XmlDocFileSaveMode,
                             NullLogger.Instance,
-                            signedPackageVerifier: null),
+                            signedPackageVerifier: null,
+                            signedPackageVerifierSettings: null),
                         CancellationToken.None);
                 }
 
@@ -406,6 +411,7 @@ namespace NuGet.Packaging.Test
                 using (var packageStream = File.OpenRead(satellitePackageInfo.FullName))
                 {
                     await PackageExtractor.ExtractPackageAsync(
+                        testDirectory.Path,
                         packageReader,
                         packageStream,
                         packagePathResolver,
@@ -413,7 +419,8 @@ namespace NuGet.Packaging.Test
                             PackageSaveMode.Defaultv2,
                             PackageExtractionBehavior.XmlDocFileSaveMode,
                             NullLogger.Instance,
-                            signedPackageVerifier: null),
+                            signedPackageVerifier: null,
+                            signedPackageVerifierSettings: null),
                         CancellationToken.None);
                 }
 

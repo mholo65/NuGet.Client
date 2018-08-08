@@ -149,14 +149,15 @@ namespace NuGet.ProjectManagement
                     if (packageExtractionContext == null)
                     {
                         var signedPackageVerifier = !downloadResourceResult.SignatureVerified ? new PackageSignatureVerifier(
-                            SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
-                            SignedPackageVerifierSettings.Default) : null;
+                            SignatureVerificationProviderFactory.GetSignatureVerificationProviders()) : null;
+                        var signedPackageVerifierSettings = !downloadResourceResult.SignatureVerified ? SignedPackageVerifierSettings.GetDefault() : null;
 
                         packageExtractionContext = new PackageExtractionContext(
                             PackageSaveMode.Defaultv2,
                             PackageExtractionBehavior.XmlDocFileSaveMode,
                             new LoggerAdapter(nuGetProjectContext),
-                            signedPackageVerifier);
+                            signedPackageVerifier,
+                            signedPackageVerifierSettings);
                     }
 
                     // 2. Check if the Package already exists at root, if so, return false
@@ -181,6 +182,7 @@ namespace NuGet.ProjectManagement
                         {
                             addedPackageFilesList.AddRange(
                                 await PackageExtractor.ExtractPackageAsync(
+                                    downloadResourceResult.PackageSource,
                                     downloadResourceResult.PackageReader,
                                     PackagePathResolver,
                                     packageExtractionContext,
@@ -191,6 +193,7 @@ namespace NuGet.ProjectManagement
                         {
                             addedPackageFilesList.AddRange(
                                 await PackageExtractor.ExtractPackageAsync(
+                                    downloadResourceResult.PackageSource,
                                     downloadResourceResult.PackageReader,
                                     downloadResourceResult.PackageStream,
                                     PackagePathResolver,
@@ -203,6 +206,7 @@ namespace NuGet.ProjectManagement
                     {
                         addedPackageFilesList.AddRange(
                             await PackageExtractor.ExtractPackageAsync(
+                                downloadResourceResult.PackageSource,
                                 downloadResourceResult.PackageStream,
                                 PackagePathResolver,
                                 packageExtractionContext,
@@ -413,15 +417,14 @@ namespace NuGet.ProjectManagement
             var packageExtractionContext = nuGetProjectContext.PackageExtractionContext;
             if (packageExtractionContext == null)
             {
-                var signedPackageVerifier = new PackageSignatureVerifier(
-                            SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
-                            SignedPackageVerifierSettings.Default);
+                var signedPackageVerifier = new PackageSignatureVerifier(SignatureVerificationProviderFactory.GetSignatureVerificationProviders());
 
                 packageExtractionContext = new PackageExtractionContext(
                     PackageSaveMode.Defaultv2,
                     PackageExtractionBehavior.XmlDocFileSaveMode,
                     new LoggerAdapter(nuGetProjectContext),
-                    signedPackageVerifier);
+                    signedPackageVerifier,
+                    SignedPackageVerifierSettings.GetDefault());
             }
 
             var copiedSatelliteFiles = await PackageExtractor.CopySatelliteFilesAsync(

@@ -58,7 +58,12 @@ namespace NuGet.PackageManagement.VisualStudio
 
                     try
                     {
-                        return await action();
+                        // Run it as part of CPS JTF so that it can be joined in Shell JTF collection
+                        // and allows other tasks to proceed instead of deadlocking them.
+                        return await NuGetUIThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+                        {
+                            return await action();
+                        });
                     }
                     finally
                     {
@@ -71,10 +76,14 @@ namespace NuGet.PackageManagement.VisualStudio
                         _lockCount.Value--;
                     }
                 });
+                
             }
             else
             {
-                return await action();
+                return await NuGetUIThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+                {
+                    return await action();
+                });
             }
         }
 

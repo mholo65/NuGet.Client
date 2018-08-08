@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using FluentAssertions;
 using Moq;
 using Newtonsoft.Json.Linq;
 using NuGet.Commands;
@@ -108,7 +109,7 @@ namespace NuGet.Test
 
                         configs.Add(config);
 
-                        CreateConfigJsonNet452(config);
+                        BasicConfigNet46(config);
 
                         var msBuildNuGetProjectSystem = new TestMSBuildNuGetProjectSystem(
                             projectTargetFramework,
@@ -250,7 +251,7 @@ namespace NuGet.Test
 
                         configs.Add(config);
 
-                        CreateConfigJsonNet452(config);
+                        BasicConfigNet46(config);
 
                         var msBuildNuGetProjectSystem = new TestMSBuildNuGetProjectSystem(
                             projectTargetFramework,
@@ -377,7 +378,7 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
                 var projectTargetFramework = NuGetFramework.Parse("net452");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
@@ -482,7 +483,7 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
                 var projectTargetFramework = NuGetFramework.Parse("net45");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
@@ -527,6 +528,69 @@ namespace NuGet.Test
         }
 
         [Fact]
+        public async Task TestPacManBuildIntegratedInstallAndRollbackPackageVerifyAdditionalMessages()
+        {
+            // Arrange
+            var packageIdentity = new PackageIdentity("nuget.core", NuGetVersion.Parse("91.0.0"));
+            var sourceRepositoryProvider = TestSourceRepositoryUtility.CreateV2OnlySourceRepositoryProvider();
+
+            using (var testSolutionManager = new TestSolutionManager(true))
+            using (var randomProjectFolderPath = TestDirectory.Create())
+            {
+                var testSettings = PopulateSettingsWithSources(sourceRepositoryProvider, randomProjectFolderPath);
+                var deleteOnRestartManager = new TestDeleteOnRestartManager();
+                var nuGetPackageManager = new NuGetPackageManager(
+                    sourceRepositoryProvider,
+                    testSettings,
+                    testSolutionManager,
+                    deleteOnRestartManager);
+
+                var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
+                var token = CancellationToken.None;
+
+                BasicConfigNet46(randomConfig);
+
+                var projectTargetFramework = NuGetFramework.Parse("net45");
+                var testNuGetProjectContext = new TestNuGetProjectContext();
+                var msBuildNuGetProjectSystem = new TestMSBuildNuGetProjectSystem(
+                    projectTargetFramework,
+                    testNuGetProjectContext,
+                    randomProjectFolderPath);
+
+                var projectFilePath = Path.Combine(randomProjectFolderPath, $"{msBuildNuGetProjectSystem.ProjectName}.csproj");
+                var buildIntegratedProject = new ProjectJsonNuGetProject(randomConfig, projectFilePath);
+
+                var message = string.Empty;
+
+                // Act
+                var messages = new List<ILogMessage>();
+
+                try
+                {
+                    await nuGetPackageManager.InstallPackageAsync(
+                        buildIntegratedProject,
+                        packageIdentity,
+                        new ResolutionContext(),
+                        new TestNuGetProjectContext(),
+                        sourceRepositoryProvider.GetRepositories(),
+                        sourceRepositoryProvider.GetRepositories(),
+                        CancellationToken.None);
+                }
+                catch (PackageReferenceRollbackException ex)
+                {
+                    messages.AddRange(ex.LogMessages);
+                }
+
+                var installedPackages = await buildIntegratedProject.GetInstalledPackagesAsync(CancellationToken.None);
+                var lockFile = ProjectJsonPathUtilities.GetLockFilePath(buildIntegratedProject.JsonConfigPath);
+
+                // Assert
+                messages.Count.Should().Be(1);
+                messages[0].Message.Should().Contain("Unable to find package nuget.core with version (>= 91.0.0)");
+            }
+        }
+
+        [Fact]
         public async Task TestPacManBuildIntegratedUpdateAndRollbackPackage()
         {
             // Arrange
@@ -551,7 +615,7 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
                 var projectTargetFramework = NuGetFramework.Parse("net45");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
@@ -726,9 +790,9 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
-                var projectTargetFramework = NuGetFramework.Parse("net45");
+                var projectTargetFramework = NuGetFramework.Parse("net46");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
                 var msBuildNuGetProjectSystem = new TestMSBuildNuGetProjectSystem(projectTargetFramework, testNuGetProjectContext, randomProjectFolderPath);
                 var projectFilePath = Path.Combine(randomProjectFolderPath, $"{msBuildNuGetProjectSystem.ProjectName}.csproj");
@@ -829,7 +893,7 @@ namespace NuGet.Test
                 var originalProjectJson = File.ReadAllText(projectJson);
 
                 // Act & Assert
-                var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                var exception = await Assert.ThrowsAsync<PackageReferenceRollbackException>(
                     () => nuGetPackageManager.ExecuteNuGetProjectActionsAsync(
                         buildIntegratedProject,
                         actions,
@@ -877,9 +941,9 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
-                var projectTargetFramework = NuGetFramework.Parse("net45");
+                var projectTargetFramework = NuGetFramework.Parse("net46");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
                 var msBuildNuGetProjectSystem = new TestMSBuildNuGetProjectSystem(projectTargetFramework, testNuGetProjectContext, randomProjectFolderPath);
                 var projectFilePath = Path.Combine(randomProjectFolderPath, $"{msBuildNuGetProjectSystem.ProjectName}.csproj");
@@ -971,9 +1035,9 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
-                var projectTargetFramework = NuGetFramework.Parse("net45");
+                var projectTargetFramework = NuGetFramework.Parse("net46");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
                 var msBuildNuGetProjectSystem = new TestMSBuildNuGetProjectSystem(projectTargetFramework, testNuGetProjectContext, randomProjectFolderPath);
                 var projectFilePath = Path.Combine(randomProjectFolderPath, $"{msBuildNuGetProjectSystem.ProjectName}.csproj");
@@ -1465,7 +1529,7 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
                 var projectTargetFramework = NuGetFramework.Parse("net452");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
@@ -1536,7 +1600,7 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
                 var projectTargetFramework = NuGetFramework.Parse("net452");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
@@ -1575,7 +1639,7 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
                 var projectTargetFramework = NuGetFramework.Parse("net452");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
@@ -1617,7 +1681,7 @@ namespace NuGet.Test
                 var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
                 var token = CancellationToken.None;
 
-                CreateConfigJsonNet452(randomConfig);
+                BasicConfigNet46(randomConfig);
 
                 var projectTargetFramework = NuGetFramework.Parse("net452");
                 var testNuGetProjectContext = new TestNuGetProjectContext();
@@ -1671,7 +1735,7 @@ namespace NuGet.Test
 
                     var randomConfig = Path.Combine(randomProjectFolderPath, "project.json");
 
-                    CreateConfigJsonNet452(randomConfig);
+                    BasicConfigNet46(randomConfig);
 
                     var projectTargetFramework = NuGetFramework.Parse("net452");
                     var msBuildNuGetProjectSystem = new TestMSBuildNuGetProjectSystem(projectTargetFramework, testNuGetProjectContext, randomProjectFolderPath);
@@ -1732,22 +1796,22 @@ namespace NuGet.Test
             }
         }
 
-        private static void CreateConfigJsonNet452(string path)
+        private static void BasicConfigNet46(string path)
         {
             using (var writer = new StreamWriter(path))
             {
-                writer.Write(BasicConfigNet452.ToString());
+                writer.Write(BasicConfigNet460.ToString());
             }
         }
 
-        private static JObject BasicConfigNet452
+        private static JObject BasicConfigNet460
         {
             get
             {
                 var json = new JObject();
 
                 var frameworks = new JObject();
-                frameworks["net452"] = new JObject();
+                frameworks["net46"] = new JObject();
 
                 json["dependencies"] = new JObject();
 

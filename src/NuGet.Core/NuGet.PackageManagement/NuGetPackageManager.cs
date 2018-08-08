@@ -816,8 +816,7 @@ namespace NuGet.PackageManagement
                 foreach (var installedPackage in projectInstalledPackageReferences)
                 {
                     // Skip auto referenced packages during update all.
-                    var buildPackageReference = installedPackage as BuildIntegratedPackageReference;
-                    var autoReferenced = buildPackageReference?.Dependency?.AutoReferenced == true;
+                    var autoReferenced = IsPackageReferenceAutoReferenced(installedPackage);
 
                     if (!autoReferenced)
                     {
@@ -871,8 +870,10 @@ namespace NuGet.PackageManagement
                 {
                     var installedPackageReference = projectInstalledPackageReferences
                         .FirstOrDefault(pr => StringComparer.OrdinalIgnoreCase.Equals(pr.PackageIdentity.Id, packageId));
+                    // Skip autoreferenced update when we have only a package ID.
+                    var autoReferenced = IsPackageReferenceAutoReferenced(installedPackageReference);
 
-                    if (installedPackageReference != null)
+                    if (installedPackageReference != null && !autoReferenced)
                     {
                         var resolvedPackage = await GetLatestVersionAsync(
                             packageId,
@@ -910,10 +911,10 @@ namespace NuGet.PackageManagement
                     var installed = projectInstalledPackageReferences
                         .Where(pr => StringComparer.OrdinalIgnoreCase.Equals(pr.PackageIdentity.Id, packageIdentity.Id))
                         .FirstOrDefault();
+                    var autoReferenced = IsPackageReferenceAutoReferenced(installed);
 
-                    //  if the package is not currently installed ignore it
-
-                    if (installed != null)
+                    //  if the package is not currently installed, or the installed one is auto referenced ignore it
+                    if (installed != null && !autoReferenced)
                     {
                         lowLevelActions.Add(NuGetProjectAction.CreateUninstallProjectAction(installed.PackageIdentity, nuGetProject));
                         lowLevelActions.Add(NuGetProjectAction.CreateInstallProjectAction(packageIdentity,
@@ -951,6 +952,12 @@ namespace NuGet.PackageManagement
             }
 
             return actions;
+        }
+
+        private static bool IsPackageReferenceAutoReferenced(PackageReference package)
+        {
+            var buildPackageReference = package as BuildIntegratedPackageReference;
+            return buildPackageReference?.Dependency?.AutoReferenced == true;
         }
 
         /// <summary>
@@ -1279,6 +1286,13 @@ namespace NuGet.PackageManagement
             }
 
             return nuGetProjectActions;
+        }
+
+        public async Task<IEnumerable<PackageDependencyInfo>> GetInstalledPackagesDependencyInfo(NuGetProject nuGetProject, CancellationToken token, bool includeUnresolved = false)
+        {
+            var targetFramework = nuGetProject.GetMetadata<NuGetFramework>(NuGetProjectMetadataKeys.TargetFramework);
+            var installedPackageIdentities = (await nuGetProject.GetInstalledPackagesAsync(token)).Select(pr => pr.PackageIdentity);
+            return await GetDependencyInfoFromPackagesFolder(installedPackageIdentities, targetFramework, includeUnresolved);
         }
 
         /// <summary>
@@ -1999,7 +2013,8 @@ namespace NuGet.PackageManagement
         }
 
         private async Task<IEnumerable<PackageDependencyInfo>> GetDependencyInfoFromPackagesFolder(IEnumerable<PackageIdentity> packageIdentities,
-            NuGetFramework nuGetFramework)
+            NuGetFramework nuGetFramework,
+            bool includeUnresolved = false)
         {
             try
             {
@@ -2014,6 +2029,10 @@ namespace NuGet.PackageManagement
                     if (packageDependencyInfo != null)
                     {
                         results.Add(packageDependencyInfo);
+                    }
+                    else if (includeUnresolved)
+                    {
+                        results.Add(new PackageDependencyInfo(package, null));
                     }
                 }
 
@@ -2853,11 +2872,20 @@ namespace NuGet.PackageManagement
             else
             {
                 // Fail and display a rollback message to let the user know they have returned to the original state
-                throw new InvalidOperationException(
-                    string.Format(
+                var message = string.Format(
                         CultureInfo.InvariantCulture,
                         Strings.RestoreFailedRollingBack,
-                        buildIntegratedProject.ProjectName));
+                        buildIntegratedProject.ProjectName);
+
+                // Read additional errors from the lock file if one exists
+                var logMessages = restoreResult.LockFile?
+                    .LogMessages
+                    .Where(e => e.Level == LogLevel.Error)
+                    .Select(e => e.AsRestoreLogMessage())
+                  ?? Enumerable.Empty<ILogMessage>();
+
+                // Throw an exception containing all errors, these will be displayed in the error list
+                throw new PackageReferenceRollbackException(message, logMessages);
             }
 
             await OpenReadmeFile(buildIntegratedProject, nuGetProjectContext, token);
@@ -3031,7 +3059,7 @@ namespace NuGet.PackageManagement
 
             // Step-2: Check if the package directory could be deleted
             if (!(nuGetProject is INuGetIntegratedProject)
-                && !await PackageExistsInAnotherNuGetProject(nuGetProject, packageIdentity, SolutionManager, token))
+                && !await PackageExistsInAnotherNuGetProject(nuGetProject, packageIdentity, SolutionManager, token, excludeIntegrated: true))
             {
                 packageWithDirectoriesToBeDeleted.Add(packageIdentity);
             }
@@ -3048,7 +3076,7 @@ namespace NuGet.PackageManagement
         /// project <paramref name="nuGetProject" /> is also installed in any
         /// other projects in the solution.
         /// </summary>
-        public static async Task<bool> PackageExistsInAnotherNuGetProject(NuGetProject nuGetProject, PackageIdentity packageIdentity, ISolutionManager solutionManager, CancellationToken token)
+        public static async Task<bool> PackageExistsInAnotherNuGetProject(NuGetProject nuGetProject, PackageIdentity packageIdentity, ISolutionManager solutionManager, CancellationToken token, bool excludeIntegrated= false)
         {
             if (nuGetProject == null)
             {
@@ -3070,14 +3098,19 @@ namespace NuGet.PackageManagement
             var nuGetProjectName = NuGetProject.GetUniqueNameOrName(nuGetProject);
             foreach (var otherNuGetProject in (await solutionManager.GetNuGetProjectsAsync()))
             {
-                var otherNuGetProjectName = NuGetProject.GetUniqueNameOrName(otherNuGetProject);
-                if (!otherNuGetProjectName.Equals(nuGetProjectName, StringComparison.OrdinalIgnoreCase))
+                if (excludeIntegrated && otherNuGetProject is INuGetIntegratedProject)
                 {
-                    var packageExistsInAnotherNuGetProject = (await otherNuGetProject.GetInstalledPackagesAsync(token)).Any(pr => pr.PackageIdentity.Equals(packageIdentity));
-                    if (packageExistsInAnotherNuGetProject)
-                    {
-                        return true;
-                    }
+                    continue;
+                }
+                var otherNuGetProjectName = NuGetProject.GetUniqueNameOrName(otherNuGetProject);
+                if (otherNuGetProjectName.Equals(nuGetProjectName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                var packageExistsInAnotherNuGetProject = (await otherNuGetProject.GetInstalledPackagesAsync(token)).Any(pr => pr.PackageIdentity.Equals(packageIdentity));
+                if (packageExistsInAnotherNuGetProject)
+                {
+                    return true;
                 }
             }
 

@@ -171,6 +171,7 @@ namespace NuGet.Commands
             request.PackageSaveMode = PackageSaveMode;
 
             if (request.ProjectStyle == ProjectStyle.PackageReference
+                || request.ProjectStyle == ProjectStyle.DotnetToolReference
                 || request.ProjectStyle == ProjectStyle.Standalone)
             {
                 request.LockFilePath = Path.Combine(request.RestoreOutputPath, LockFileFormat.AssetsFileName);

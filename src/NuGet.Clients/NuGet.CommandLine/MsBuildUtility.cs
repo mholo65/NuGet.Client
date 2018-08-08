@@ -74,6 +74,7 @@ namespace NuGet.CommandLine
             IConsole console,
             bool recursive,
             string solutionDirectory,
+            string solutionName,
             string restoreConfigFile,
             string[] sources,
             string packagesDirectory)
@@ -120,7 +121,7 @@ namespace NuGet.CommandLine
                 inputTargetXML.Save(inputTargetPath);
 
                 // Create msbuild parameters and include global properties that cannot be set in the input targets path
-                var arguments = GetMSBuildArguments(entryPointTargetPath, inputTargetPath, nugetExePath, solutionDirectory, restoreConfigFile, sources, packagesDirectory);
+                var arguments = GetMSBuildArguments(entryPointTargetPath, inputTargetPath, nugetExePath, solutionDirectory, solutionName, restoreConfigFile, sources, packagesDirectory);
 
                 var processStartInfo = new ProcessStartInfo
                 {
@@ -221,6 +222,7 @@ namespace NuGet.CommandLine
             string inputTargetPath,
             string nugetExePath,
             string solutionDirectory,
+            string solutionName,
             string restoreConfigFile,
             string[] sources,
             string packagesDirectory)
@@ -259,6 +261,7 @@ namespace NuGet.CommandLine
             AddPropertyIfHasValue(args, "RestoreConfigFile", restoreConfigFile);
             AddPropertyIfHasValue(args, "RestorePackagesPath", packagesDirectory);
             AddPropertyIfHasValue(args, "SolutionDir", solutionDirectory);
+            AddPropertyIfHasValue(args, "SolutionName", solutionName);
 
             // Disable parallel and use ContinueOnError since this may run on an older
             // version of MSBuild that do not support SkipNonexistentTargets.
@@ -598,21 +601,26 @@ namespace NuGet.CommandLine
             {
                 return null;
             }
-
+            //Use mscorlib to find mono and msbuild directory
+            var systemLibLocation = Path.GetDirectoryName(typeof(object).Assembly.Location);
+            var msbuildBasePathOnMono = Path.GetFullPath(Path.Combine(systemLibLocation,"..","msbuild"));
+            //Combine msbuild version paths
+            var msBuildPathOnMono14 = Path.Combine(msbuildBasePathOnMono, "14.1", "bin");
+            var msBuildPathOnMono15 = Path.Combine(msbuildBasePathOnMono, "15.0", "bin");
             if (string.IsNullOrEmpty(userVersion))
             {
                 return new[] {
-                        new MsBuildToolset(version: "15.0", path: CommandLineConstants.MsBuildPathOnMac15),
-                        new MsBuildToolset(version: "14.1", path: CommandLineConstants.MsBuildPathOnMac14)}
+                        new MsBuildToolset(version: "15.0", path: msBuildPathOnMono15),
+                        new MsBuildToolset(version: "14.1", path: msBuildPathOnMono14)}
                     .FirstOrDefault(t => Directory.Exists(t.Path));
             }
             else
             {
                 switch (userVersion)
                 {
-                    case "14.1": return new MsBuildToolset(version: "14.1", path: CommandLineConstants.MsBuildPathOnMac14);
+                    case "14.1": return new MsBuildToolset(version: "14.1", path: msBuildPathOnMono14);
                     case "15":
-                    case "15.0": return new MsBuildToolset(version: userVersion, path: CommandLineConstants.MsBuildPathOnMac15);
+                    case "15.0": return new MsBuildToolset(version: userVersion, path: msBuildPathOnMono15);
                 }
             }
 
@@ -942,9 +950,8 @@ namespace NuGet.CommandLine
                     }
                 }
 
-                // Try to find msbuild.exe from hard code path.
-                var path = new[] { CommandLineConstants.MsBuildPathOnMac15, CommandLineConstants.MsBuildPathOnMac14 }.
-                    Select(p => Path.Combine(p, "msbuild.exe")).FirstOrDefault(File.Exists);
+                // Find the first mono path that exists
+                var path = GetMsBuildFromMonoPaths(userVersion: null)?.Path;
 
                 if (path != null)
                 {

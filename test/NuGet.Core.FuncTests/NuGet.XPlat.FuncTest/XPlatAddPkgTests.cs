@@ -10,6 +10,7 @@ using Microsoft.Extensions.CommandLineUtils;
 using Moq;
 using NuGet.CommandLine.XPlat;
 using NuGet.Commands;
+using NuGet.Common;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Test.Utility;
@@ -137,7 +138,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage();
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -175,7 +176,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage();
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -209,7 +210,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageDotnetCliToolX = XPlatTestUtils.CreatePackage(packageId: "PackageDotnetCliToolX", 
                     packageType: PackageType.DotnetCliTool);
 
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageDotnetCliToolX);
@@ -217,7 +218,7 @@ namespace NuGet.XPlat.FuncTest
                 // Generate test package
                 var packageY = XPlatTestUtils.CreatePackage(packageId:"PackageY");
 
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageY);
@@ -273,7 +274,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage(frameworkString: packageFrameworks);
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -311,7 +312,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageDotnetCliToolX = XPlatTestUtils.CreatePackage(packageId: "PackageDotnetCliToolX",
                     packageType: PackageType.DotnetCliTool);
 
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageDotnetCliToolX);
@@ -319,7 +320,7 @@ namespace NuGet.XPlat.FuncTest
                 // Generate test package
                 var packageY = XPlatTestUtils.CreatePackage(packageId: "PackageY");
 
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageY);
@@ -363,7 +364,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage();
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -403,7 +404,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage(frameworkString: packageFrameworks);
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -450,7 +451,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage(frameworkString: packageFrameworks);
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -500,7 +501,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage(frameworkString: packageFrameworks);
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -545,7 +546,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage(frameworkString: packageFrameworks);
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -576,7 +577,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage();
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -608,11 +609,11 @@ namespace NuGet.XPlat.FuncTest
                 var packageY = XPlatTestUtils.CreatePackage("PkgY");
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageY);
@@ -664,11 +665,11 @@ namespace NuGet.XPlat.FuncTest
                 var packageY = XPlatTestUtils.CreatePackage("PkgY", frameworkString: packageFrameworks);
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageY);
@@ -714,7 +715,7 @@ namespace NuGet.XPlat.FuncTest
                 var packageX = XPlatTestUtils.CreatePackage();
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packageX);
@@ -763,7 +764,7 @@ namespace NuGet.XPlat.FuncTest
 
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packages);
@@ -905,7 +906,7 @@ namespace NuGet.XPlat.FuncTest
                         XPlatTestUtils.CreatePackage(packageVersion: "0.0.5"), XPlatTestUtils.CreatePackage(packageVersion: "0.0.9") };
 
                 // Generate Package
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     pathContext.PackageSource,
                     PackageSaveMode.Defaultv3,
                     packages);

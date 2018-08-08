@@ -36,6 +36,7 @@ namespace NuGet.Build.Tasks.Pack
         ILogger Logger { get; }
         string MinClientVersion { get; }
         bool NoPackageAnalysis { get; }
+        string NoWarn { get; }
         string NuspecBasePath { get; }
         string NuspecFile { get; }
         string[] NuspecProperties { get; }
@@ -52,6 +53,8 @@ namespace NuGet.Build.Tasks.Pack
         string ReleaseNotes { get; }
         string RepositoryType { get; }
         string RepositoryUrl { get; }
+        string RepositoryBranch { get; }
+        string RepositoryCommit { get; }
         bool RequireLicenseAcceptance { get; }
         string RestoreOutputPath { get; }
         bool Serviceable { get; }
@@ -60,5 +63,7 @@ namespace NuGet.Build.Tasks.Pack
         string[] TargetFrameworks { get; }
         TItem[] TargetPathsToSymbols { get; }
         string Title { get; }
+        string TreatWarningsAsErrors { get; }
+        string WarningsAsErrors { get; }
     }
 }

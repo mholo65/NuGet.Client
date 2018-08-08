@@ -138,7 +138,7 @@ namespace NuGet.CommandLine.Test.Caching
                     });
                 });
 
-            // Add the /nuget/FindPackagesById()?id='' endpoint.
+            // Add the /nuget/FindPackagesById()?id=''&semVerLevel=2.0.0 endpoint.
             MockServer.Get.Add(
                 builder.GetFindPackagesByIdPath(identity.Id),
                 request =>
@@ -315,12 +315,13 @@ namespace NuGet.CommandLine.Test.Caching
             using (var fileStream = new FileStream(packagePath, FileMode.Open, FileAccess.Read))
             {
                 using (await GlobalPackagesFolderUtility.AddPackageAsync(
-                    identity,
-                    fileStream,
-                    GlobalPackagesPath,
-                    Guid.Empty,
-                    Common.NullLogger.Instance,
-                    CancellationToken.None))
+                    source: null,
+                    packageIdentity: identity,
+                    packageStream: fileStream,
+                    globalPackagesFolder: GlobalPackagesPath,
+                    parentId: Guid.Empty,
+                    logger: Common.NullLogger.Instance,
+                    token: CancellationToken.None))
                 {
                 }
             }

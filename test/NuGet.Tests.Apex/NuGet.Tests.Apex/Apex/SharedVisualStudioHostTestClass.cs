@@ -1,7 +1,14 @@
+// Copyright (c) .NET Foundation. All rights reserved.
+// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+
 using System;
+using FluentAssertions;
 using Microsoft.Test.Apex;
 using Microsoft.Test.Apex.VisualStudio;
+using Microsoft.Test.Apex.VisualStudio.Solution;
+using Test.Utility;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace NuGet.Tests.Apex
 {
@@ -20,8 +27,14 @@ namespace NuGet.Tests.Apex
         private readonly IVisualStudioHostFixtureFactory _contextFixtureFactory;
         private readonly Lazy<VisualStudioHostFixture> _hostFixture;
 
-        protected SharedVisualStudioHostTestClass(IVisualStudioHostFixtureFactory contextFixtureFactory)
+        /// <summary>
+        /// ITestOutputHelper wrapper
+        /// </summary>
+        public XunitLogger XunitLogger { get; }
+
+        protected SharedVisualStudioHostTestClass(IVisualStudioHostFixtureFactory contextFixtureFactory, ITestOutputHelper output)
         {
+            XunitLogger = new XunitLogger(output);
             _contextFixtureFactory = contextFixtureFactory;
 
             _hostFixture = new Lazy<VisualStudioHostFixture>(() =>
@@ -30,10 +43,7 @@ namespace NuGet.Tests.Apex
             });
         }
 
-        public override VisualStudioHost VisualStudio
-        {
-            get { return _hostFixture.Value.VisualStudio; }
-        }
+        public override VisualStudioHost VisualStudio => _hostFixture.Value.VisualStudio;
 
         public override TService GetApexService<TService>()
         {
@@ -50,12 +60,25 @@ namespace NuGet.Tests.Apex
             VisualStudio.Stop();
         }
 
-        public IOperations Operations
+        protected NuGetConsoleTestExtension GetConsole(ProjectTestExtension project)
         {
-            get
-            {
-                return _hostFixture.Value.Operations;
-            }
+            XunitLogger.LogInformation("GetConsole");
+            VisualStudio.ClearWindows();
+            var nugetTestService = GetNuGetTestService();
+
+            XunitLogger.LogInformation("EnsurePackageManagerConsoleIsOpen");
+            nugetTestService.EnsurePackageManagerConsoleIsOpen().Should().BeTrue("Console was opened");
+
+            XunitLogger.LogInformation("GetPackageManagerConsole");
+            var nugetConsole = nugetTestService.GetPackageManagerConsole(project.Name);
+
+            nugetTestService.WaitForAutoRestore();
+
+            XunitLogger.LogInformation("GetConsole complete");
+
+            return nugetConsole;
         }
+
+        public IOperations Operations => _hostFixture.Value.Operations;
     }
 }

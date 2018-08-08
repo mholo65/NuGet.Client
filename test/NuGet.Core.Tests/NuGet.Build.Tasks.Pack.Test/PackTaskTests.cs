@@ -87,6 +87,7 @@ namespace NuGet.Build.Tasks.Pack.Test
                     OutputDirectory = dir,
                     Path = nuspecPath,
                     Exclude = Array.Empty<string>(),
+                    Symbols = true,
                     Logger = NullLogger.Instance
                 },
                 MSBuildProjectFactory.ProjectCreator,
@@ -119,7 +120,9 @@ namespace NuGet.Build.Tasks.Pack.Test
                 ProjectUrl = " ProjectUrl \t ",
                 ReleaseNotes = " ReleaseNotes \t ",
                 RepositoryType = " RepositoryType \t ",
-                RepositoryUrl = " RepositoryUrl \t "
+                RepositoryUrl = " RepositoryUrl \t ",
+                RepositoryCommit = " RepositoryCommit \t ",
+                RepositoryBranch = " RepositoryBranch \t "
             };
 
             // Act
@@ -141,6 +144,8 @@ namespace NuGet.Build.Tasks.Pack.Test
             Assert.Equal("ReleaseNotes", actual.ReleaseNotes);
             Assert.Equal("RepositoryType", actual.RepositoryType);
             Assert.Equal("RepositoryUrl", actual.RepositoryUrl);
+            Assert.Equal("RepositoryCommit", actual.RepositoryCommit);
+            Assert.Equal("RepositoryBranch", actual.RepositoryBranch);
         }
 
         [Fact]
@@ -164,6 +169,8 @@ namespace NuGet.Build.Tasks.Pack.Test
                 ReleaseNotes = " \t ",
                 RepositoryType = " \t ",
                 RepositoryUrl = " \t ",
+                RepositoryCommit = " \t ",
+                RepositoryBranch = " \t ",
             };
 
             // Act
@@ -185,6 +192,8 @@ namespace NuGet.Build.Tasks.Pack.Test
             Assert.Null(actual.ReleaseNotes);
             Assert.Null(actual.RepositoryType);
             Assert.Null(actual.RepositoryUrl);
+            Assert.Null(actual.RepositoryCommit);
+            Assert.Null(actual.RepositoryBranch);
         }
 
         [Fact]
@@ -309,9 +318,9 @@ namespace NuGet.Build.Tasks.Pack.Test
             {
                 AssemblyName = "AssemblyName",
                 FrameworkAssemblyReferences = new ITaskItem[0],
-                Authors = new string[0],
-                AllowedOutputExtensionsInPackageBuildOutputFolder = new string[0],
-                AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder = new string[0],
+                Authors = Array.Empty<string>(),
+                AllowedOutputExtensionsInPackageBuildOutputFolder = Array.Empty<string>(),
+                AllowedOutputExtensionsInSymbolsPackageBuildOutputFolder = Array.Empty<string>(),
                 BuildOutputFolder = "BuildOutputFolder",
                 ContentTargetFolders = new string[] { "ContentTargetFolders" } ,
                 ContinuePackingAfterGeneratingNuspec = true,
@@ -327,24 +336,26 @@ namespace NuGet.Build.Tasks.Pack.Test
                 MinClientVersion = "MinClientVersion",
                 NoPackageAnalysis = true,
                 NuspecOutputPath = "NuspecOutputPath",
-                NuspecProperties = new string[0],
+                NuspecProperties = Array.Empty<string>(),
                 PackItem = null, // This is asserted by other tests. It does not serialize well.
                 PackageFiles = new ITaskItem[0],
                 PackageFilesToExclude = new ITaskItem[0],
                 PackageId = "PackageId",
                 PackageOutputPath = "PackageOutputPath",
-                PackageTypes = new string[0],
+                PackageTypes = Array.Empty<string>(),
                 PackageVersion = "PackageVersion",
                 ProjectReferencesWithVersions = new ITaskItem[0],
                 ProjectUrl = "ProjectUrl",
                 ReleaseNotes = "ReleaseNotes",
                 RepositoryType = "RepositoryType",
                 RepositoryUrl = "RepositoryUrl",
+                RepositoryCommit = "RepositoryCommit",
+                RepositoryBranch = "RepositoryBranch",
                 RequireLicenseAcceptance = true,
                 Serviceable = true,
                 SourceFiles = new ITaskItem[0],
-                Tags = new string[0],
-                TargetFrameworks = new string[0],
+                Tags = Array.Empty<string>(),
+                TargetFrameworks = Array.Empty<string>(),
                 BuildOutputInPackage = new ITaskItem[0],
                 TargetPathsToSymbols = new ITaskItem[0]
             };

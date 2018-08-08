@@ -17,6 +17,7 @@ using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Text;
+using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.TextManager.Interop;
 using Microsoft.VisualStudio.Threading;
 using NuGet.PackageManagement;
@@ -132,6 +133,11 @@ namespace NuGetConsole.Implementation
             }
         }
 
+        /// <summary>
+        /// Internal for testing, true when the console has been loaded.
+        /// </summary>
+        public bool IsLoaded { get; private set; }
+
         [SuppressMessage(
             "Microsoft.Design",
             "CA1031:DoNotCatchGeneralExceptionTypes",
@@ -154,7 +160,11 @@ namespace NuGetConsole.Implementation
             _loadTask = ThreadHelper.JoinableTaskFactory.StartOnIdle(
                 async () =>
                 {
+                    // Load
                     await Task.Run(LoadConsoleEditorAsync);
+
+                    // Mark as complete
+                    IsLoaded = true;
                 });
         }
 
@@ -632,6 +642,23 @@ namespace NuGetConsole.Implementation
                 powerShellConsole.WriteLine(command);
 
                 return host.Execute(powerShellConsole, command, null);
+            }
+            return false;
+        }
+
+        public void StartDispatcher()
+        {
+            if (WpfConsole != null)
+            {
+                WpfConsole.Dispatcher.Start();
+            }
+        }
+
+        public bool IsHostSuccessfullyInitialized()
+        {
+            if (WpfConsole != null)
+            {
+                return WpfConsole.Host.IsInitializedSuccessfully;
             }
             return false;
         }

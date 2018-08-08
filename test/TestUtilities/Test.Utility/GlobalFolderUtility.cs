@@ -27,21 +27,26 @@ namespace NuGet.Test.Utility
         {
             using (var reader = new PackageArchiveReader(packagePath))
             {
-                var signedPackageVerifier = requireSignVerify ? new PackageSignatureVerifier(
-                           SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
-                           SignedPackageVerifierSettings.Default) : null;
+                var signedPackageVerifier = requireSignVerify ?
+                    new PackageSignatureVerifier(SignatureVerificationProviderFactory.GetSignatureVerificationProviders()) :
+                    null;
+
+                var signedPackageVerifierSettings = requireSignVerify ? SignedPackageVerifierSettings.GetDefault() : null;
 
                 var pathContext = new PackageExtractionContext(
-                    packageSaveMode: PackageSaveMode.Defaultv3,
-                    xmlDocFileSaveMode: XmlDocFileSaveMode.None,
-                    logger: Common.NullLogger.Instance,
-                    signedPackageVerifier: signedPackageVerifier);
+                    PackageSaveMode.Defaultv3,
+                    XmlDocFileSaveMode.None,
+                    Common.NullLogger.Instance,
+                    signedPackageVerifier,
+                    signedPackageVerifierSettings);
 
                 var versionFolderPathResolver = new VersionFolderPathResolver(globalFolder);
 
                 using (var stream = File.OpenRead(packagePath))
                 {
-                    await PackageExtractor.InstallFromSourceAsync(reader.GetIdentity(),
+                    await PackageExtractor.InstallFromSourceAsync(
+                        null,
+                        reader.GetIdentity(),
                         async (d) => await stream.CopyToAsync(d),
                         versionFolderPathResolver,
                         pathContext,

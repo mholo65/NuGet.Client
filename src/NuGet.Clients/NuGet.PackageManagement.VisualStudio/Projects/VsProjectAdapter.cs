@@ -12,6 +12,7 @@ using Microsoft;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell.Interop;
 using NuGet.Commands;
+using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.ProjectManagement;
 using NuGet.RuntimeModel;
@@ -34,18 +35,18 @@ namespace NuGet.PackageManagement.VisualStudio
 
         #region Properties
 
-        public string BaseIntermediateOutputPath
+        public string MSBuildProjectExtensionsPath
         {
             get
             {
-                var baseIntermediateOutputPath = BuildProperties.GetPropertyValue(ProjectBuildProperties.BaseIntermediateOutputPath);
+                var msbuildProjectExtensionsPath = BuildProperties.GetPropertyValue(ProjectBuildProperties.MSBuildProjectExtensionsPath);
 
-                if (string.IsNullOrEmpty(baseIntermediateOutputPath))
+                if (string.IsNullOrEmpty(msbuildProjectExtensionsPath))
                 {
                     return null;
                 }
 
-                return Path.Combine(ProjectDirectory, baseIntermediateOutputPath);
+                return Path.Combine(ProjectDirectory, msbuildProjectExtensionsPath);
             }
         }
 
@@ -277,7 +278,7 @@ namespace NuGet.PackageManagement.VisualStudio
                     return new string[] { _projectTypeGuid };
                 }
 
-                return new string[0];
+                return Array.Empty<string>();
             }
         }
 

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
@@ -28,7 +29,7 @@ namespace NuGet.Packaging.Signing
         public static string X509Certificate2ToString(X509Certificate2 cert, HashAlgorithmName fingerprintAlgorithm)
         {
             var certStringBuilder = new StringBuilder();
-            X509Certificate2ToString(cert, certStringBuilder, fingerprintAlgorithm, indentation: "");
+            X509Certificate2ToString(cert, certStringBuilder, fingerprintAlgorithm, indentation: "  ");
             return certStringBuilder.ToString();
         }
 
@@ -69,7 +70,7 @@ namespace NuGet.Packaging.Signing
             for (var i = 0; i < Math.Min(_limit, certCollection.Count); i++)
             {
                 var cert = certCollection[i];
-                X509Certificate2ToString(cert, collectionStringBuilder, fingerprintAlgorithm, indentation: "");
+                X509Certificate2ToString(cert, collectionStringBuilder, fingerprintAlgorithm, indentation: "  ");
                 collectionStringBuilder.AppendLine();
             }
 
@@ -84,7 +85,7 @@ namespace NuGet.Packaging.Signing
         public static string X509ChainToString(X509Chain chain, HashAlgorithmName fingerprintAlgorithm)
         {
             var collectionStringBuilder = new StringBuilder();
-            var indentationLevel = "    ";
+            var indentationLevel = "      ";
             var indentation = indentationLevel;
 
             var chainElementsCount = chain.ChainElements.Count;
@@ -306,6 +307,18 @@ namespace NuGet.Packaging.Signing
 
                 return true;
             }
+        }
+
+        public static IReadOnlyList<byte[]> GetRawDataForCollection(X509Certificate2Collection certificates)
+        {
+            var certificatesRawData = new List<byte[]>(capacity: certificates.Count);
+
+            foreach (var certificate in certificates)
+            {
+                certificatesRawData.Add(certificate.RawData);
+            }
+
+            return certificatesRawData.AsReadOnly();
         }
     }
 }

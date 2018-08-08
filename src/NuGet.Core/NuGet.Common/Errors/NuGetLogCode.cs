@@ -4,7 +4,7 @@
 namespace NuGet.Common
 {
     /// <summary>
-    /// This enum is used to quantify NuGet error and wanring codes. 
+    /// This enum is used to quantify NuGet error and warning codes. 
     /// Format - NUxyzw where NU is the profix indicating NuGet and xyzw is a 4 digit code
     ///
     /// Numbers - xyzw
@@ -22,6 +22,7 @@ namespace NuGet.Common
     /// Groups:
     /// 1000-1999 - Restore
     /// 3000-3999 - Signing
+    /// 5000-5999 - Packaging
     ///
     /// Sub groups for Restore:
     /// error/warning - Reason
@@ -118,6 +119,21 @@ namespace NuGet.Common
         /// un-matched reference assemblies
         /// </summary>
         NU1203 = 1203,
+
+        /// <summary>
+        /// Invalid package types
+        /// </summary>
+        NU1204 = 1204, 
+
+        /// <summary>
+        /// project has an invalid dependency count
+        /// </summary>
+        NU1211 = 1211,
+
+        /// <summary>
+        /// Incompatible tools package/project combination
+        /// </summary>
+        NU1212 = 1212,
 
         /// <summary>
         /// Package MinClientVersion did not match.
@@ -245,7 +261,7 @@ namespace NuGet.Common
         NU3008 = 3008,
 
         /// <summary>
-        /// The package signature contains multiple primary signatures.
+        /// The package signature file does not contain exactly one primary signature.
         /// </summary>
         NU3009 = 3009,
 
@@ -355,6 +371,31 @@ namespace NuGet.Common
         NU3030 = 3030,
 
         /// <summary>
+        /// The repository countersignature is invalid.
+        /// </summary>
+        NU3031 = 3031,
+
+        /// <summary>
+        /// The package signature contains multiple repository countersignatures.
+        /// </summary>
+        NU3032 = 3032,
+
+        /// <summary>
+        /// A repository primary signature must not have a repository countersignature.
+        /// </summary>
+        NU3033 = 3033,
+
+        /// <summary>
+        /// The package signature certificate does not match the trusted certificate list.
+        /// </summary>
+        NU3034 = 3034,
+
+        /// <summary>
+        /// Chain building failed for the repository countersignature.
+        /// </summary>
+        NU3035 = 3035,
+
+        /// <summary>
         /// Undefined Package Error.
         /// </summary>
         NU5000 = 5000,
@@ -400,8 +441,229 @@ namespace NuGet.Common
         NU5008 = 5008,
 
         /// <summary>
+        /// Error_CannotFindMsbuild
+        /// </summary>
+        NU5009 = 5009,
+
+        /// <summary>
+        /// Error_InvalidVersionInPackage
+        /// </summary>
+        NU5010 = 5010,
+
+        /// <summary>
+        /// Error_UnableToExtractAssemblyMetadata
+        /// </summary>
+        NU5011 = 5011,
+
+        /// <summary>
+        /// Error_UnableToFindBuildOutput
+        /// </summary>
+        NU5012 = 5012,
+
+        /// <summary>
+        /// Error_FailedToBuildProject
+        /// </summary>
+        NU5013 = 5013,
+
+        /// <summary>
+        /// Error_ProcessingNuspecFile
+        /// </summary>
+        NU5014 = 5014,
+
+        /// <summary>
+        /// Error_MultipleTargetFrameworks
+        /// </summary>
+        NU5015 = 5015,
+
+        /// <summary>
+        /// Error_InvalidDependencyVersionConstraints
+        /// </summary>
+        NU5016 = 5016,
+
+        /// <summary>
+        /// Error_CannotCreateEmptyPackage
+        /// </summary>
+        NU5017 = 5017,
+
+        /// <summary>
+        /// Error_Manifest_InvalidReference
+        /// </summary>
+        NU5018 = 5018,
+
+        /// <summary>
+        /// Error_PackageAuthoring_FileNotFound
+        /// </summary>
+        NU5019 = 5019,
+
+        /// <summary>
+        /// Error_EmptySourceFilePath
+        /// </summary>
+        NU5020 = 5020,
+
+        /// <summary>
+        /// Error_EmptySourceFileProjectDirectory
+        /// </summary>
+        NU5021 = 5021,
+
+        /// <summary>
+        /// Error_InvalidMinClientVersion
+        /// </summary>
+        NU5022 = 5022,
+
+        /// <summary>
+        /// Error_AssetsFileNotFound
+        /// </summary>
+        NU5023 = 5023,
+
+        /// <summary>
+        /// Error_InvalidPackageVersion
+        /// </summary>
+        NU5024 = 5024,
+
+        /// <summary>
+        /// Error_AssetsFileDoesNotHaveValidPackageSpec
+        /// </summary>
+        NU5025 = 5025,
+
+        /// <summary>
+        /// Error_FileNotFound
+        /// </summary>
+        NU5026 = 5026,
+
+        /// <summary>
+        /// Error_InvalidTargetFramework
+        /// </summary>
+        NU5027 = 5027,
+
+        /// <summary>
+        /// Error_NoPackItemProvided
+        /// </summary>
+        NU5028 = 5028,
+
+        /// <summary>
+        /// Error_InvalidNuspecProperties
+        /// </summary>
+        NU5029 = 5029,
+
+        /// <summary>
+        /// AssemblyOutsideLibWarning
+        /// </summary>
+        NU5100 = 5100,
+
+        /// <summary>
+        /// AssemblyDirectlyUnderLibWarning
+        /// </summary>
+        NU5101 = 5101,
+
+        /// <summary>
+        /// DefaultSpecValueWarning
+        /// </summary>
+        NU5102 = 5102,
+
+        /// <summary>
+        /// InvalidFrameworkWarning
+        /// </summary>
+        NU5103 = 5103,
+
+        /// <summary>
+        /// InvalidPrereleaseDependencyWarning
+        /// </summary>
+        NU5104 = 5104,
+
+        /// <summary>
+        /// LegacyVersionWarning
+        /// </summary>
+        NU5105 = 5105,
+
+        /// <summary>
+        /// WinRTObsoleteWarning
+        /// </summary>
+        NU5106 = 5106,
+
+        /// <summary>
+        /// MisplacedInitScriptWarning
+        /// </summary>
+        NU5107 = 5107,
+
+        /// <summary>
+        /// MisplacedTransformFileWarning
+        /// </summary>
+        NU5108 = 5108,
+
+        /// <summary>
+        /// PlaceholderFileInPackageWarning
+        /// </summary>
+        NU5109 = 5109,
+
+        /// <summary>
+        /// ScriptOutsideToolsWarning
+        /// </summary>
+        NU5110 = 5110,
+
+        /// <summary>
+        /// UnrecognizedScriptWarning
+        /// </summary>
+        NU5111 = 5111,
+
+        /// <summary>
+        /// UnspecifiedDependencyVersionWarning
+        /// </summary>
+        NU5112 = 5112,
+
+        /// <summary>
+        /// Warning_SemanticVersion
+        /// </summary>
+        NU5113 = 5113,
+
+        /// <summary>
+        /// Warning_DuplicatePropertyKey
+        /// </summary>
+        NU5114 = 5114,
+
+        /// <summary>
+        /// Warning_UnspecifiedField
+        /// </summary>
+        NU5115 = 5115,
+
+        /// <summary>
+        /// Warning_FileDoesNotExist
+        /// </summary>
+        NU5116 = 5116,
+
+        /// <summary>
+        /// Warning_UnresolvedFilePath
+        /// </summary>
+        NU5117 = 5117,
+
+        /// <summary>
+        /// Warning_FileNotAddedToPackage
+        /// </summary>
+        NU5118 = 5118,
+
+        /// <summary>
+        /// Warning_FileExcludedByDefault
+        /// </summary>
+        NU5119 = 5119,
+
+        /// <summary>
+        /// Migrator_PackageHasInstallScript
+        /// </summary>
+        NU5120 = 5120,
+
+        /// <summary>
+        /// Migrator_PackageHasContentFolder
+        /// </summary>
+        NU5121 = 5121,
+
+        /// <summary>
+        /// Migrator_XdtTransformInPackage
+        /// </summary>
+        NU5122 = 5122,
+
+        /// <summary>
         /// Undefined package warning
         /// </summary>
-        NU5500 = 5500,
+        NU5500 = 5500
+
     }
 }

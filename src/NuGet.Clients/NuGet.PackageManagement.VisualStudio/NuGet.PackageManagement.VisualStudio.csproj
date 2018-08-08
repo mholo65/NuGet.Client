@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'README.md'))\build\common.legacy.props" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -184,6 +184,7 @@
     <Compile Include="Utility\FrameworkAssembly.cs" />
     <Compile Include="Utility\FrameworkAssemblyResolver.cs" />
     <Compile Include="Utility\NativeMethods.cs" />
+    <Compile Include="Utility\NuGetProjectUpgradeUtility.cs" />
     <Compile Include="Utility\ProjectRetargetingUtility.cs" />
     <Compile Include="Utility\RefreshFileUtility.cs" />
     <Compile Include="Utility\RegistrySettingUtility.cs" />
@@ -309,6 +310,9 @@
     </PackageReference>
     <PackageReference Include="VSLangProj2">
       <Version>7.0.5000</Version>
+    </PackageReference>
+    <PackageReference Include="VSLangProj157">
+      <Version>15.7.0</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>

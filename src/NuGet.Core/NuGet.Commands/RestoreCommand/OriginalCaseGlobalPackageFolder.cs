@@ -84,11 +84,11 @@ namespace NuGet.Commands
                         continue;
                     }
 
-                    var localPackageFilePath = GetLocalPackageFilePath(remoteMatch);
+                    var localPackageSourceInfo = GetLocalPackageSourceInfo(remoteMatch);
                     var packageIdentity = new PackageIdentity(remoteMatch.Library.Name, remoteMatch.Library.Version);
                     IPackageDownloader packageDependency = null;
 
-                    if (string.IsNullOrEmpty(localPackageFilePath))
+                    if (string.IsNullOrEmpty(localPackageSourceInfo?.Package.ZipPath))
                     {
                         packageDependency = await remoteMatch.Provider.GetPackageDownloaderAsync(
                             packageIdentity,
@@ -99,7 +99,8 @@ namespace NuGet.Commands
                     else
                     {
                         packageDependency = new LocalPackageArchiveDownloader(
-                            localPackageFilePath,
+                            localPackageSourceInfo.Repository.RepositoryRoot,
+                            localPackageSourceInfo.Package.ZipPath,
                             packageIdentity,
                             _request.Log);
                     }
@@ -142,15 +143,14 @@ namespace NuGet.Commands
 
         private PackageExtractionContext GetPathContext()
         {
-            var signedPackageVerifier = new PackageSignatureVerifier(
-                            SignatureVerificationProviderFactory.GetSignatureVerificationProviders(),
-                            SignedPackageVerifierSettings.Default);
+            var signedPackageVerifier = new PackageSignatureVerifier(SignatureVerificationProviderFactory.GetSignatureVerificationProviders());
 
             return new PackageExtractionContext(
                 _request.PackageSaveMode,
                 _request.XmlDocFileSaveMode,
                 _request.Log,
-                signedPackageVerifier);
+                signedPackageVerifier,
+                SignedPackageVerifierSettings.GetDefault());
         }
 
         private static PackageIdentity GetPackageIdentity(RemoteMatch remoteMatch)
@@ -160,7 +160,7 @@ namespace NuGet.Commands
                 remoteMatch.Library.Version);
         }
 
-        private string GetLocalPackageFilePath(RemoteMatch remoteMatch)
+        private LocalPackageSourceInfo GetLocalPackageSourceInfo(RemoteMatch remoteMatch)
         {
             var library = remoteMatch.Library;
 
@@ -172,7 +172,7 @@ namespace NuGet.Commands
 
             if (localPackage != null && File.Exists(localPackage.Package.ZipPath))
             {
-                return localPackage.Package.ZipPath;
+                return localPackage;
             }
 
             return null;

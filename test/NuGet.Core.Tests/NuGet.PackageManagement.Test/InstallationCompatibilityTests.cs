@@ -86,7 +86,7 @@ namespace NuGet.PackageManagement.Test
             // Arrange
             var tc = new TestContext();
             tc.MinClientVersion = new NuGetVersion("10.0.0");
-            var result = new DownloadResourceResult(Stream.Null, tc.PackageReader.Object);
+            var result = new DownloadResourceResult(Stream.Null, tc.PackageReader.Object, string.Empty);
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<MinClientVersionException>(() =>
@@ -116,7 +116,7 @@ namespace NuGet.PackageManagement.Test
             {
                 var tc = new TestContext(userPackageFolder);
 
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     userPackageFolder,
                     PackageSaveMode.Defaultv3,
                     new[]
@@ -163,7 +163,7 @@ namespace NuGet.PackageManagement.Test
             {
                 var tc = new TestContext(userPackageFolder);
 
-                await SimpleTestPackageUtility.CreateFolderFeedV3(
+                await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                     userPackageFolder,
                     PackageSaveMode.Defaultv3,
                     new[]
@@ -361,7 +361,7 @@ namespace NuGet.PackageManagement.Test
                     .Returns(userPackageFolder);
                 NuGetPathContext
                     .Setup(x => x.FallbackPackageFolders)
-                    .Returns(new string[0]);
+                    .Returns(Array.Empty<string>());
 
                 NuspecReader
                     .Setup(p => p.GetIdentity())
@@ -409,7 +409,7 @@ namespace NuGet.PackageManagement.Test
                 string expected)
             {
                 // Arrange
-                var result = new DownloadResourceResult(Stream.Null, PackageReader.Object);
+                var result = new DownloadResourceResult(Stream.Null, PackageReader.Object, string.Empty);
 
                 // Act & Assert
                 var ex = await Assert.ThrowsAsync<PackagingException>(() =>
@@ -429,7 +429,7 @@ namespace NuGet.PackageManagement.Test
             public async Task VerifySuccessAsync(NuGetProject nugetProject)
             {
                 // Arrange
-                var result = new DownloadResourceResult(Stream.Null, PackageReader.Object);
+                var result = new DownloadResourceResult(Stream.Null, PackageReader.Object, string.Empty);
 
                 // Act & Assert
                 await Target.EnsurePackageCompatibilityAsync(

@@ -17,13 +17,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
     /// Tests Sign command
     /// These tests require admin privilege as the certs need to be added to the root store location
     /// </summary>
-    [Collection("Sign Command Test Collection")]
+    [Collection(SignCommandTestCollection.Name)]
     public class VerifyCommandTests
     {
         private readonly string _noTimestamperWarningCode = NuGetLogCode.NU3027.ToString();
         private readonly string _primarySignatureInvalidErrorCode = NuGetLogCode.NU3018.ToString();
         private readonly string _signingDefaultErrorCode = NuGetLogCode.NU3000.ToString();
-        private readonly string _noMatchingCertErrorCode = NuGetLogCode.NU3003.ToString();
+        private readonly string _noMatchingCertErrorCode = NuGetLogCode.NU3034.ToString();
 
         private SignCommandTestFixture _testFixture;
         private TrustedTestCert<TestCertificate> _trustedTestCert;
@@ -37,11 +37,12 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void VerifyCommand_VerifySignedPackageSucceeds()
+        public async Task VerifyCommand_VerifySignedPackageSucceedsAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -74,13 +75,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public async Task VerifyCommand_VerifySignedAndTimestampedPackageSucceeds()
+        public async Task VerifyCommand_VerifySignedAndTimestampedPackageSucceedsAsync()
         {
             // Arrange
             var timestampService = await _testFixture.GetDefaultTrustedTimestampServiceAsync();
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -113,11 +115,12 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void VerifyCommand_VerifyResignedPackageSucceeds()
+        public async Task VerifyCommand_VerifyResignedPackageSucceedsAsync()
         {
             // Arrange
+            var package = new SimpleTestPackageContext();
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -157,13 +160,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void VerifyCommand_VerifyOnPackageSignedWithValidCertificateChainSucceeds()
+        public async Task VerifyCommand_VerifyOnPackageSignedWithValidCertificateChainSucceedsAsync()
         {
             // Arrange
             var cert = _testFixture.TrustedTestCertificateChain.Leaf;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -196,13 +200,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void VerifyCommand_VerifyOnPackageSignedWithAllowedCertificateSucceeds()
+        public async Task VerifyCommand_VerifyOnPackageSignedWithAllowedCertificateSucceedsAsync()
         {
             // Arrange
             var cert = _testFixture.TrustedTestCertificateChain.Leaf;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 
@@ -221,8 +226,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
 
                 signResult.Success.Should().BeTrue();
 
-                var certificateFingerprint = CertificateUtility.GetHash(cert.Source.Cert, HashAlgorithmName.SHA256);
-                var certificateFingerprintString = BitConverter.ToString(certificateFingerprint).Replace("-", "");
+                var certificateFingerprintString = SignatureTestUtility.GetFingerprint(cert.Source.Cert, HashAlgorithmName.SHA256);
 
                 // Act
                 var verifyResult = CommandRunner.Run(
@@ -238,13 +242,14 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         [CIOnlyFact]
-        public void VerifyCommand_VerifyOnPackageSignedWithoutAllowedCertificateFails()
+        public async Task VerifyCommand_VerifyOnPackageSignedWithoutAllowedCertificateFailsAsync()
         {
             // Arrange
             var cert = _testFixture.TrustedTestCertificateChain.Leaf;
+            var package = new SimpleTestPackageContext();
 
             using (var dir = TestDirectory.Create())
-            using (var zipStream = new SimpleTestPackageContext().CreateAsStream())
+            using (var zipStream = await package.CreateAsStreamAsync())
             {
                 var packagePath = Path.Combine(dir, Guid.NewGuid().ToString());
 

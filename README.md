@@ -9,12 +9,6 @@ This repo contains the following clients:
   * [NuGet Package Manager for Visual Studio 2017](https://docs.nuget.org/ndocs/tools/package-manager-ui)
   * [PowerShell CmdLets](https://docs.nuget.org/ndocs/tools/powershell-reference)
 
-## Build Status
-
-| VSTS Build |
-|:------:|
-|[![](https://devdiv.visualstudio.com/_apis/public/build/definitions/0bdbc590-a062-4c3f-b0f6-9383f67865ee/5868/badge)](https://devdiv.visualstudio.com/DevDiv/_build?_a=completed&definitionId=5868)|
-
 ## Open Source Code of Conduct
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
@@ -30,6 +24,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 - [Windows 10 SDK](https://dev.windows.com/en-US/downloads/windows-10-sdk)
 - Git
 - Windows Powershell v3.0+
+- [.NET Core SDK 1.0.5](https://github.com/dotnet/core/blob/master/release-notes/download-archives/1.0.4-sdk-download.md)
 
 ### Steps to build NuGet client tools
 
