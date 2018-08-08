@@ -43,7 +43,7 @@ namespace NuGet.ProjectManagement
         {
             var safeSettings = new XmlReaderSettings
                 {
-#if !NETSTANDARD1_3
+#if !NETSTANDARD1_6
                     XmlResolver = null,
 #endif
                     DtdProcessing = DtdProcessing.Prohibit,

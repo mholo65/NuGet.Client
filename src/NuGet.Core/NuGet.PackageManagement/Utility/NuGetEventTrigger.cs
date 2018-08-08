@@ -24,7 +24,7 @@ namespace NuGet.PackageManagement
         [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "By design, we want to move on if any error occured.")]
         private NuGetEventTrigger()
         {
-#if NETSTANDARD1_3
+#if NETSTANDARD1_6
             _triggerEventMethod = null;
 #else
             try

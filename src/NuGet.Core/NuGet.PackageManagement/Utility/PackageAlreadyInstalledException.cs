@@ -5,7 +5,7 @@ using System;
 
 namespace NuGet.PackageManagement
 {
-#if !NETSTANDARD1_3
+#if !NETSTANDARD1_6
     [Serializable]
 #endif
     public class PackageAlreadyInstalledException : Exception

@@ -35,7 +35,7 @@ namespace NuGet.ProjectManagement
                 {
                     { new FileTransformExtensions(".transform", ".transform"), new XmlTransformer(GetConfigMappings()) },
                     { new FileTransformExtensions(".pp", ".pp"), new Preprocessor() },
-#if !NETSTANDARD1_3
+#if !NETSTANDARD1_6
                     { new FileTransformExtensions(".install.xdt", ".uninstall.xdt"), new XdtTransformer() }
 #endif
                 };
